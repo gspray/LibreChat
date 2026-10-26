@@ -2,7 +2,9 @@ services:
   api:
     environment:
       SCHEDULES_SINGLE_PROCESS: "true"
-      APP_TITLE: Instructor Assistant
+      APP_TITLE: Ask Lesson Caddie Assistant
+      APP_SHORT_NAME: Ask Caddie
+      SSMLABS_BRANDING_ASSET_VERSION: "1"
       HIDE_TOOL_ACTIVITY: "true"
       INSTRUCTOR_ASSISTANT_MODEL: gpt-4o
       LESSONCADDIE_HOME_URL: https://lessoncaddie.ssmlabs.com/app
@@ -20,3 +22,11 @@ services:
       - ./config/ssmlabs/lessonCaddieReturn.js:/app/config/ssmlabs/lessonCaddieReturn.js:ro
       - ./config/ssmlabs/back-to-lessoncaddie.browser.js:/app/client/dist/ssmlabs/back-to-lessoncaddie.js:ro
       - ./config/ssmlabs/hide-model-selector.browser.js:/app/client/dist/ssmlabs/hide-model-selector.js:ro
+      - ./config/ssmlabs/branding/manifest.webmanifest:/app/client/dist/manifest.webmanifest:ro
+      - ./config/ssmlabs/branding/assets/favicon-16x16.png:/app/client/dist/assets/favicon-16x16.png:ro
+      - ./config/ssmlabs/branding/assets/favicon-32x32.png:/app/client/dist/assets/favicon-32x32.png:ro
+      - ./config/ssmlabs/branding/assets/apple-touch-icon-180x180.png:/app/client/dist/assets/apple-touch-icon-180x180.png:ro
+      - ./config/ssmlabs/branding/assets/icon-192x192.png:/app/client/dist/assets/icon-192x192.png:ro
+      - ./config/ssmlabs/branding/assets/icon-512x512.png:/app/client/dist/assets/icon-512x512.png:ro
+      - ./config/ssmlabs/branding/assets/maskable-icon.png:/app/client/dist/assets/maskable-icon.png:ro
+      - ./config/ssmlabs/branding/assets/logo.svg:/app/client/dist/assets/logo.svg:ro

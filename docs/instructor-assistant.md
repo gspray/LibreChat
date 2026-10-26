@@ -4,7 +4,9 @@ Dedicated LessonCaddie instructor agent for this LibreChat deployment (v0.8.9-rc
 
 ## User-facing name
 
-**Instructor Assistant** everywhere. The MCP server identifier remains `lessoncaddie-instructor`.
+**Ask Lesson Caddie Assistant** (`APP_TITLE`) for browser tab, PWA manifest, and login chrome. **Ask Caddie** (`APP_SHORT_NAME`) for home-screen short name. The default agent remains **Instructor Assistant**; the MCP server identifier remains `lessoncaddie-instructor`.
+
+LessonCaddie launcher icons under `config/ssmlabs/branding/assets/` are volume-mounted over `/app/client/dist/assets/` (favicons, `logo.svg`, maskable/512 icons) and `manifest.webmanifest`. `config/ssmlabs/inject-index-html.js` patches the served `index.html` title, description, apple web app title, and favicon cache-bust query. Recreate the `api` container after changing those files; a process restart alone does not remount volumes.
 
 ## Architecture
 
@@ -33,7 +35,9 @@ Variables:
 | `HIDE_TOOL_ACTIVITY` | `true` | Hide tool names, args, JSON, and “Ran tool” cards from non-admin users. Admins still see tool activity. Stored tool results stay in Mongo for the model. |
 | `INSTRUCTOR_ASSISTANT_MODEL` | `gpt-4o` | Centrally billed OpenAI model. Instructors do not supply API keys. |
 | `INSTRUCTOR_ASSISTANT_OWNER_EMAIL` | `greg.spray@gmail.com` | LibreChat user who owns the agent record. |
-| `APP_TITLE` | `Instructor Assistant` | Browser/app title. |
+| `APP_TITLE` | `Ask Lesson Caddie Assistant` | Browser/app title (tab default, login logo alt). |
+| `APP_SHORT_NAME` | `Ask Caddie` | Apple web app / PWA short name. |
+| `SSMLABS_BRANDING_ASSET_VERSION` | `1` | Bumps favicon query string when icons change (PWA cache). |
 | `LESSONCADDIE_HOME_URL` | `https://lessoncaddie.ssmlabs.com/app` | Fallback destination for **← Back to LessonCaddie**. |
 | `LESSONCADDIE_ALLOWED_ORIGINS` | `https://lessoncaddie.ssmlabs.com` | Comma-separated origins allowed as `returnUrl` / `lessoncaddieReturn` query values. The home URL origin is always included. |
 
