@@ -19,6 +19,8 @@ Host copies (gitignored by upstream LibreChat):
 - `librechat.yaml`
 - `docker-compose.override.yml`
 
+**Live branding on chat.ssmlabs.com** also comes from the Mongo `configs` document `principalId: __base__` (Admin → Config overrides). That layer wins over `librechat.yaml` for fields such as `interface.customWelcome` and `modelSpecs.list[].label` (landing title and “Message …” composer placeholder). After editing yaml, check Mongo if the UI copy did not change.
+
 Tracked templates (copy onto those paths after a git pull):
 
 - `config/instructor-assistant.librechat.yaml`
