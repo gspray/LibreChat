@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Button, TooltipAnchor } from '@librechat/client';
 import type { TStartupConfig } from 'librechat-data-provider';
-import useDrawerViewport from '~/hooks/Nav/useDrawerViewport';
+import { useLocalize } from '~/hooks';
 
 type LessonCaddieStartup = TStartupConfig & {
   lessonCaddie?: {
@@ -71,11 +71,17 @@ export default function BackToLessonCaddie({
 }: {
   startupConfig?: LessonCaddieStartup;
 }) {
-  const isSmallScreen = useDrawerViewport();
+  const localize = useLocalize();
   const lessonCaddie = startupConfig?.lessonCaddie;
-  const allowedOrigins = Array.isArray(lessonCaddie?.allowedOrigins)
-    ? lessonCaddie.allowedOrigins.filter((origin) => typeof origin === 'string' && origin.trim())
-    : [];
+  const allowedOrigins = useMemo(
+    () =>
+      Array.isArray(lessonCaddie?.allowedOrigins)
+        ? lessonCaddie.allowedOrigins.filter(
+            (origin) => typeof origin === 'string' && origin.trim(),
+          )
+        : [],
+    [lessonCaddie?.allowedOrigins],
+  );
   const storageKey = lessonCaddie?.storageKey?.trim() || DEFAULT_STORAGE_KEY;
   const homeUrl = sanitizeReturnUrl(lessonCaddie?.homeUrl, allowedOrigins);
 
@@ -119,23 +125,19 @@ export default function BackToLessonCaddie({
     return null;
   }
 
-  const label = 'LessonCaddie App';
+  const label = localize('com_ui_back_to_lessoncaddie');
   return (
     <TooltipAnchor
       description={label}
       render={
-        <Button asChild size={isSmallScreen ? 'icon' : 'sm'} variant="header-action">
+        <Button asChild size="icon" variant="header-action">
           <a
             href={href}
             data-testid="back-to-lessoncaddie"
             aria-label={label}
-            className="inline-flex items-center gap-1 no-underline"
+            className="inline-flex items-center no-underline"
           >
-            {isSmallScreen ? (
-              <ArrowLeft className="icon-md" aria-hidden="true" />
-            ) : (
-              <span>LessonCaddie App</span>
-            )}
+            <ArrowLeft className="icon-md rtl:-scale-x-100" aria-hidden="true" />
           </a>
         </Button>
       }

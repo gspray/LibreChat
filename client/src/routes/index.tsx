@@ -12,6 +12,7 @@ import { OAuthSuccess, OAuthError } from '~/components/OAuth';
 import { AuthContextProvider } from '~/hooks/AuthContext';
 import { importWithRecovery } from '~/lib/assets/lazy';
 import RouteErrorBoundary from './RouteErrorBoundary';
+import BrandedStandalone from './BrandedStandalone';
 import StartupLayout from './Layouts/Startup';
 import MarketplaceRoute from './Marketplace';
 import { codeSetupRoute } from './CodeSetup';
@@ -68,6 +69,7 @@ export const router = createBrowserRouter(
     },
     {
       path: 'oauth',
+      element: <BrandedStandalone />,
       errorElement: <RouteErrorBoundary />,
       children: [
         {
@@ -101,7 +103,11 @@ export const router = createBrowserRouter(
     },
     {
       path: 'verify',
-      element: <VerifyEmail />,
+      element: (
+        <BrandedStandalone>
+          <VerifyEmail />
+        </BrandedStandalone>
+      ),
       errorElement: <RouteErrorBoundary />,
     },
     {

@@ -9,7 +9,6 @@ import {
   Permissions,
   isForcedTemporaryRetention,
 } from 'librechat-data-provider';
-import BackToLessonCaddie from '~/components/ssmlabs/BackToLessonCaddie';
 import { OpenSidebar, PresetsMenu, NewChat, HeaderMenu } from './Menus';
 import { TemporaryChat, TemporaryChatIndicator } from './TemporaryChat';
 import useDrawerViewport from '~/hooks/Nav/useDrawerViewport';
@@ -99,9 +98,6 @@ function Header({
     <div className="from-surface-canvas via-surface-canvas/70 text-text-primary md:from-surface-canvas/80 md:via-surface-canvas/50 2xl:from-surface-canvas/0 theme-chrome-quiet:bg-surface-canvas theme-chrome-quiet:bg-none absolute top-0 z-20 flex h-[3.25rem] w-full items-center gap-2 bg-gradient-to-b to-transparent p-2 font-semibold 2xl:via-transparent">
       <div className={cn('flex-shrink-0 items-center', isSmallScreen ? 'flex' : 'hidden')}>
         <OpenSidebar testId="header-open-sidebar-button" />
-      </div>
-      <div className="flex shrink-0 items-center">
-        <BackToLessonCaddie startupConfig={startupConfig} />
       </div>
 
       <div
