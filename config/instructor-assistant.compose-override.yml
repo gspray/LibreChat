@@ -17,3 +17,4 @@ services:
       - ./config/provision-instructor-assistant.js:/app/config/provision-instructor-assistant.js:ro
       - ./config/ssmlabs:/app/config/ssmlabs:ro
       - ./config/ssmlabs/back-to-lessoncaddie.browser.js:/app/client/dist/ssmlabs/back-to-lessoncaddie.js:ro
+      - ./config/ssmlabs/hide-model-selector.browser.js:/app/client/dist/ssmlabs/hide-model-selector.js:ro
