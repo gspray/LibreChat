@@ -6,8 +6,8 @@ const path = require('path');
 const BACK_SENTINEL = 'data-ssmlabs-lessoncaddie-back="true"';
 const SELECTOR_SENTINEL = 'data-ssmlabs-hide-model-selector="true"';
 const SCRIPTS = [
-  `<script src="/ssmlabs/back-to-lessoncaddie.js?v=3" defer ${BACK_SENTINEL}></script>`,
-  `<script src="/ssmlabs/hide-model-selector.js?v=1" defer ${SELECTOR_SENTINEL}></script>`,
+  `<script src="/ssmlabs/back-to-lessoncaddie.js?v=4" defer ${BACK_SENTINEL}></script>`,
+  `<script src="/ssmlabs/hide-model-selector.js?v=2" defer ${SELECTOR_SENTINEL}></script>`,
 ].join('\n');
 
 const originalReadFileSync = fs.readFileSync;

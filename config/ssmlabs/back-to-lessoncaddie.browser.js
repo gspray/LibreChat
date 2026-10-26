@@ -171,11 +171,13 @@
     button.id = BUTTON_ID;
     button.href = target;
     button.setAttribute('aria-label', LABEL);
-    button.innerHTML =
-      '<svg class="ssmlabs-back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span class="ssmlabs-back-label"></span>';
+    const mobile = window.matchMedia(MOBILE_QUERY).matches;
+    button.innerHTML = mobile
+      ? '<svg class="ssmlabs-back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span class="ssmlabs-back-label"></span>'
+      : '<span class="ssmlabs-back-label"></span>';
     const label = button.querySelector('.ssmlabs-back-label');
     if (label) {
-      label.textContent = DESKTOP_LABEL;
+      label.textContent = mobile ? '' : DESKTOP_LABEL;
     }
     const after = header.children[0] &&
       header.children[0].contains(document.querySelector('[data-testid="header-open-sidebar-button"]'))
@@ -189,21 +191,37 @@
     return true;
   }
 
+  function normalizeReactBackLink() {
+    const link = document.querySelector('[data-testid="back-to-lessoncaddie"]');
+    if (!link) {
+      return false;
+    }
+    if (window.matchMedia(MOBILE_QUERY).matches) {
+      return true;
+    }
+    link.querySelectorAll('svg, i, [class*="icon"]').forEach((node) => {
+      if (node.closest('[data-testid="back-to-lessoncaddie"]') === link) {
+        node.remove();
+      }
+    });
+    const textHost = link.querySelector('span') || link;
+    textHost.textContent = DESKTOP_LABEL;
+    return true;
+  }
+
   function start(config) {
     const target = resolveTarget(config);
     if (!target) {
       return;
     }
-    if (mountButton(target)) {
-      return;
-    }
-    const observer = new MutationObserver(() => {
-      if (mountButton(target)) {
-        observer.disconnect();
-      }
-    });
+    const tick = () => {
+      normalizeReactBackLink();
+      mountButton(target);
+    };
+    tick();
+    const observer = new MutationObserver(tick);
     observer.observe(document.body, { childList: true, subtree: true });
-    window.setTimeout(() => observer.disconnect(), 15000);
+    window.setTimeout(() => observer.disconnect(), 120000);
   }
 
   fetch('/api/config', { credentials: 'same-origin' })

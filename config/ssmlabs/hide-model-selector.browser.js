@@ -2,10 +2,28 @@
   'use strict';
 
   const SELECTOR_TEST_ID = 'model-selector-button';
-  let hideWhenModelSelectDisabled = false;
+  let shouldHide = false;
+  let configLoaded = false;
+
+  function envHideEnabled() {
+    return shouldHide === true;
+  }
+
+  function readHideFlagFromStartup(startup) {
+    if (!startup || typeof startup !== 'object') {
+      return false;
+    }
+    if (startup.lessonCaddie && startup.lessonCaddie.hideModelSelector === true) {
+      return true;
+    }
+    if (startup.interface && startup.interface.modelSelect === false) {
+      return true;
+    }
+    return false;
+  }
 
   function hideModelSelectorChip() {
-    if (!hideWhenModelSelectDisabled) {
+    if (!envHideEnabled()) {
       return false;
     }
     const button = document.querySelector(`[data-testid="${SELECTOR_TEST_ID}"]`);
@@ -16,34 +34,49 @@
     if (host) {
       host.setAttribute('data-ssmlabs-model-selector-hidden', 'true');
       host.style.display = 'none';
+      host.setAttribute('aria-hidden', 'true');
     }
     return true;
   }
 
   function observeUntilHidden() {
+    if (!envHideEnabled()) {
+      return;
+    }
     if (hideModelSelectorChip()) {
       return;
     }
     const observer = new MutationObserver(() => {
-      if (hideModelSelectorChip()) {
-        observer.disconnect();
-      }
+      hideModelSelectorChip();
     });
     observer.observe(document.body, { childList: true, subtree: true });
-    window.setTimeout(() => observer.disconnect(), 30000);
+    window.setTimeout(() => observer.disconnect(), 120000);
   }
 
-  function applyFromStartupConfig(startup) {
-    hideWhenModelSelectDisabled = startup?.interface?.modelSelect === false;
-    if (hideWhenModelSelectDisabled) {
+  function applyStartup(startup) {
+    configLoaded = true;
+    shouldHide = readHideFlagFromStartup(startup);
+    if (shouldHide) {
       observeUntilHidden();
+      hideModelSelectorChip();
     }
   }
 
-  fetch('/api/config', { credentials: 'same-origin' })
-    .then((response) => (response.ok ? response.json() : null))
-    .then(applyFromStartupConfig)
-    .catch(() => {
-      /* Leave LibreChat usable if config cannot be loaded. */
-    });
+  function loadConfig() {
+    return fetch('/api/config', { credentials: 'same-origin' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then(applyStartup)
+      .catch(() => {
+        /* Leave LibreChat usable if config cannot be loaded. */
+      });
+  }
+
+  loadConfig();
+  window.setTimeout(loadConfig, 1500);
+  window.setTimeout(loadConfig, 5000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      loadConfig();
+    }
+  });
 })();
