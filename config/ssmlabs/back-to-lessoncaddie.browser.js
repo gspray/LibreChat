@@ -70,7 +70,16 @@
 
   function queryReturnValue() {
     const params = new URLSearchParams(window.location.search);
-    return (params.get('returnUrl') || params.get('lessoncaddieReturn') || '').trim();
+    const fromSearch = (params.get('returnUrl') || params.get('lessoncaddieReturn') || '').trim();
+    if (fromSearch) {
+      return fromSearch;
+    }
+    const hash = String(window.location.hash || '').replace(/^#/, '');
+    if (!hash) {
+      return '';
+    }
+    const hashParams = new URLSearchParams(hash);
+    return (hashParams.get('returnUrl') || hashParams.get('lessoncaddieReturn') || '').trim();
   }
 
   function resolveTarget(config) {

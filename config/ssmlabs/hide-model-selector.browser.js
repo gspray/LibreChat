@@ -30,12 +30,11 @@
     if (!button) {
       return false;
     }
-    const host = button.closest('.relative.flex') || button.parentElement;
-    if (host) {
-      host.setAttribute('data-ssmlabs-model-selector-hidden', 'true');
-      host.style.display = 'none';
-      host.setAttribute('aria-hidden', 'true');
-    }
+    // Hide only the control. `.relative.flex` also matches the chat canvas
+    // (`Presentation` drag-drop wrapper) and blanks the authenticated UI.
+    button.setAttribute('data-ssmlabs-model-selector-hidden', 'true');
+    button.style.display = 'none';
+    button.setAttribute('aria-hidden', 'true');
     return true;
   }
 

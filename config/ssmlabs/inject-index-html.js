@@ -7,8 +7,8 @@ const BACK_SENTINEL = 'data-ssmlabs-lessoncaddie-back="true"';
 const SELECTOR_SENTINEL = 'data-ssmlabs-hide-model-selector="true"';
 const BRANDING_SENTINEL = 'data-ssmlabs-branding="true"';
 const SCRIPTS = [
-  `<script src="/ssmlabs/back-to-lessoncaddie.js?v=4" defer ${BACK_SENTINEL}></script>`,
-  `<script src="/ssmlabs/hide-model-selector.js?v=2" defer ${SELECTOR_SENTINEL}></script>`,
+  `<script src="/ssmlabs/back-to-lessoncaddie.js?v=5" defer ${BACK_SENTINEL}></script>`,
+  `<script src="/ssmlabs/hide-model-selector.js?v=3" defer ${SELECTOR_SENTINEL}></script>`,
 ].join('\n');
 
 const DEFAULT_APP_TITLE = 'Ask Lesson Caddie Assistant';
