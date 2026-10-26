@@ -75,6 +75,20 @@ function injectBranding(html) {
   return next;
 }
 
+function injectBaseHref(html) {
+  const clientUrl = process.env.DOMAIN_CLIENT
+    ? new URL(process.env.DOMAIN_CLIENT)
+    : null;
+  const baseHref = clientUrl
+    ? (clientUrl.pathname.endsWith('/') ? clientUrl.pathname : `${clientUrl.pathname}/`)
+    : '/';
+  const baseTag = `<base href="${escapeHtml(baseHref)}">`;
+  if (/<base\b[^>]*>/i.test(html)) {
+    return html.replace(/<base\b[^>]*>/i, baseTag);
+  }
+  return html.replace(/<head\b[^>]*>/i, (headTag) => `${headTag}\n    ${baseTag}`);
+}
+
 function injectOverlayScripts(html) {
   let next = html;
   if (!(html.includes(BACK_SENTINEL) && html.includes(SELECTOR_SENTINEL))) {
@@ -91,7 +105,7 @@ function injectOverlayScripts(html) {
 }
 
 function injectIndexHtml(html) {
-  return injectOverlayScripts(injectBranding(html));
+  return injectOverlayScripts(injectBaseHref(injectBranding(html)));
 }
 
 const originalReadFileSync = fs.readFileSync;
@@ -114,6 +128,7 @@ fs.readFileSync = function readFileSyncWithLessonCaddieBack(file, options) {
 
 module.exports = {
   injectBranding,
+  injectBaseHref,
   injectIndexHtml,
   injectOverlayScripts,
 };

@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { injectBranding } = require('./inject-index-html');
+const { injectBaseHref, injectBranding } = require('./inject-index-html');
 
 const SAMPLE = `<!doctype html>
 <html lang="en-US">
@@ -36,5 +36,35 @@ test('injectBranding sets title, description, apple title, and favicon cache bus
     process.env.APP_TITLE = prevTitle;
     process.env.APP_SHORT_NAME = prevShort;
     delete process.env.SSMLABS_BRANDING_ASSET_VERSION;
+  }
+});
+
+test('injectBaseHref anchors relative assets at the app root on nested routes', () => {
+  const prevDomainClient = process.env.DOMAIN_CLIENT;
+  process.env.DOMAIN_CLIENT = 'https://chat.ssmlabs.com';
+  try {
+    const html = injectBaseHref(SAMPLE);
+    assert.match(html, /<base href="\/">/);
+  } finally {
+    if (prevDomainClient === undefined) {
+      delete process.env.DOMAIN_CLIENT;
+    } else {
+      process.env.DOMAIN_CLIENT = prevDomainClient;
+    }
+  }
+});
+
+test('injectBaseHref preserves configured subdirectory deployments', () => {
+  const prevDomainClient = process.env.DOMAIN_CLIENT;
+  process.env.DOMAIN_CLIENT = 'https://chat.example.com/chat';
+  try {
+    const html = injectBaseHref(SAMPLE);
+    assert.match(html, /<base href="\/chat\/">/);
+  } finally {
+    if (prevDomainClient === undefined) {
+      delete process.env.DOMAIN_CLIENT;
+    } else {
+      process.env.DOMAIN_CLIENT = prevDomainClient;
+    }
   }
 });
