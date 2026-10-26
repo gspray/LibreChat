@@ -64,6 +64,8 @@ Default selection: model spec `instructor-assistant` with `softDefault: true` an
 
 UI: `modelSelect` and `parameters` off; MCP `chatMenu` false; MCP create/share/public false; prompts off. Administrators retain agent create and tool diagnostics.
 
+On LibreChat **v0.8.9-rc1**, `interface.modelSelect: false` alone does **not** hide the header model/agent chip when `modelSpecs.list` is non-empty (the chip can still open “Search models”). Keep `modelSpecs` for `softDefault` and landing starters; hide the chip with the mounted `config/ssmlabs/hide-model-selector.browser.js` overlay (or rebuild the client after the `ModelSelector` fix). Do **not** set `showInMenu: false` on the only spec — that removes it from `/api/config` and breaks client-side default agent selection for new chats.
+
 ## Provision / update
 
 From the LibreChat repo after the API container is running:
