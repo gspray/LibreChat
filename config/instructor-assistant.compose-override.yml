@@ -5,6 +5,9 @@ services:
       APP_TITLE: Instructor Assistant
       HIDE_TOOL_ACTIVITY: "true"
       INSTRUCTOR_ASSISTANT_MODEL: gpt-4o
+      LESSONCADDIE_HOME_URL: https://lessoncaddie.ssmlabs.com/app
+      LESSONCADDIE_ALLOWED_ORIGINS: https://lessoncaddie.ssmlabs.com
+      NODE_OPTIONS: --require /app/config/ssmlabs/inject-index-html.js
     volumes:
       - ./librechat.yaml:/app/librechat.yaml:ro
       - ./api/server/routes/config.js:/app/api/server/routes/config.js:ro
@@ -12,3 +15,5 @@ services:
       - ./api/server/utils/hideToolActivity.js:/app/api/server/utils/hideToolActivity.js:ro
       - ./api/server/controllers/agents/callbacks.js:/app/api/server/controllers/agents/callbacks.js:ro
       - ./config/provision-instructor-assistant.js:/app/config/provision-instructor-assistant.js:ro
+      - ./config/ssmlabs:/app/config/ssmlabs:ro
+      - ./config/ssmlabs/back-to-lessoncaddie.browser.js:/app/client/dist/ssmlabs/back-to-lessoncaddie.js:ro

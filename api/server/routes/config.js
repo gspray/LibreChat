@@ -39,6 +39,7 @@ const { hasCapability, getHeldCapabilities } = require('~/server/middleware/role
 const { getLdapConfig } = require('~/server/services/Config/ldap');
 const { getRumConfig } = require('~/server/services/Config/rum');
 const { getAppConfig } = require('~/server/services/Config/app');
+const { resolveLessonCaddieConfig } = require('../../../config/ssmlabs/lessonCaddieReturn');
 
 const router = express.Router();
 const emailLoginEnabled =
@@ -115,6 +116,7 @@ function buildPreLoginPayload() {
     emailEnabled: checkEmailConfig(),
     passwordResetEnabled,
     twoFactorAuthenticationRequired: isEnabled(process.env.ENFORCE_TWO_FACTOR_AUTHENTICATION),
+    lessonCaddie: resolveLessonCaddieConfig(process.env),
   };
 
   const minPasswordLength = parseInt(process.env.MIN_PASSWORD_LENGTH, 10);

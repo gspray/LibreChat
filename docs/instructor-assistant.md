@@ -32,6 +32,20 @@ Variables:
 | `INSTRUCTOR_ASSISTANT_MODEL` | `gpt-4o` | Centrally billed OpenAI model. Instructors do not supply API keys. |
 | `INSTRUCTOR_ASSISTANT_OWNER_EMAIL` | `greg.spray@gmail.com` | LibreChat user who owns the agent record. |
 | `APP_TITLE` | `Instructor Assistant` | Browser/app title. |
+| `LESSONCADDIE_HOME_URL` | `https://lessoncaddie.ssmlabs.com/app` | Fallback destination for **← Back to LessonCaddie**. |
+| `LESSONCADDIE_ALLOWED_ORIGINS` | `https://lessoncaddie.ssmlabs.com` | Comma-separated origins allowed as `returnUrl` / `lessoncaddieReturn` query values. The home URL origin is always included. |
+
+## Back to LessonCaddie
+
+The chat header (welcome screen and every conversation) includes a same-tab **← Back to LessonCaddie** control. Mobile shows a compact back-arrow button with that accessible name.
+
+Open LibreChat with a safe return URL when leaving a LessonCaddie screen:
+
+`https://chat.ssmlabs.com/c/new?returnUrl=https://lessoncaddie.ssmlabs.com/app/edit-lesson?lessonId=…`
+
+The value is stored in `sessionStorage` for that tab, so later conversations still return to the originating screen. Unsafe or off-allowlist URLs are ignored and the button uses `LESSONCADDIE_HOME_URL`. LibreChat auth cookies and saved chats are unchanged.
+
+This is an isolated overlay under `config/ssmlabs/` plus a one-line `Header.tsx` mount of `client/src/components/ssmlabs/BackToLessonCaddie.tsx` for a future client image rebuild. The published LibreChat image serves the overlay without rebuilding Vite.
 
 OpenAI credentials stay in the existing Compose/Doppler env. They are not written into yaml or browser config.
 
