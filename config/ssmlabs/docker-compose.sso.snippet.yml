@@ -1,0 +1,11 @@
+# Copy these keys into the local (gitignored) docker-compose.override.yml `api.environment`
+# and `api.volumes` sections. Leave LESSONCADDIE_SSO_ENABLED=false on production chat.
+#
+#   NODE_OPTIONS: --require /app/config/ssmlabs/inject-index-html.js --require /app/config/ssmlabs/attach-lessoncaddie-sso.js
+#   LESSONCADDIE_SSO_ENABLED: ${LESSONCADDIE_SSO_ENABLED:-false}
+#   LESSONCADDIE_SSO_ISSUER: ${LESSONCADDIE_SSO_ISSUER:-}
+#   LESSONCADDIE_SSO_SHARED_SECRET: ${LESSONCADDIE_SSO_SHARED_SECRET:-}
+#   LESSONCADDIE_SSO_ENVIRONMENT: ${LESSONCADDIE_SSO_ENVIRONMENT:-stage}
+#
+#   volumes:
+#     - ./config/ssmlabs/lessoncaddie-sso.browser.js:/app/client/dist/ssmlabs/lessoncaddie-sso.js:ro

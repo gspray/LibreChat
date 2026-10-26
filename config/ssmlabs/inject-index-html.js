@@ -6,10 +6,17 @@ const path = require('path');
 const BACK_SENTINEL = 'data-ssmlabs-lessoncaddie-back="true"';
 const SELECTOR_SENTINEL = 'data-ssmlabs-hide-model-selector="true"';
 const BRANDING_SENTINEL = 'data-ssmlabs-branding="true"';
+const SSO_SENTINEL = 'data-ssmlabs-lessoncaddie-sso="true"';
 const SCRIPTS = [
   `<script src="/ssmlabs/back-to-lessoncaddie.js?v=5" defer ${BACK_SENTINEL}></script>`,
   `<script src="/ssmlabs/hide-model-selector.js?v=3" defer ${SELECTOR_SENTINEL}></script>`,
 ].join('\n');
+const SSO_SCRIPT = `<script src="/ssmlabs/lessoncaddie-sso.js?v=1" defer ${SSO_SENTINEL}></script>`;
+
+function isLessonCaddieSsoEnabled(env = process.env) {
+  const raw = String(env.LESSONCADDIE_SSO_ENABLED || '').trim().toLowerCase();
+  return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
+}
 
 const DEFAULT_APP_TITLE = 'Ask Lesson Caddie Assistant';
 const DEFAULT_APP_SHORT_NAME = 'Ask Caddie';
@@ -69,14 +76,16 @@ function injectBranding(html) {
 }
 
 function injectOverlayScripts(html) {
-  if (html.includes(BACK_SENTINEL) && html.includes(SELECTOR_SENTINEL)) {
-    return html;
-  }
   let next = html;
-  for (const tag of SCRIPTS.split('\n')) {
-    if (!next.includes(tag)) {
-      next = next.replace('</head>', `${tag}\n</head>`);
+  if (!(html.includes(BACK_SENTINEL) && html.includes(SELECTOR_SENTINEL))) {
+    for (const tag of SCRIPTS.split('\n')) {
+      if (!next.includes(tag)) {
+        next = next.replace('</head>', `${tag}\n</head>`);
+      }
     }
+  }
+  if (isLessonCaddieSsoEnabled() && !next.includes(SSO_SENTINEL)) {
+    next = next.replace('</head>', `${SSO_SCRIPT}\n</head>`);
   }
   return next;
 }
