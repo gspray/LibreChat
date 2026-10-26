@@ -53,6 +53,16 @@ function readQueryReturnValue() {
       return value;
     }
   }
+
+  const hash = window.location.hash.replace(/^#/, '');
+  const hashParams = new URLSearchParams(hash);
+  for (const key of QUERY_KEYS) {
+    const value = hashParams.get(key)?.trim();
+    if (value) {
+      return value;
+    }
+  }
+
   return '';
 }
 
@@ -109,7 +119,7 @@ export default function BackToLessonCaddie({
     return null;
   }
 
-  const label = 'Back to LessonCaddie';
+  const label = 'LessonCaddie App';
   return (
     <TooltipAnchor
       description={label}
@@ -124,7 +134,7 @@ export default function BackToLessonCaddie({
             {isSmallScreen ? (
               <ArrowLeft className="icon-md" aria-hidden="true" />
             ) : (
-              <span>Back to LessonCaddie</span>
+              <span>LessonCaddie App</span>
             )}
           </a>
         </Button>
