@@ -71,6 +71,7 @@ export interface AppConfig {
   githubCompare?: TCustomConfig['githubCompare'];
   /** Outbound call budgets; unset keys fall back to the server defaults */
   timeouts?: TCustomConfig['timeouts'];
+  messages?: TCustomConfig['messages'];
   skillDeletion?: {
     finalizationEnabled?: boolean;
     sweepIntervalMs?: number;
