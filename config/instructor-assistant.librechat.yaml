@@ -1,0 +1,62 @@
+version: 1.3.18
+cache: true
+mcpSettings:
+  apps: true
+  allowedDomains:
+    - lessoncaddie.ssmlabs.com
+mcpServers:
+  lessoncaddie-instructor:
+    type: streamable-http
+    url: https://lessoncaddie.ssmlabs.com/api/instructor-mcp
+    requiresOAuth: true
+    chatMenu: false
+    serverInstructions: true
+    oauth:
+      scope: 'instructor:read instructor:write offline_access'
+    requestHeaders:
+      X-LibreChat-User-Id: '{{LIBRECHAT_USER_ID}}'
+      X-LibreChat-Conversation-Id: '{{LIBRECHAT_BODY_CONVERSATIONID}}'
+mcpAppSandbox:
+  url: https://mcp-sandbox.ssmlabs.com/api/mcp/sandbox
+interface:
+  customWelcome: "Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?"
+  landingHeading: entity
+  landingFooter: false
+  modelSelect: false
+  parameters: false
+  presets: false
+  mascot: false
+  defaultPinnedTools: []
+  mcpServers:
+    use: true
+    create: false
+    share: false
+    public: false
+  agents:
+    use: true
+    create: true
+    share: false
+    public: false
+  prompts:
+    use: false
+    create: false
+    share: false
+    public: false
+modelSpecs:
+  enforce: false
+  prioritize: true
+  list:
+    - name: instructor-assistant
+      label: Instructor Assistant
+      description: "Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?"
+      softDefault: true
+      showOnLanding: true
+      hideBadgeRow: true
+      conversation_starters:
+        - Find one of my students
+        - Show my recent lessons
+        - Help me schedule a lesson
+        - Review a student’s practice plan
+      preset:
+        endpoint: agents
+        agent_id: agent_instructor_assistant

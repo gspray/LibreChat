@@ -44,6 +44,10 @@ const { processFileCitations } = require('~/server/services/Files/Citations');
 const { processCodeOutput, runPreviewFinalize } = require('~/server/services/Files/Code/process');
 const { preflightCodeOutputBatch } = require('~/server/services/Files/Code/preflight');
 const { saveBase64Image } = require('~/server/services/Files/process');
+const {
+  shouldHideToolActivityForUser,
+  shouldDropToolSse,
+} = require('~/server/utils/hideToolActivity');
 
 function isHostFileAuthoringArtifact(artifact) {
   return artifact?.[HOST_FILE_AUTHORING_ARTIFACT_KEY] === true;
@@ -269,6 +273,9 @@ function checkIfLastAgent(last_agent_id, langgraph_node) {
  * @returns {Promise<void>}
  */
 async function emitEvent(res, streamId, eventData, expectedCreatedAt) {
+  if (shouldHideToolActivityForUser(res?.req?.user) && shouldDropToolSse(eventData)) {
+    return;
+  }
   if (streamId) {
     await GenerationJobManager.emitChunk(streamId, eventData, { expectedCreatedAt });
   } else {
@@ -1217,6 +1224,9 @@ function createPtcProgressEmitter({ res, streamId = null, jobCreatedAt }) {
       ).catch(() => {
         /* dropped: the trace is best-effort */
       });
+      return;
+    }
+    if (shouldHideToolActivityForUser(res?.req?.user)) {
       return;
     }
     sendEvent(res, payload);

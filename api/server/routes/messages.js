@@ -49,6 +49,10 @@ const {
   prepareMessageRequestValidation,
 } = require('~/server/middleware');
 const db = require('~/models');
+const {
+  shouldHideToolActivityForUser,
+  redactMessagesForClient,
+} = require('~/server/utils/hideToolActivity');
 
 const retentionStore = { stampForcedRetention: db.stampForcedRetention };
 
@@ -68,6 +72,14 @@ const filterFeedbackContent = createContentFilter({
   extract: (req) => extractFeedbackContent(req.body),
 });
 const toolCallPreviewDeps = { getAppConfig };
+const denyHiddenToolDetails = (req, res) => {
+  if (!shouldHideToolActivityForUser(req.user)) {
+    return false;
+  }
+  res.status(403).json({ error: 'Tool details are not available.' });
+  return true;
+};
+
 const readToolCallPart = createToolCallPartHandler({
   getMessages: db.getMessages,
   validate: (req) => createMessageRequestValidation(req, { activeJobMessageRead: true }),
@@ -569,7 +581,10 @@ router.get('/:conversationId', prepareMessageRequestValidation, async (req, res)
     }
 
     const messages = messagesResult?.messages ?? [];
-    res.status(200).json(await previewToolCalls(messages));
+    const previewed = await previewToolCalls(messages);
+    res.status(200).json(
+      shouldHideToolActivityForUser(req.user) ? redactMessagesForClient(previewed) : previewed,
+    );
   } catch (error) {
     logger.error('Error fetching messages:', error);
     res.status(500).json({ error: 'Internal server error' });
@@ -630,15 +645,29 @@ router.get('/:conversationId/:messageId', validateMessageReq, async (req, res) =
     if (!message) {
       return res.status(404).json({ error: 'Message not found' });
     }
-    res.status(200).json(message);
+    const payload = Array.isArray(message) ? message : [message];
+    const redacted = shouldHideToolActivityForUser(req.user)
+      ? redactMessagesForClient(payload)
+      : payload;
+    res.status(200).json(Array.isArray(message) ? redacted : redacted[0]);
   } catch (error) {
     logger.error('Error fetching message:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-router.get('/:conversationId/:messageId/parts/:partIndex', readToolCallPart);
-router.get('/:conversationId/:messageId/subagent-calls', readSubagentAttachmentCalls);
+router.get('/:conversationId/:messageId/parts/:partIndex', (req, res, next) => {
+  if (denyHiddenToolDetails(req, res)) {
+    return;
+  }
+  return readToolCallPart(req, res, next);
+});
+router.get('/:conversationId/:messageId/subagent-calls', (req, res, next) => {
+  if (denyHiddenToolDetails(req, res)) {
+    return;
+  }
+  return readSubagentAttachmentCalls(req, res, next);
+});
 
 router.put('/:conversationId/:messageId', messageMutationMiddleware, async (req, res) => {
   try {

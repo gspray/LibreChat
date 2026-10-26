@@ -25,6 +25,7 @@ export * from './Endpoint';
 
 export type { TranslationKeys } from './useLocalize';
 
+export { default as useHideToolActivity } from './useHideToolActivity';
 export { default as useTimeout } from './useTimeout';
 export { default as useNewConvo } from './useNewConvo';
 export { default as useLocalize } from './useLocalize';

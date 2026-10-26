@@ -311,6 +311,7 @@ router.get('/', async function (req, res) {
 
     /** @type {TStartupConfig} */
     const payload = {
+      hideToolActivity: isEnabled(process.env.HIDE_TOOL_ACTIVITY),
       ...preLoginPayload,
       ...publicSharePayload,
       ...buildPostLoginPayload(appConfig),
