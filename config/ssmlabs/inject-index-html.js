@@ -8,7 +8,7 @@ const SELECTOR_SENTINEL = 'data-ssmlabs-hide-model-selector="true"';
 const BRANDING_SENTINEL = 'data-ssmlabs-branding="true"';
 const SSO_SENTINEL = 'data-ssmlabs-lessoncaddie-sso="true"';
 const SCRIPTS = [
-  `<script src="/ssmlabs/back-to-lessoncaddie.js?v=5" defer ${BACK_SENTINEL}></script>`,
+  `<script src="/ssmlabs/back-to-lessoncaddie.js?v=6" defer ${BACK_SENTINEL}></script>`,
   `<script src="/ssmlabs/hide-model-selector.js?v=3" defer ${SELECTOR_SENTINEL}></script>`,
 ].join('\n');
 const SSO_SCRIPT = `<script src="/ssmlabs/lessoncaddie-sso.js?v=1" defer ${SSO_SENTINEL}></script>`;

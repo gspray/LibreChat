@@ -38,12 +38,12 @@ Variables:
 | `APP_TITLE` | `Ask Lesson Caddie Assistant` | Browser/app title (tab default, login logo alt). |
 | `APP_SHORT_NAME` | `Ask Caddie` | Apple web app / PWA short name. |
 | `SSMLABS_BRANDING_ASSET_VERSION` | `1` | Bumps favicon query string when icons change (PWA cache). |
-| `LESSONCADDIE_HOME_URL` | `https://lessoncaddie.ssmlabs.com/app` | Fallback destination for **← Back to LessonCaddie**. |
+| `LESSONCADDIE_HOME_URL` | `https://lessoncaddie.ssmlabs.com/app` | Fallback destination for **LessonCaddie App**. |
 | `LESSONCADDIE_ALLOWED_ORIGINS` | `https://lessoncaddie.ssmlabs.com` | Comma-separated origins allowed as `returnUrl` / `lessoncaddieReturn` query values. The home URL origin is always included. |
 
-## Back to LessonCaddie
+## LessonCaddie App return link
 
-The chat header (welcome screen and every conversation) includes a same-tab **← Back to LessonCaddie** control. Mobile shows a compact back-arrow button with that accessible name.
+The chat header (welcome screen and every conversation) includes a same-tab **LessonCaddie App** control. Mobile shows a compact back-arrow button with that accessible name.
 
 Open LibreChat with a safe return URL when leaving a LessonCaddie screen:
 

@@ -1,7 +1,7 @@
 (function ssmlabsBackToLessonCaddie() {
   'use strict';
-  const LABEL = 'Back to LessonCaddie';
-  const DESKTOP_LABEL = 'Back to LessonCaddie';
+  const LABEL = 'LessonCaddie App';
+  const DESKTOP_LABEL = 'LessonCaddie App';
   const BUTTON_ID = 'ssmlabs-back-to-lessoncaddie';
   const MOBILE_QUERY = '(max-width: 768px)';
 
