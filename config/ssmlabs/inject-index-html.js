@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SENTINEL = 'data-ssmlabs-lessoncaddie-back="true"';
-const SCRIPT = `<script src="/ssmlabs/back-to-lessoncaddie.js?v=2" defer ${SENTINEL}></script>`;
+const SCRIPT = `<script src="/ssmlabs/back-to-lessoncaddie.js?v=3" defer ${SENTINEL}></script>`;
 
 const originalReadFileSync = fs.readFileSync;
 fs.readFileSync = function readFileSyncWithLessonCaddieBack(file, options) {

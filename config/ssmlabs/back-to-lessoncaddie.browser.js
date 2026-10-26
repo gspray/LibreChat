@@ -1,7 +1,7 @@
 (function ssmlabsBackToLessonCaddie() {
   'use strict';
   const LABEL = 'Back to LessonCaddie';
-  const DESKTOP_LABEL = '← Back to LessonCaddie';
+  const DESKTOP_LABEL = 'Back to LessonCaddie';
   const BUTTON_ID = 'ssmlabs-back-to-lessoncaddie';
   const MOBILE_QUERY = '(max-width: 768px)';
 
@@ -128,6 +128,11 @@
       #${BUTTON_ID} .ssmlabs-back-icon {
         width: 1rem;
         height: 1rem;
+      }
+      @media (min-width: 769px) {
+        #${BUTTON_ID} .ssmlabs-back-icon {
+          display: none;
+        }
       }
       @media ${MOBILE_QUERY} {
         #${BUTTON_ID} {

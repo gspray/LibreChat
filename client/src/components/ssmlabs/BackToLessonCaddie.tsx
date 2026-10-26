@@ -124,7 +124,7 @@ export default function BackToLessonCaddie({
             {isSmallScreen ? (
               <ArrowLeft className="icon-md" aria-hidden="true" />
             ) : (
-              <span>← Back to LessonCaddie</span>
+              <span>Back to LessonCaddie</span>
             )}
           </a>
         </Button>
