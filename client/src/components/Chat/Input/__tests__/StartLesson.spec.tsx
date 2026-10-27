@@ -5,12 +5,10 @@ import StartLesson from '../StartLesson';
 jest.mock('~/data-provider', () => ({ useGetStartupConfig: jest.fn() }));
 jest.mock('~/hooks', () => ({ useLocalize: () => () => 'Start Lesson' }));
 
-const startup = jest.mocked(useGetStartupConfig);
+const startup = useGetStartupConfig as jest.Mock;
 
 function configure(startLessonUrl?: string) {
-  startup.mockReturnValue({ data: { interface: { startLessonUrl } } } as ReturnType<
-    typeof useGetStartupConfig
-  >);
+  startup.mockReturnValue({ data: { interface: { startLessonUrl } } });
 }
 
 describe('Start Lesson', () => {
