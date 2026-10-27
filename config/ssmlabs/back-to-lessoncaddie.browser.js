@@ -31,7 +31,7 @@
     }
     try {
       return new URL(candidate);
-    } catch (error) {
+    } catch {
       return null;
     }
   }
@@ -48,14 +48,16 @@
     const allowed =
       url.protocol === 'https:'
         ? allowedOrigins.includes(url.origin)
-        : url.protocol === 'http:' && isLocalHttpHost(url.hostname) && allowedOrigins.includes(url.origin);
+        : url.protocol === 'http:' &&
+          isLocalHttpHost(url.hostname) &&
+          allowedOrigins.includes(url.origin);
     return allowed ? url.toString() : '';
   }
 
   function readStored(storageKey) {
     try {
       return sessionStorage.getItem(storageKey) || '';
-    } catch (error) {
+    } catch {
       return '';
     }
   }
@@ -63,7 +65,7 @@
   function writeStored(storageKey, value) {
     try {
       sessionStorage.setItem(storageKey, value);
-    } catch (error) {
+    } catch {
       /* Private mode still navigates to the home URL. */
     }
   }
@@ -98,7 +100,10 @@
   function findHeader() {
     const sidebar = document.querySelector('[data-testid="header-open-sidebar-button"]');
     if (sidebar) {
-      return sidebar.closest('.absolute.top-0') || sidebar.parentElement && sidebar.parentElement.parentElement;
+      return (
+        sidebar.closest('.absolute.top-0') ||
+        (sidebar.parentElement && sidebar.parentElement.parentElement)
+      );
     }
     return document.querySelector('.absolute.top-0.z-20.flex');
   }
@@ -188,10 +193,13 @@
     if (label) {
       label.textContent = mobile ? '' : DESKTOP_LABEL;
     }
-    const after = header.children[0] &&
-      header.children[0].contains(document.querySelector('[data-testid="header-open-sidebar-button"]'))
-      ? header.children[0]
-      : null;
+    const after =
+      header.children[0] &&
+      header.children[0].contains(
+        document.querySelector('[data-testid="header-open-sidebar-button"]'),
+      )
+        ? header.children[0]
+        : null;
     if (after && after.nextSibling) {
       header.insertBefore(button, after.nextSibling);
     } else {
@@ -214,7 +222,9 @@
       }
     });
     const textHost = link.querySelector('span') || link;
-    textHost.textContent = DESKTOP_LABEL;
+    if (textHost.textContent !== DESKTOP_LABEL) {
+      textHost.textContent = DESKTOP_LABEL;
+    }
     return true;
   }
 
