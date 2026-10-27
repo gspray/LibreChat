@@ -12,6 +12,7 @@ import useToolFavorites from '~/hooks/Input/useToolFavorites';
 import useElementSize from '~/hooks/Generic/useElementSize';
 import useChipPacking from '~/hooks/Input/useChipPacking';
 import { useBadgeRowContext } from '~/Providers';
+import StartLesson from '../StartLesson';
 import TokenUsage from '../TokenUsage';
 import { useLocalize } from '~/hooks';
 import Thinking from './Thinking';
@@ -397,7 +398,7 @@ function Bar({
       <div ref={rowRef} className={rowClass}>
         {/* Never unmounted, so its glyph can turn into the close mark rather
             than one icon being swapped for another. */}
-        <span ref={plusRef} className="shrink-0">
+        <span ref={plusRef} className="flex shrink-0 items-center gap-1.5">
           <Palette
             index={index}
             entries={entries}
@@ -418,6 +419,7 @@ function Bar({
             canAttach={canAttach}
             anchorRef={anchorRef}
           />
+          {index === 0 && <StartLesson />}
         </span>
         {/* A box rather than `contents` so it has something to move: the split
             only puts chips here when they all fit on this line, so wrapping as

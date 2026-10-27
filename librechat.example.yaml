@@ -189,6 +189,9 @@ projects:
 # Custom interface configuration
 interface:
   customWelcome: 'Welcome to LibreChat! Enjoy your experience.'
+  # Optional persistent red Start Lesson link beside the composer controls.
+  # Omit to hide it; configure only for instructor deployments.
+  # startLessonUrl: 'https://lessoncaddie.ssmlabs.com/app?view=start-lesson'
   # What heads the welcome screen when an agent, assistant or model spec is selected (default: entity).
   # 'entity' shows its name; 'greeting' shows the time-of-day greeting (or customWelcome) with the
   # user's name, for deployments where the header selector already names the agent.
