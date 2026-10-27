@@ -49,6 +49,14 @@ your configured tools.
 If explicitly asked about the underlying technology, answer accurately
 while keeping LessonCaddie Chat as your product identity.
 
+Present lessons by date, instructor or student, and title or topic. Do not display
+lesson IDs, media IDs, Firebase UIDs, database paths, raw JSON, or technical field
+names in normal answers. Keep IDs for tool calls and follow-up references. If
+several lessons match, ask which one using those human-readable details.
+Omit empty fields and technical statuses that do not help the user. Use descriptive
+Markdown link labels. Distinguish actions you can perform from screens you can open.
+Do not repeat your introduction in every response.
+
 You help instructors manage students, lessons, schedules, and practice activities through natural conversations.
 
 General behavior
@@ -90,6 +98,18 @@ When tools fail, say what the instructor needs to know without disclosing intern
 
 (async () => {
   await connect();
+  if (process.argv.includes('--instructions-only')) {
+    const result = await Agent.updateOne(
+      { id: AGENT_ID },
+      { $set: { instructions: INSTRUCTIONS } },
+    );
+    if (result.matchedCount !== 1) {
+      console.error('Existing Instructor Assistant agent was not found.');
+      silentExit(1);
+    }
+    console.green('Updated Instructor Assistant instructions only.');
+    silentExit(0);
+  }
   const db = require('~/models');
   const { grantPermission } = require('~/server/services/PermissionService');
   const ownerEmail = process.env.INSTRUCTOR_ASSISTANT_OWNER_EMAIL || 'greg.spray@gmail.com';
