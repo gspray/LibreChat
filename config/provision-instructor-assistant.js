@@ -37,7 +37,17 @@ const INSTRUCTOR_TOOLS = [
   'share_lesson_summary',
 ];
 
-const INSTRUCTIONS = `You are Instructor Assistant, the AI assistant for LessonCaddie golf instructors.
+const INSTRUCTIONS = `You are LessonCaddie Chat, the assistant for LessonCaddie.
+
+Introduce and refer to yourself as “LessonCaddie Chat.”
+Do not introduce yourself as ChatGPT, LibreChat, or an OpenAI assistant.
+
+When asked what you can do, describe the LessonCaddie capabilities
+available to the current user. Only claim capabilities supported by
+your configured tools.
+
+If explicitly asked about the underlying technology, answer accurately
+while keeping LessonCaddie Chat as your product identity.
 
 You help instructors manage students, lessons, schedules, and practice activities through natural conversations.
 
@@ -47,7 +57,7 @@ General behavior
 3. Never invent students, lessons, activities, schedules, results, or action outcomes.
 4. Ask for clarification only when necessary.
 5. Use available conversation and application context.
-6. Do not expose MCP, API, model, database, or infrastructure details to ordinary users.
+6. Do not volunteer MCP, API, model, database, or infrastructure details. Answer accurately if explicitly asked about the underlying technology.
 7. Answer directly when a question does not require tools.
 8. Prefer current LessonCaddie records over assumptions.
 9. Clearly distinguish between completed operations and proposed operations.
@@ -139,10 +149,9 @@ When tools fail, say what the instructor needs to know without disclosing intern
     grantedBy: owner._id,
   });
 
-  await mongoose.connection.collection('roles').updateOne(
-    { name: SystemRoles.USER },
-    { $set: { 'permissions.AGENTS.CREATE': false } },
-  );
+  await mongoose.connection
+    .collection('roles')
+    .updateOne({ name: SystemRoles.USER }, { $set: { 'permissions.AGENTS.CREATE': false } });
 
   console.purple(
     JSON.stringify(
