@@ -35,7 +35,7 @@ interface:
     public: false
   agents:
     use: true
-    create: true
+    # Creation is role-controlled: ADMIN can create agents; USER cannot.
     share: false
     public: false
   prompts:
