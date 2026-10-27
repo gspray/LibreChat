@@ -2,6 +2,9 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const express = require('express');
+const request = require('supertest');
+const { createLessonCaddieSsoRouter } = require('./lessonCaddieSsoRoutes');
 const {
   resolveSsoConfig,
   sanitizeAppReturnTo,
@@ -20,18 +23,68 @@ test('SSO config stays disabled until secret, issuer, and flag are set', () => {
 test('return paths off LessonCaddie origins are rejected', () => {
   const allowed = ['https://lessoncaddie.ssmlabs.com'];
   assert.equal(
-    sanitizeAppReturnTo('https://evil.example/phish', allowed, 'https://lessoncaddie.ssmlabs.com/app'),
+    sanitizeAppReturnTo(
+      'https://evil.example/phish',
+      allowed,
+      'https://lessoncaddie.ssmlabs.com/app',
+    ),
     'https://lessoncaddie.ssmlabs.com/app',
   );
   assert.equal(sanitizeAppReturnTo('/c/new', allowed, '/c/new'), '/c/new');
 });
 
 test('start URL sends the user through LessonCaddie with a return path', () => {
-  const url = new URL(buildLessonCaddieStartUrl({
-    homeUrl: 'https://lessoncaddie.ssmlabs.com/app',
-  }, '/c/new'));
+  const url = new URL(
+    buildLessonCaddieStartUrl(
+      {
+        homeUrl: 'https://lessoncaddie.ssmlabs.com/app',
+      },
+      '/c/new',
+      'browser-state',
+    ),
+  );
   assert.equal(url.origin, 'https://lessoncaddie.ssmlabs.com');
   assert.equal(url.searchParams.get('librechatSsoReturn'), '/c/new');
+  assert.equal(url.searchParams.get('librechatSsoState'), 'browser-state');
+});
+
+test('callback replaces the chat session only with matching browser state', async () => {
+  const app = express();
+  app.use((req, _res, next) => {
+    req.cookies = { lc_sso_state: String(req.headers.cookie || '').split('=')[1] || '' };
+    next();
+  });
+  let redeemed = 0;
+  let signedInUser = '';
+  app.use(
+    '/sso/lessoncaddie',
+    createLessonCaddieSsoRouter({
+      resolveSsoConfig: () => ({ enabled: true, homeUrl: 'https://lessoncaddie.ssmlabs.com/app' }),
+      redeemWithLessonCaddie: async () => {
+        redeemed += 1;
+        return { firebaseUid: 'switched-user', email: 'switched@example.com' };
+      },
+      resolveLibreChatUser: async () => ({ _id: 'chat-switched-user' }),
+      getModels: () => ({}),
+      getAuthService: () => ({
+        setAuthTokens: async (uid) => {
+          signedInUser = uid;
+        },
+      }),
+    }),
+  );
+  const mismatched = await request(app)
+    .get('/sso/lessoncaddie/callback?code=code&state=other')
+    .set('Cookie', 'lc_sso_state=browser-state');
+  assert.equal(mismatched.status, 401);
+  assert.equal(redeemed, 0);
+  const valid = await request(app)
+    .get('/sso/lessoncaddie/callback?code=code&state=browser-state&returnTo=%2Fc%2Fnew')
+    .set('Cookie', 'lc_sso_state=browser-state');
+  assert.equal(valid.status, 302);
+  assert.equal(valid.headers.location, '/c/new');
+  assert.equal(redeemed, 1);
+  assert.equal(signedInUser, 'chat-switched-user');
 });
 
 test('resolveLibreChatUser creates on first login and does not merge by email', async () => {
@@ -73,7 +126,10 @@ test('resolveLibreChatUser creates on first login and does not merge by email', 
       return { ok: true, value: created };
     },
   };
-  const user = await resolveLibreChatUser({ firebaseUid: 'fb-2', email: 'new@example.com' }, createModels);
+  const user = await resolveLibreChatUser(
+    { firebaseUid: 'fb-2', email: 'new@example.com' },
+    createModels,
+  );
   assert.equal(user._id, 'lc-new');
 });
 
@@ -99,11 +155,14 @@ test('explicit link maps an existing LibreChat user without changing ADMIN', asy
       throw new Error('should not create');
     },
   };
-  const user = await resolveLibreChatUser({
-    firebaseUid: 'fb-admin',
-    email: 'admin@example.com',
-    linkedLibreChatUserId: 'lc-admin',
-  }, models);
+  const user = await resolveLibreChatUser(
+    {
+      firebaseUid: 'fb-admin',
+      email: 'admin@example.com',
+      linkedLibreChatUserId: 'lc-admin',
+    },
+    models,
+  );
   assert.equal(user.role, 'ADMIN');
   assert.equal(user.openidId, 'fb-admin');
 });

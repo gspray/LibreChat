@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const crypto = require('node:crypto');
 const {
   resolveSsoConfig,
   sanitizeAppReturnTo,
@@ -18,6 +19,7 @@ function createLessonCaddieSsoRouter(deps = {}) {
   const getModels = deps.getModels || (() => require('~/models'));
   const getAuthService = deps.getAuthService || (() => require('~/server/services/AuthService'));
   const logger = deps.logger || console;
+  const chatOrigin = () => new URL(process.env.DOMAIN_CLIENT || 'https://chat.ssmlabs.com').origin;
 
   router.get('/start', (req, res) => {
     const config = loadConfig();
@@ -27,10 +29,17 @@ function createLessonCaddieSsoRouter(deps = {}) {
     }
     const returnTo = sanitizeAppReturnTo(
       req.query.returnTo || req.query.redirect_uri,
-      [req.protocol + '://' + req.get('host')],
+      [chatOrigin()],
       '/c/new',
     );
-    res.redirect(302, buildLessonCaddieStartUrl(config, returnTo));
+    const state = crypto.randomBytes(24).toString('base64url');
+    res.cookie('lc_sso_state', state, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 300000,
+    });
+    res.redirect(302, buildLessonCaddieStartUrl(config, returnTo, state));
   });
 
   router.get('/callback', async (req, res) => {
@@ -39,8 +48,20 @@ function createLessonCaddieSsoRouter(deps = {}) {
       res.status(503).send('LessonCaddie SSO is not enabled.');
       return;
     }
-    const origin = `${req.protocol}://${req.get('host')}`;
+    const origin = chatOrigin();
     const returnTo = sanitizeAppReturnTo(req.query.returnTo, [origin], '/c/new');
+    const state = String(req.query.state || '');
+    const cookieState = String(req.cookies?.lc_sso_state || '');
+    res.clearCookie('lc_sso_state');
+    if (
+      !state ||
+      state.length !== cookieState.length ||
+      !cookieState ||
+      !crypto.timingSafeEqual(Buffer.from(state), Buffer.from(cookieState))
+    ) {
+      res.status(401).send('Chat sign-in expired. Please start again from LessonCaddie.');
+      return;
+    }
     try {
       const identity = await redeem(config, {
         code: req.query.code,
@@ -66,7 +87,7 @@ function createLessonCaddieSsoRouter(deps = {}) {
         res.status(502).send('LibreChat could not complete LessonCaddie sign-in.');
         return;
       }
-      res.redirect(302, buildLessonCaddieStartUrl(config, returnTo));
+      res.status(401).send('Chat sign-in failed. Please start again from LessonCaddie.');
     }
   });
 
@@ -89,7 +110,10 @@ function createLessonCaddieSsoRouter(deps = {}) {
       config.homeUrl,
     );
     if (returnTo === 'about:blank') {
-      res.status(200).type('html').send('<!doctype html><title>Signed out</title><script>window.close()</script>');
+      res
+        .status(200)
+        .type('html')
+        .send('<!doctype html><title>Signed out</title><script>window.close()</script>');
       return;
     }
     res.redirect(302, returnTo || config.homeUrl);

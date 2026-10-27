@@ -78,9 +78,10 @@ function sanitizeAppReturnTo(candidate, allowedOrigins, fallback) {
   }
 }
 
-function buildLessonCaddieStartUrl(config, returnTo) {
+function buildLessonCaddieStartUrl(config, returnTo, state) {
   const url = new URL(config.homeUrl);
   url.searchParams.set('librechatSsoReturn', returnTo || '/c/new');
+  url.searchParams.set('librechatSsoState', state);
   return url.toString();
 }
 
@@ -88,7 +89,8 @@ function mapIdentityError(code) {
   if (code === 'LINK_REQUIRED') {
     return {
       status: 409,
-      message: 'This email already has a LibreChat account. An administrator must link it before SSO can continue.',
+      message:
+        'This email already has a LibreChat account. An administrator must link it before SSO can continue.',
     };
   }
   return { status: 401, message: 'LibreChat sign-in failed.' };
@@ -151,6 +153,7 @@ async function redeemWithLessonCaddie(config, { code, state, origin }) {
     headers: {
       Authorization: `Bearer ${config.secret}`,
       'Content-Type': 'application/json',
+      'X-LibreChat-Origin': origin,
     },
     body: JSON.stringify({ code, state, origin }),
   });

@@ -24,12 +24,22 @@ function attach(server) {
   if (!app) {
     return;
   }
-  server.__ssmlabsLessonCaddieSsoAttached = true;
   const config = resolveSsoConfig();
   if (!config.enabled) {
     return;
   }
   app.use('/sso/lessoncaddie', createLessonCaddieSsoRouter());
+  const stack = app.router?.stack;
+  const ssoLayer = stack?.pop();
+  const fallbackIndex = stack?.findIndex((layer) =>
+    String(layer.handle).includes('STATIC_ASSET_EXT.test(req.path)'),
+  );
+  if (!ssoLayer || fallbackIndex < 0) {
+    if (ssoLayer) stack.push(ssoLayer);
+    throw new Error('LessonCaddie SSO route must be mounted before the SPA fallback');
+  }
+  stack.splice(fallbackIndex, 0, ssoLayer);
+  server.__ssmlabsLessonCaddieSsoAttached = true;
 }
 
 http.Server.prototype.listen = function listenWithLessonCaddieSso(...args) {
@@ -37,6 +47,7 @@ http.Server.prototype.listen = function listenWithLessonCaddieSso(...args) {
     attach(this);
   } catch (error) {
     console.error('[ssmlabs-lessoncaddie-sso] failed to attach routes', error);
+    throw error;
   }
   return originalListen.apply(this, args);
 };
