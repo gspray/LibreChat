@@ -471,6 +471,7 @@ export class Chat {
   private releaseState?: () => void;
   private active?: ActiveRequest;
   private disposed = false;
+  private revision = 0;
   /**
    * The conversation this chat runs under: its id, until the server names the one it created for
    * a chat started under `new`. Every later turn addresses that one.
@@ -497,6 +498,26 @@ export class Chat {
 
   get messages(): TMessage[] {
     return this.init.state.messages;
+  }
+
+  /**
+   * Counts the changes reported to subscribers, writes made to the state outside the chat
+   * included. A write can keep the same list while a message in it changed, so a snapshot keyed
+   * by this sees every write.
+   */
+  get version(): number {
+    return this.revision;
+  }
+
+  /**
+   * Replaces the message list after the writes already queued. AI SDK: the `messages` setter. A
+   * function receives the list current when it is written. The rollback of an optimistic write
+   * treats it as it treats any write made after its own.
+   */
+  setMessages(messages: TMessage[] | ((current: TMessage[]) => TMessage[])): Promise<void> {
+    return this.executor.run(() => {
+      this.write(typeof messages === 'function' ? messages(this.messages) : messages);
+    });
   }
 
   /** Submits a user turn. Rejects while another turn of this chat is in flight. */
@@ -942,6 +963,7 @@ export class Chat {
   }
 
   private notify(): void {
+    this.revision += 1;
     for (const listener of this.listeners) {
       try {
         listener();
