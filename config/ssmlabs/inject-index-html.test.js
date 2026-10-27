@@ -51,6 +51,12 @@ test('enabling SSO leaves ordinary LibreChat login visits unchanged', () => {
   }
 });
 
+test('injectIndexHtml uses the React back link without a second DOM observer', () => {
+  const html = injectIndexHtml(SAMPLE);
+  assert.doesNotMatch(html, /back-to-lessoncaddie\.js/);
+  assert.match(html, /hide-model-selector\.js/);
+});
+
 test('injectBaseHref anchors relative assets at the app root on nested routes', () => {
   const prevDomainClient = process.env.DOMAIN_CLIENT;
   process.env.DOMAIN_CLIENT = 'https://chat.ssmlabs.com';

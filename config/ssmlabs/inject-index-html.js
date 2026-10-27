@@ -3,13 +3,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const BACK_SENTINEL = 'data-ssmlabs-lessoncaddie-back="true"';
 const SELECTOR_SENTINEL = 'data-ssmlabs-hide-model-selector="true"';
 const BRANDING_SENTINEL = 'data-ssmlabs-branding="true"';
-const SCRIPTS = [
-  `<script src="/ssmlabs/back-to-lessoncaddie.js?v=6" defer ${BACK_SENTINEL}></script>`,
-  `<script src="/ssmlabs/hide-model-selector.js?v=3" defer ${SELECTOR_SENTINEL}></script>`,
-].join('\n');
+const SELECTOR_SCRIPT = `<script src="/ssmlabs/hide-model-selector.js?v=3" defer ${SELECTOR_SENTINEL}></script>`;
 
 const DEFAULT_APP_TITLE = 'LessonCaddie';
 const DEFAULT_APP_SHORT_NAME = 'Ask Caddie';
@@ -81,15 +77,10 @@ function injectBaseHref(html) {
 }
 
 function injectOverlayScripts(html) {
-  let next = html;
-  if (!(html.includes(BACK_SENTINEL) && html.includes(SELECTOR_SENTINEL))) {
-    for (const tag of SCRIPTS.split('\n')) {
-      if (!next.includes(tag)) {
-        next = next.replace('</head>', `${tag}\n</head>`);
-      }
-    }
+  if (html.includes(SELECTOR_SENTINEL)) {
+    return html;
   }
-  return next;
+  return html.replace('</head>', `${SELECTOR_SCRIPT}\n</head>`);
 }
 
 function injectIndexHtml(html) {
