@@ -3077,6 +3077,14 @@ export const interfaceSchema = z
       .optional(),
     termsOfService: termsOfServiceSchema.optional(),
     customWelcome: z.string().optional(),
+    /** Instructor workspace link displayed beside the composer controls when configured. */
+    startLessonUrl: z
+      .string()
+      .url()
+      .refine((value) => /^https?:\/\//i.test(value), {
+        message: 'Start Lesson requires an absolute HTTP(S) URL',
+      })
+      .optional(),
     /** What heads the welcome screen when an agent, assistant or branded spec is
      *  selected: its name (`entity`), or the time-of-day greeting with the user's
      *  name (`greeting`) for deployments whose header selector already names it. */

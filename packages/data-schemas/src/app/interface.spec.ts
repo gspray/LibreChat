@@ -4,6 +4,16 @@ import type { AppConfig } from '~/types';
 import { loadDefaultInterface, deriveSpecInterface } from './interface';
 
 describe('loadDefaultInterface', () => {
+  it('forwards a configured Start Lesson URL to the served interface', async () => {
+    const startLessonUrl = 'https://lessoncaddie.ssmlabs.com/app?view=start-lesson';
+    const interfaceConfig = await loadDefaultInterface({
+      config: { interface: { startLessonUrl } },
+      configDefaults: getConfigDefaults(),
+    });
+
+    expect(interfaceConfig?.startLessonUrl).toBe(startLessonUrl);
+  });
+
   it('uses the schema default for URL auto-submit when not configured', async () => {
     const interfaceConfig = await loadDefaultInterface({
       config: {},
