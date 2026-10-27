@@ -2,7 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { injectBaseHref, injectBranding } = require('./inject-index-html');
+const { injectBaseHref, injectBranding, injectIndexHtml } = require('./inject-index-html');
 
 const SAMPLE = `<!doctype html>
 <html lang="en-US">
@@ -36,6 +36,18 @@ test('injectBranding sets title, description, apple title, and favicon cache bus
     process.env.APP_TITLE = prevTitle;
     process.env.APP_SHORT_NAME = prevShort;
     delete process.env.SSMLABS_BRANDING_ASSET_VERSION;
+  }
+});
+
+test('enabling SSO leaves ordinary LibreChat login visits unchanged', () => {
+  const previous = process.env.LESSONCADDIE_SSO_ENABLED;
+  process.env.LESSONCADDIE_SSO_ENABLED = 'true';
+  try {
+    const html = injectIndexHtml(SAMPLE);
+    assert.doesNotMatch(html, /lessoncaddie-sso\.js/);
+  } finally {
+    if (previous === undefined) delete process.env.LESSONCADDIE_SSO_ENABLED;
+    else process.env.LESSONCADDIE_SSO_ENABLED = previous;
   }
 });
 
