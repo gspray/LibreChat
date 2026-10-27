@@ -1,12 +1,11 @@
 import { Button } from '@librechat/client';
-import { useGetStartupConfig } from '~/data-provider';
+import type { TStartupConfig } from 'librechat-data-provider';
 import { useLocalize } from '~/hooks';
 
 /** A plain app link: starting a lesson never sends a chat message or invokes an MCP tool. */
-export default function StartLesson() {
+export default function StartLesson({ startupConfig }: { startupConfig?: TStartupConfig }) {
   const localize = useLocalize();
-  const { data } = useGetStartupConfig();
-  const href = data?.interface?.startLessonUrl;
+  const href = startupConfig?.interface?.startLessonUrl;
   if (!href) {
     return null;
   }

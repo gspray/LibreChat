@@ -1,26 +1,25 @@
 import { render, screen } from '@testing-library/react';
-import { useGetStartupConfig } from '~/data-provider';
-import StartLesson from '../StartLesson';
+import type { TStartupConfig } from 'librechat-data-provider';
+import StartLesson from './StartLesson';
 
-jest.mock('~/data-provider', () => ({ useGetStartupConfig: jest.fn() }));
 jest.mock('~/hooks', () => ({ useLocalize: () => () => 'Start Lesson' }));
 
-const startup = useGetStartupConfig as jest.Mock;
-
-function configure(startLessonUrl?: string) {
-  startup.mockReturnValue({ data: { interface: { startLessonUrl } } });
+function config(startLessonUrl?: string): TStartupConfig {
+  return { interface: { startLessonUrl } } as TStartupConfig;
 }
 
 describe('Start Lesson', () => {
   it('keeps deployments without a configured app link unchanged', () => {
-    configure();
-    render(<StartLesson />);
+    render(<StartLesson startupConfig={config()} />);
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
   it('offers an accessible app link instead of submitting the chat form', () => {
-    configure('https://lessoncaddie.ssmlabs.com/app?view=start-lesson');
-    render(<StartLesson />);
+    render(
+      <StartLesson
+        startupConfig={config('https://lessoncaddie.ssmlabs.com/app?view=start-lesson')}
+      />,
+    );
     const link = screen.getByRole('link', { name: 'Start Lesson' });
     expect(link).toHaveAttribute('href', 'https://lessoncaddie.ssmlabs.com/app?view=start-lesson');
     expect(link).not.toHaveAttribute('target');
@@ -30,8 +29,7 @@ describe('Start Lesson', () => {
   it.each(['javascript:alert(1)', 'data:text/html,hello', '/app', 'invalid'])(
     'does not render an unsafe or invalid app URL: %s',
     (url) => {
-      configure(url);
-      render(<StartLesson />);
+      render(<StartLesson startupConfig={config(url)} />);
       expect(screen.queryByRole('link')).not.toBeInTheDocument();
     },
   );
