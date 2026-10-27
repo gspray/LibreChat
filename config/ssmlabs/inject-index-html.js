@@ -14,11 +14,13 @@ const SCRIPTS = [
 const SSO_SCRIPT = `<script src="/ssmlabs/lessoncaddie-sso.js?v=1" defer ${SSO_SENTINEL}></script>`;
 
 function isLessonCaddieSsoEnabled(env = process.env) {
-  const raw = String(env.LESSONCADDIE_SSO_ENABLED || '').trim().toLowerCase();
+  const raw = String(env.LESSONCADDIE_SSO_ENABLED || '')
+    .trim()
+    .toLowerCase();
   return raw === '1' || raw === 'true' || raw === 'yes' || raw === 'on';
 }
 
-const DEFAULT_APP_TITLE = 'Ask Lesson Caddie Assistant';
+const DEFAULT_APP_TITLE = 'LessonCaddie';
 const DEFAULT_APP_SHORT_NAME = 'Ask Caddie';
 const DEFAULT_META_DESCRIPTION =
   'Ask Lesson Caddie Assistant — instructor chat powered by LessonCaddie.';
@@ -36,7 +38,8 @@ function injectBranding(html) {
     return html;
   }
   const title = (process.env.APP_TITLE || DEFAULT_APP_TITLE).trim() || DEFAULT_APP_TITLE;
-  const shortName = (process.env.APP_SHORT_NAME || DEFAULT_APP_SHORT_NAME).trim() || DEFAULT_APP_SHORT_NAME;
+  const shortName =
+    (process.env.APP_SHORT_NAME || DEFAULT_APP_SHORT_NAME).trim() || DEFAULT_APP_SHORT_NAME;
   const description = (process.env.APP_META_DESCRIPTION || DEFAULT_META_DESCRIPTION).trim();
   const assetVersion = (process.env.SSMLABS_BRANDING_ASSET_VERSION || '1').trim() || '1';
 
@@ -76,12 +79,9 @@ function injectBranding(html) {
 }
 
 function injectBaseHref(html) {
-  const clientUrl = process.env.DOMAIN_CLIENT
-    ? new URL(process.env.DOMAIN_CLIENT)
-    : null;
-  const baseHref = clientUrl
-    ? (clientUrl.pathname.endsWith('/') ? clientUrl.pathname : `${clientUrl.pathname}/`)
-    : '/';
+  const clientUrl = process.env.DOMAIN_CLIENT ? new URL(process.env.DOMAIN_CLIENT) : null;
+  const pathname = clientUrl?.pathname || '/';
+  const baseHref = pathname.endsWith('/') ? pathname : `${pathname}/`;
   const baseTag = `<base href="${escapeHtml(baseHref)}">`;
   if (/<base\b[^>]*>/i.test(html)) {
     return html.replace(/<base\b[^>]*>/i, baseTag);
@@ -109,7 +109,7 @@ function injectIndexHtml(html) {
 }
 
 const originalReadFileSync = fs.readFileSync;
-fs.readFileSync = function readFileSyncWithLessonCaddieBack(file, options) {
+fs.readFileSync = function readFileSyncWithLessonCaddieBack(file, _options) {
   const data = originalReadFileSync.apply(this, arguments);
   const filePath = typeof file === 'string' ? file : String(file);
   if (path.basename(filePath) !== 'index.html') {

@@ -22,12 +22,12 @@ const SAMPLE = `<!doctype html>
 test('injectBranding sets title, description, apple title, and favicon cache bust', () => {
   const prevTitle = process.env.APP_TITLE;
   const prevShort = process.env.APP_SHORT_NAME;
-  process.env.APP_TITLE = 'Ask Lesson Caddie Assistant';
+  process.env.APP_TITLE = 'LessonCaddie';
   process.env.APP_SHORT_NAME = 'Ask Caddie';
   process.env.SSMLABS_BRANDING_ASSET_VERSION = '9';
   try {
     const html = injectBranding(SAMPLE);
-    assert.match(html, /<title>Ask Lesson Caddie Assistant<\/title>/);
+    assert.match(html, /<title>LessonCaddie<\/title>/);
     assert.match(html, /name="description" content="[^"]*LessonCaddie/);
     assert.match(html, /name="apple-mobile-web-app-title" content="Ask Caddie"/);
     assert.match(html, /href="assets\/favicon-32x32\.png\?v=9"/);
