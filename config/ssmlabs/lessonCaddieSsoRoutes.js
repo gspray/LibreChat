@@ -75,7 +75,11 @@ function createLessonCaddieSsoRouter(deps = {}) {
     } catch (error) {
       logger.error('[ssmlabs-lessoncaddie-sso] callback failed', error?.code || error?.message);
       const mapped = mapIdentityError(error?.code);
-      if (error?.code === 'LINK_REQUIRED') {
+      if (
+        error?.code === 'LINK_REQUIRED' ||
+        error?.code === 'LINK_MISSING' ||
+        error?.code === 'LINK_CONFLICT'
+      ) {
         res.status(mapped.status).send(mapped.message);
         return;
       }

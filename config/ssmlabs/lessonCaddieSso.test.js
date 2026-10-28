@@ -179,6 +179,67 @@ test('resolveLibreChatUser creates on first login and does not merge by email', 
   assert.equal(user._id, 'lc-new');
 });
 
+test('stale explicit links fail closed instead of creating a second account', async () => {
+  const models = {
+    async findUser(query) {
+      if (query.provider === 'lessoncaddie' || query._id) {
+        return null;
+      }
+      return null;
+    },
+    async updateUser() {
+      throw new Error('should not update a missing link');
+    },
+    async createUserIfAbsent() {
+      throw new Error('should not create when an explicit link is missing');
+    },
+  };
+  await assert.rejects(
+    () =>
+      resolveLibreChatUser(
+        {
+          firebaseUid: 'fb-stale',
+          email: 'stale@example.com',
+          linkedLibreChatUserId: 'missing-chat-user',
+        },
+        models,
+      ),
+    (error) => error.code === 'LINK_MISSING',
+  );
+});
+
+test('explicit links refuse to overwrite a different Firebase UID', async () => {
+  const models = {
+    async findUser(query) {
+      if (query.provider === 'lessoncaddie') {
+        return null;
+      }
+      if (String(query._id) === 'lc-taken') {
+        return { _id: 'lc-taken', openidId: 'other-uid', provider: 'lessoncaddie', role: 'USER' };
+      }
+      return null;
+    },
+    async updateUser() {
+      throw new Error('should not steal an existing mapping');
+    },
+    async createUserIfAbsent() {
+      throw new Error('should not create');
+    },
+  };
+  await assert.rejects(
+    () =>
+      resolveLibreChatUser(
+        {
+          firebaseUid: 'fb-new',
+          email: 'new@example.com',
+          linkedLibreChatUserId: 'lc-taken',
+        },
+        models,
+      ),
+    (error) => error.code === 'LINK_CONFLICT',
+  );
+});
+
 test('explicit link maps an existing LibreChat user without changing ADMIN', async () => {
   const adminUser = { _id: 'lc-admin', role: 'ADMIN', email: 'admin@example.com' };
   const models = {
