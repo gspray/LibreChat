@@ -68,3 +68,25 @@ test('parses SSE data lines into JSON events', () => {
   assert.deepEqual(found, [{ ok: true }]);
   assert.equal(rest, '');
 });
+
+test('reassembles navigation JSON across XHR progress chunks', () => {
+  const found = [];
+  const payload = {
+    event: 'on_run_step_completed',
+    data: {
+      result: {
+        tool_call: {
+          name: 'open_app_screen_mcp_lessoncaddie-instructor',
+          output: JSON.stringify(RESULT),
+        },
+      },
+    },
+  };
+  const line = `data: ${JSON.stringify(payload)}\n`;
+  const mid = Math.floor(line.length / 2);
+  let rest = parseSseChunk(line.slice(0, mid), (event) => found.push(event));
+  rest = parseSseChunk(`${rest}${line.slice(mid)}`, (event) => found.push(event));
+  assert.equal(found.length, 1);
+  assert.equal(extractNavigationFromPayload(found[0])?.destination, 'start-lesson');
+  assert.equal(rest, '');
+});

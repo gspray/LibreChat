@@ -340,7 +340,20 @@
     }, 1500);
   }
 
+  function ensureEmbeddedBridge(windowObject, state) {
+    if (state.appNavigationBridge === true) {
+      return;
+    }
+    if (!isFramed(windowObject)) {
+      return;
+    }
+    if (resolveParentOrigin(windowObject, state)) {
+      state.appNavigationBridge = true;
+    }
+  }
+
   function postNavigate(windowObject, state, result) {
+    ensureEmbeddedBridge(windowObject, state);
     if (!isFramed(windowObject) || state.appNavigationBridge !== true) {
       logNav('external_client', {
         requestId: result.requestId,
@@ -420,6 +433,7 @@
       logNav('external_client', { requestId: result.requestId, destination: result.destination });
       return false;
     }
+    ensureEmbeddedBridge(windowObject, state);
     if (state.appNavigationBridge === true) {
       return postNavigate(windowObject, state, result);
     }
@@ -530,12 +544,51 @@
     return String(method || 'GET').toUpperCase() === 'POST' && /\/api\//.test(String(url || ''));
   }
 
+  function installXhrScan(windowObject, state) {
+    const Original = windowObject.XMLHttpRequest;
+    const proto = Original && Original.prototype;
+    if (!proto || typeof proto.open !== 'function' || proto.open.__lcNavWrapped) {
+      return;
+    }
+    const originalOpen = proto.open;
+    proto.open = function lessonCaddieNavXhrOpen() {
+      if (!this.__lcNavBound) {
+        this.__lcNavBound = true;
+        let scanned = 0;
+        let carry = '';
+        const scan = () => {
+          try {
+            const text = String(this.responseText || '');
+            if (text.length <= scanned) {
+              return;
+            }
+            carry += text.slice(scanned);
+            scanned = text.length;
+            carry = parseSseChunk(carry, (payload) => consumePayload(windowObject, state, payload));
+          } catch {
+            // Overlay must not break Chat streaming.
+          }
+        };
+        this.addEventListener('progress', scan);
+        this.addEventListener('readystatechange', () => {
+          if (this.readyState === Original.LOADING || this.readyState === Original.DONE) {
+            scan();
+          }
+        });
+        this.addEventListener('load', scan);
+      }
+      return originalOpen.apply(this, arguments);
+    };
+    proto.open.__lcNavWrapped = true;
+  }
+
   function install(windowObject) {
     if (!windowObject || windowObject.__lcNavOverlayInstalled) {
       return;
     }
     windowObject.__lcNavOverlayInstalled = true;
     const state = createState();
+    installXhrScan(windowObject, state);
     windowObject.addEventListener('message', (event) =>
       handleShellMessage(windowObject, state, event),
     );
