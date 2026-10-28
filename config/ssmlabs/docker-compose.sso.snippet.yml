@@ -12,3 +12,4 @@
 #
 #   volumes:
 #     - ./config/ssmlabs/lessoncaddie-sso.browser.js:/app/client/dist/ssmlabs/lessoncaddie-sso.js:ro
+#     - ./config/ssmlabs/embed-passthrough-sw.js:/app/client/dist/sw.js:ro

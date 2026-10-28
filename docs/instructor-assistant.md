@@ -43,6 +43,8 @@ Variables:
 
 Chat uses LibreChat’s own header. App ↔ Assistant switching lives in the LessonCaddie shell, not inside chat.
 
+LibreChat’s default `X-Frame-Options: SAMEORIGIN` blocks the Assistant iframe. Set `X_FRAME_OPTIONS=off` (Caddy also strips it). A Workbox service worker can still replay a cached `/` that carried that header — overlay `config/ssmlabs/embed-passthrough-sw.js` on `/sw.js` so those caches are dropped.
+
 OpenAI credentials stay in the existing Compose/Doppler env. They are not written into yaml or browser config.
 
 ## Agent record

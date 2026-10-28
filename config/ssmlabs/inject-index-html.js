@@ -5,7 +5,27 @@ const path = require('path');
 
 const SELECTOR_SENTINEL = 'data-ssmlabs-hide-model-selector="true"';
 const BRANDING_SENTINEL = 'data-ssmlabs-branding="true"';
+const EMBED_SW_SENTINEL = 'data-ssmlabs-embed-sw="true"';
 const SELECTOR_SCRIPT = `<script src="/ssmlabs/hide-model-selector.js?v=3" defer ${SELECTOR_SENTINEL}></script>`;
+const EMBED_SW_SCRIPT = `<script ${EMBED_SW_SENTINEL}>
+(function clearFramedChatWorker() {
+  if (window.parent === window) return;
+  if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+    navigator.serviceWorker.getRegistrations().then(function (registrations) {
+      registrations.forEach(function (registration) {
+        registration.unregister();
+      });
+    });
+  }
+  if (window.caches && caches.keys) {
+    caches.keys().then(function (keys) {
+      keys.forEach(function (key) {
+        caches.delete(key);
+      });
+    });
+  }
+})();
+</script>`;
 
 const DEFAULT_APP_TITLE = 'LessonCaddie';
 const DEFAULT_APP_SHORT_NAME = 'Ask Caddie';
@@ -77,10 +97,14 @@ function injectBaseHref(html) {
 }
 
 function injectOverlayScripts(html) {
-  if (html.includes(SELECTOR_SENTINEL)) {
-    return html;
+  let next = html;
+  if (!next.includes(SELECTOR_SENTINEL)) {
+    next = next.replace('</head>', `${SELECTOR_SCRIPT}\n</head>`);
   }
-  return html.replace('</head>', `${SELECTOR_SCRIPT}\n</head>`);
+  if (!next.includes(EMBED_SW_SENTINEL)) {
+    next = next.replace('</head>', `${EMBED_SW_SCRIPT}\n</head>`);
+  }
+  return next;
 }
 
 function injectIndexHtml(html) {
