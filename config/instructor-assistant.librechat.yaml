@@ -13,10 +13,11 @@ mcpServers:
     requiresOAuth: false
     chatMenu: false
     serverInstructions: true
-    requestHeaders:
+    headers:
       X-LessonCaddie-Sso-Secret: '${LESSONCADDIE_SSO_SHARED_SECRET}'
       X-LibreChat-Firebase-Uid: '{{LIBRECHAT_USER_OPENIDID}}'
       X-LibreChat-User-Provider: '{{LIBRECHAT_USER_PROVIDER}}'
+    requestHeaders:
       X-LibreChat-User-Id: '{{LIBRECHAT_USER_ID}}'
       X-LibreChat-Conversation-Id: '{{LIBRECHAT_BODY_CONVERSATIONID}}'
       X-LibreChat-Message-Id: '{{LIBRECHAT_BODY_MESSAGEID}}'
