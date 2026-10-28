@@ -55,7 +55,7 @@ OpenAI credentials stay in the existing Compose/Doppler env. They are not writte
 | ID | `agent_instructor_assistant` |
 | Model | `gpt-4o` (`openAI`) |
 | MCP | `lessoncaddie-instructor` |
-| Tools | 18 instructor MCP tools (`{name}_mcp_lessoncaddie-instructor`) |
+| Tools | Instructor MCP tools including `open_app_screen` (`{name}_mcp_lessoncaddie-instructor`) |
 | Sharing | Owner ACL + USER role **viewer**. USER `permissions.AGENTS.CREATE` is `false`. |
 
 Default selection: model spec `instructor-assistant` with `softDefault: true` and `preset.agent_id: agent_instructor_assistant`. Existing conversations that use another agent are not rewritten.

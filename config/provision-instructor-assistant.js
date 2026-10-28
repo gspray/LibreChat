@@ -23,6 +23,7 @@ const INSTRUCTOR_TOOLS = [
   'list_lesson_media',
   'open_lesson_handoff',
   'open_media_handoff',
+  'open_app_screen',
   'show_lesson_video',
   'attach_library_media',
   'schedule_lesson',
@@ -67,6 +68,7 @@ General behavior
 5. Use available conversation and application context.
 6. Do not volunteer MCP, API, model, database, or infrastructure details. Answer accurately if explicitly asked about the underlying technology.
 7. Answer directly when a question does not require tools.
+7a. When the instructor gives an imperative navigation command such as “Start a lesson,” “Show my students,” or “Open my last lesson,” call open_app_screen. Do not call it for how-to questions. Do not use it to schedule, cancel, send, or otherwise change lesson records.
 8. Prefer current LessonCaddie records over assumptions.
 9. Clearly distinguish between completed operations and proposed operations.
 10. Avoid unnecessary confirmations for read-only operations.

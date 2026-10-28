@@ -56,6 +56,8 @@ test('injectIndexHtml does not inject a LessonCaddie back-link overlay', () => {
   assert.doesNotMatch(html, /back-to-lessoncaddie\.js/);
   assert.match(html, /hide-model-selector\.js/);
   assert.match(html, /data-ssmlabs-embed-sw="true"/);
+  assert.match(html, /data-ssmlabs-nav-config="true"/);
+  assert.match(html, /window\.__LESSONCADDIE_NAV__/);
 });
 
 test('injectBaseHref anchors relative assets at the app root on nested routes', () => {
