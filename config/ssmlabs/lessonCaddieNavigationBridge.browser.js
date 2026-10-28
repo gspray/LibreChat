@@ -68,6 +68,60 @@
     }
   }
 
+  function resultFromHref(windowObject, href) {
+    const linkOrigin = originOf(href);
+    if (windowObject) {
+      if (!isAllowedOrigin(windowObject, linkOrigin)) {
+        return null;
+      }
+    } else if (
+      !/^https:\/\//.test(href) &&
+      href.indexOf('127.0.0.1') === -1 &&
+      href.indexOf('localhost') === -1
+    ) {
+      return null;
+    }
+    let url;
+    try {
+      url = new URL(href);
+    } catch {
+      return null;
+    }
+    if (url.username || url.password || url.hash) {
+      return null;
+    }
+    const path = url.pathname.replace(/\/+$/, '') || '/';
+    const params = {};
+    let destination = '';
+    if (path === '/app' && url.searchParams.get('view') === 'start-lesson') {
+      destination = 'start-lesson';
+    } else if (path === '/app' && url.searchParams.get('panel') === 'directory') {
+      destination = 'student-list';
+    } else if (path === '/app' && url.searchParams.get('panel') === 'sessions') {
+      destination = 'lesson-list';
+    } else if (path === '/app' && url.searchParams.get('panel') === 'playbook') {
+      destination = 'practice-plan';
+    } else if (path === '/app/edit-lesson' && url.searchParams.get('lessonId')) {
+      destination = url.searchParams.get('handoff') === 'edit' ? 'video-editor' : 'lesson-detail';
+      params.lessonId = url.searchParams.get('lessonId');
+      const mediaId = url.searchParams.get('mediaId');
+      if (mediaId) {
+        params.mediaId = mediaId;
+      }
+    }
+    if (!destination) {
+      return null;
+    }
+    return {
+      type: NAVIGATION_TYPE,
+      version: NAVIGATION_VERSION,
+      destination,
+      params,
+      requestId: `click-${destination}`,
+      deepLink: href,
+    };
+  }
+
   function parseNavigationResult(raw, windowObject) {
     const parsed = parseJson(raw);
     if (!parsed || typeof parsed !== 'object') {
@@ -129,6 +183,12 @@
       const parsed = parseNavigationResult(node, windowObject);
       if (parsed) {
         found.push(parsed);
+        return;
+      }
+      const urlMatch = node.match(/https?:\/\/[^\s)]+/);
+      const fromLink = urlMatch ? resultFromHref(windowObject, urlMatch[0]) : null;
+      if (fromLink) {
+        found.push(fromLink);
       }
       return;
     }
@@ -182,7 +242,10 @@
   function createState() {
     return {
       parentOrigin: '',
+      appNavigationBridge: false,
       processedIds: new Set(),
+      lastResult: null,
+      fallbackTimers: {},
     };
   }
 
@@ -231,8 +294,44 @@
     };
   }
 
+  function hideResolvedDeepLinks(windowObject, result) {
+    const href = clean(result && result.deepLink);
+    const doc = windowObject.document;
+    if (!href || !doc || typeof doc.querySelectorAll !== 'function') {
+      return;
+    }
+    doc.querySelectorAll('a[href]').forEach((anchor) => {
+      if (anchor.href === href) {
+        anchor.setAttribute('data-lc-nav-bridged', 'true');
+        anchor.hidden = true;
+      }
+    });
+  }
+
+  function scheduleFallback(windowObject, state, result) {
+    const requestId = result.requestId;
+    if (state.fallbackTimers[requestId]) {
+      windowObject.clearTimeout(state.fallbackTimers[requestId]);
+    }
+    state.fallbackTimers[requestId] = windowObject.setTimeout(() => {
+      delete state.fallbackTimers[requestId];
+      if (!state.processedIds.has(`${requestId}:acked`)) {
+        logNav('fallback_link', {
+          requestId,
+          destination: result.destination,
+          code: 'bridge_timeout',
+        });
+      }
+    }, 1500);
+  }
+
   function postNavigate(windowObject, state, result) {
-    if (!isFramed(windowObject)) {
+    if (!isFramed(windowObject) || state.appNavigationBridge !== true) {
+      logNav('external_client', {
+        requestId: result.requestId,
+        destination: result.destination,
+        code: state.appNavigationBridge === true ? 'not_framed' : 'unknown_client',
+      });
       return false;
     }
     if (!remember(state, result.requestId)) {
@@ -244,15 +343,18 @@
     }
     const message = buildNavigateMessage(result);
     const origin = resolveParentOrigin(windowObject, state);
+    if (!origin) {
+      logNav('fallback_link', {
+        requestId: result.requestId,
+        destination: result.destination,
+        code: 'missing_parent_origin',
+      });
+      return false;
+    }
     try {
-      if (origin) {
-        windowObject.parent.postMessage(message, origin);
-      } else {
-        readConfig(windowObject).allowedOrigins.forEach((allowed) => {
-          windowObject.parent.postMessage(message, allowed);
-        });
-      }
+      windowObject.parent.postMessage(message, origin);
       logNav('bridge_sent', { requestId: result.requestId, destination: result.destination });
+      scheduleFallback(windowObject, state, result);
       return true;
     } catch (error) {
       logNav('bridge_failed', { requestId: result.requestId, code: 'postmessage_failed' });
@@ -269,6 +371,28 @@
       return;
     }
     state.parentOrigin = event.origin;
+    if (event.data.capabilities && event.data.capabilities.appNavigationBridge === true) {
+      state.appNavigationBridge = true;
+    }
+    if (event.data.type === 'navigate-ack') {
+      const requestId = clean(event.data.requestId);
+      if (requestId) {
+        state.processedIds.add(`${requestId}:acked`);
+        if (state.fallbackTimers[requestId]) {
+          windowObject.clearTimeout(state.fallbackTimers[requestId]);
+          delete state.fallbackTimers[requestId];
+        }
+      }
+      if (event.data.ok === true && state.lastResult) {
+        hideResolvedDeepLinks(windowObject, state.lastResult);
+        windowObject.setTimeout(() => hideResolvedDeepLinks(windowObject, state.lastResult), 800);
+      }
+      logNav('ack_received', {
+        requestId,
+        destination: state.lastResult && state.lastResult.destination,
+        code: event.data.code,
+      });
+    }
   }
 
   function consumePayload(windowObject, state, payload) {
@@ -276,7 +400,65 @@
     if (!result) {
       return false;
     }
-    return postNavigate(windowObject, state, result);
+    state.lastResult = result;
+    if (!isFramed(windowObject)) {
+      logNav('external_client', { requestId: result.requestId, destination: result.destination });
+      return false;
+    }
+    if (state.appNavigationBridge === true) {
+      return postNavigate(windowObject, state, result);
+    }
+    windowObject.setTimeout(() => {
+      if (state.lastResult && state.lastResult.requestId === result.requestId) {
+        if (state.appNavigationBridge === true) {
+          postNavigate(windowObject, state, result);
+          return;
+        }
+        logNav('fallback_link', {
+          requestId: result.requestId,
+          destination: result.destination,
+          code: 'unknown_client',
+        });
+      }
+    }, 400);
+    return false;
+  }
+
+  function handleDeepLinkClick(windowObject, state, event) {
+    if (state.appNavigationBridge !== true || !isFramed(windowObject)) {
+      return false;
+    }
+    const target = event && event.target;
+    const anchor = target && target.closest ? target.closest('a[href]') : null;
+    const href = anchor && anchor.href;
+    if (!href || !isAllowedOrigin(windowObject, originOf(href))) {
+      return false;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const result =
+      state.lastResult && state.lastResult.deepLink === href
+        ? state.lastResult
+        : resultFromHref(windowObject, href);
+    if (result) {
+      state.processedIds.delete(result.requestId);
+      postNavigate(windowObject, state, result);
+    }
+    return true;
+  }
+
+  function announceBridgeReady(windowObject) {
+    if (!isFramed(windowObject)) {
+      return;
+    }
+    try {
+      windowObject.parent.postMessage(
+        { source: ASSISTANT_MESSAGE_SOURCE, type: 'bridge-ready', version: NAVIGATION_VERSION },
+        '*',
+      );
+    } catch {
+      // Parent origin is confirmed only by the handshake that follows.
+    }
   }
 
   function parseSseChunk(buffer, onEvent) {
@@ -342,6 +524,12 @@
     windowObject.addEventListener('message', (event) =>
       handleShellMessage(windowObject, state, event),
     );
+    windowObject.addEventListener(
+      'click',
+      (event) => handleDeepLinkClick(windowObject, state, event),
+      true,
+    );
+    announceBridgeReady(windowObject);
 
     const originalFetch = windowObject.fetch;
     if (typeof originalFetch === 'function') {
@@ -388,7 +576,10 @@
     TOOL_NAME,
     parseNavigationResult,
     extractNavigationFromPayload,
+    resultFromHref,
     parseSseChunk,
+    handleDeepLinkClick,
+    announceBridgeReady,
     install,
   };
 });

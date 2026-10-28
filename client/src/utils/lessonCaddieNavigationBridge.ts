@@ -199,12 +199,10 @@ function buildNavigateMessage(result: NavigationResult) {
 }
 
 function fallbackStandalone(result: NavigationResult) {
-  const url = result.deepLink;
-  if (!url || isFramed()) {
+  if (!result.deepLink || isFramed()) {
     return;
   }
   logNav('standalone_fallback', { requestId: result.requestId, destination: result.destination });
-  window.location.assign(url);
 }
 
 export function handleShellMessage(event: MessageEvent) {
@@ -215,6 +213,9 @@ export function handleShellMessage(event: MessageEvent) {
     return;
   }
   state.parentOrigin = event.origin;
+  if (event.data.capabilities?.appNavigationBridge === true) {
+    (window as Window & { __lcAppNavigationBridge?: boolean }).__lcAppNavigationBridge = true;
+  }
   if (event.data.type === 'navigate-ack') {
     logNav('ack_received', {
       requestId: event.data.requestId,
@@ -265,7 +266,9 @@ export function onToolResult(notice: ToolResultNotice = {}) {
     return false;
   }
   const started = window.performance?.now?.() ?? Date.now();
-  if (isFramed()) {
+  const bridgeEnabled =
+    (window as Window & { __lcAppNavigationBridge?: boolean }).__lcAppNavigationBridge === true;
+  if (isFramed() && bridgeEnabled) {
     const origin = resolveParentOrigin();
     try {
       if (origin) {
@@ -288,7 +291,7 @@ export function onToolResult(notice: ToolResultNotice = {}) {
     }
   }
   fallbackStandalone(result);
-  return true;
+  return false;
 }
 
 export function installLessonCaddieNavigationBridge() {
@@ -310,6 +313,7 @@ export function installLessonCaddieNavigationBridge() {
 export function resetLessonCaddieNavigationBridgeForTests() {
   state.parentOrigin = '';
   state.processedIds.clear();
+  delete (window as Window & { __lcAppNavigationBridge?: boolean }).__lcAppNavigationBridge;
 }
 
 export const lessonCaddieNavigationConstants = {

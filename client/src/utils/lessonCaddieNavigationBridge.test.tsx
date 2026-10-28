@@ -41,7 +41,12 @@ describe('lessonCaddieNavigationBridge', () => {
     });
     handleShellMessage({
       origin: 'https://lessoncaddie.ssmlabs.com',
-      data: { source: 'lessoncaddie-shell', type: 'surface', surface: 'assistant' },
+      data: {
+        source: 'lessoncaddie-shell',
+        type: 'surface',
+        surface: 'assistant',
+        capabilities: { appNavigationBridge: true },
+      },
     } as MessageEvent);
     expect(
       onToolResult({
@@ -63,6 +68,26 @@ describe('lessonCaddieNavigationBridge', () => {
     expect(posted).toEqual([]);
   });
 
+  it('does not postMessage for unknown clients without a bridge capability', () => {
+    const posted: unknown[] = [];
+    Object.defineProperty(window, 'parent', {
+      configurable: true,
+      value: { postMessage: (data: unknown) => posted.push(data) },
+    });
+    handleShellMessage({
+      origin: 'https://lessoncaddie.ssmlabs.com',
+      data: { source: 'lessoncaddie-shell', type: 'surface', surface: 'assistant' },
+    } as MessageEvent);
+    expect(
+      onToolResult({
+        functionName: 'open_app_screen_mcp_lessoncaddie-instructor',
+        output: JSON.stringify(RESULT),
+        sawSubmitting: true,
+      }),
+    ).toBe(false);
+    expect(posted).toEqual([]);
+  });
+
   it('posts from a live turn even when the tool part is not last', () => {
     const posted: unknown[] = [];
     Object.defineProperty(window, 'parent', {
@@ -71,7 +96,12 @@ describe('lessonCaddieNavigationBridge', () => {
     });
     handleShellMessage({
       origin: 'https://lessoncaddie.ssmlabs.com',
-      data: { source: 'lessoncaddie-shell', type: 'surface', surface: 'assistant' },
+      data: {
+        source: 'lessoncaddie-shell',
+        type: 'surface',
+        surface: 'assistant',
+        capabilities: { appNavigationBridge: true },
+      },
     } as MessageEvent);
     expect(
       onToolResult({
@@ -93,7 +123,12 @@ describe('lessonCaddieNavigationBridge', () => {
     installLessonCaddieNavigationBridge();
     handleShellMessage({
       origin: 'https://lessoncaddie.ssmlabs.com',
-      data: { source: 'lessoncaddie-shell', type: 'surface', surface: 'assistant' },
+      data: {
+        source: 'lessoncaddie-shell',
+        type: 'surface',
+        surface: 'assistant',
+        capabilities: { appNavigationBridge: true },
+      },
     } as MessageEvent);
     const notice = {
       functionName: 'open_app_screen_mcp_lessoncaddie-instructor',

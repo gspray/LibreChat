@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const {
   extractNavigationFromPayload,
   parseSseChunk,
+  resultFromHref,
 } = require('./lessonCaddieNavigationBridge.browser.js');
 
 const RESULT = {
@@ -28,6 +29,22 @@ test('extracts navigation from a completed MCP SSE payload', () => {
     },
   };
   assert.equal(extractNavigationFromPayload(payload)?.destination, 'start-lesson');
+});
+
+test('extracts start-lesson from an external markdown fallback link', () => {
+  const payload = {
+    content: [
+      {
+        type: 'text',
+        text: 'Open Start Lesson in LessonCaddie: https://lessoncaddie.ssmlabs.com/app?view=start-lesson',
+      },
+    ],
+  };
+  assert.equal(extractNavigationFromPayload(payload)?.destination, 'start-lesson');
+  assert.equal(
+    resultFromHref(null, 'https://lessoncaddie.ssmlabs.com/app?view=start-lesson')?.destination,
+    'start-lesson',
+  );
 });
 
 test('parses SSE data lines into JSON events', () => {
