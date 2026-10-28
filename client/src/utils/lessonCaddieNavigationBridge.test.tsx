@@ -63,6 +63,27 @@ describe('lessonCaddieNavigationBridge', () => {
     expect(posted).toEqual([]);
   });
 
+  it('posts from a live turn even when the tool part is not last', () => {
+    const posted: unknown[] = [];
+    Object.defineProperty(window, 'parent', {
+      configurable: true,
+      value: { postMessage: (data: unknown, origin: string) => posted.push({ data, origin }) },
+    });
+    handleShellMessage({
+      origin: 'https://lessoncaddie.ssmlabs.com',
+      data: { source: 'lessoncaddie-shell', type: 'surface', surface: 'assistant' },
+    } as MessageEvent);
+    expect(
+      onToolResult({
+        functionName: 'open_app_screen_mcp_lessoncaddie-instructor',
+        output: JSON.stringify(RESULT),
+        isLast: false,
+        sawSubmitting: true,
+      }),
+    ).toBe(true);
+    expect(posted).toHaveLength(1);
+  });
+
   it('posts once to the LessonCaddie shell and ignores duplicates', () => {
     const posted: unknown[] = [];
     Object.defineProperty(window, 'parent', {

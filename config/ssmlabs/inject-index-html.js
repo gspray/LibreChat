@@ -9,7 +9,9 @@ const SELECTOR_SENTINEL = 'data-ssmlabs-hide-model-selector="true"';
 const BRANDING_SENTINEL = 'data-ssmlabs-branding="true"';
 const EMBED_SW_SENTINEL = 'data-ssmlabs-embed-sw="true"';
 const NAV_CONFIG_SENTINEL = 'data-ssmlabs-nav-config="true"';
+const NAV_BRIDGE_SENTINEL = 'data-ssmlabs-nav-bridge="true"';
 const SELECTOR_SCRIPT = `<script src="/ssmlabs/hide-model-selector.js?v=3" defer ${SELECTOR_SENTINEL}></script>`;
+const NAV_BRIDGE_SCRIPT = `<script src="/ssmlabs/lesson-caddie-navigation-bridge.js?v=1" ${NAV_BRIDGE_SENTINEL}></script>`;
 const EMBED_SW_SCRIPT = `<script ${EMBED_SW_SENTINEL}>
 (function clearFramedChatWorker() {
   if (window.parent === window) return;
@@ -118,6 +120,9 @@ function injectOverlayScripts(html) {
   }
   if (!next.includes(NAV_CONFIG_SENTINEL)) {
     next = next.replace('</head>', `${buildNavConfigScript()}\n</head>`);
+  }
+  if (!next.includes(NAV_BRIDGE_SENTINEL)) {
+    next = next.replace('</head>', `${NAV_BRIDGE_SCRIPT}\n</head>`);
   }
   return next;
 }

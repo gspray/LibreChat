@@ -8,7 +8,7 @@ services:
       HIDE_TOOL_ACTIVITY: "true"
       INSTRUCTOR_ASSISTANT_MODEL: gpt-4o
       LESSONCADDIE_HOME_URL: https://lessoncaddie.ssmlabs.com/app
-      LESSONCADDIE_ALLOWED_ORIGINS: https://lessoncaddie.ssmlabs.com
+      LESSONCADDIE_ALLOWED_ORIGINS: https://lessoncaddie.ssmlabs.com,http://127.0.0.1:3021,http://localhost:3021
       X_FRAME_OPTIONS: "off"
       CROSS_ORIGIN_RESOURCE_POLICY: same-site
       CSP_FRAME_ANCESTORS: "'self' https://lessoncaddie.ssmlabs.com http://127.0.0.1:3021"
@@ -24,6 +24,7 @@ services:
       - ./config/ssmlabs:/app/config/ssmlabs:ro
       - ./config/ssmlabs/lessonCaddieReturn.js:/app/config/ssmlabs/lessonCaddieReturn.js:ro
       - ./config/ssmlabs/hide-model-selector.browser.js:/app/client/dist/ssmlabs/hide-model-selector.js:ro
+      - ./config/ssmlabs/lessonCaddieNavigationBridge.browser.js:/app/client/dist/ssmlabs/lesson-caddie-navigation-bridge.js:ro
       - ./config/ssmlabs/embed-passthrough-sw.js:/app/client/dist/sw.js:ro
       - ./config/ssmlabs/branding/manifest.webmanifest:/app/client/dist/manifest.webmanifest:ro
       - ./config/ssmlabs/branding/assets/favicon-16x16.png:/app/client/dist/assets/favicon-16x16.png:ro

@@ -224,14 +224,33 @@ export function handleShellMessage(event: MessageEvent) {
   }
 }
 
+function resolveParentOrigin(): string {
+  if (state.parentOrigin) {
+    return state.parentOrigin;
+  }
+  const ancestors = window.location?.ancestorOrigins;
+  if (ancestors && ancestors.length > 0 && isAllowedOrigin(ancestors[0])) {
+    state.parentOrigin = ancestors[0];
+    return state.parentOrigin;
+  }
+  const referrer = originOf(document.referrer || '');
+  if (referrer && isAllowedOrigin(referrer)) {
+    state.parentOrigin = referrer;
+    return referrer;
+  }
+  return '';
+}
+
 export function onToolResult(notice: ToolResultNotice = {}) {
   const name = clean(notice.functionName);
-  if (
-    !name.includes(TOOL_NAME) ||
-    notice.hasError ||
-    notice.sawSubmitting !== true ||
-    notice.isLast !== true
-  ) {
+  if (!name.includes(TOOL_NAME) || notice.hasError || notice.sawSubmitting !== true) {
+    let skipCode = 'not_live_turn';
+    if (!name.includes(TOOL_NAME)) {
+      skipCode = 'name';
+    } else if (notice.hasError) {
+      skipCode = 'error';
+    }
+    logNav('bridge_skipped', { code: skipCode });
     return false;
   }
   const result = parseNavigationResult(notice.output);
@@ -246,9 +265,16 @@ export function onToolResult(notice: ToolResultNotice = {}) {
     return false;
   }
   const started = window.performance?.now?.() ?? Date.now();
-  if (isFramed() && state.parentOrigin) {
+  if (isFramed()) {
+    const origin = resolveParentOrigin();
     try {
-      window.parent.postMessage(buildNavigateMessage(result), state.parentOrigin);
+      if (origin) {
+        window.parent.postMessage(buildNavigateMessage(result), origin);
+      } else {
+        readConfig().allowedOrigins.forEach((allowed) => {
+          window.parent.postMessage(buildNavigateMessage(result), allowed);
+        });
+      }
       logNav('bridge_sent', {
         requestId: result.requestId,
         destination: result.destination,
