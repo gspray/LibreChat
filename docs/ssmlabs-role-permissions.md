@@ -36,20 +36,22 @@ commit the new snapshot before retrying.
 
 On each future target host, set `LIBRECHAT_INSTANCE_ENV=stage` or
 `LIBRECHAT_INSTANCE_ENV=production` in the Compose environment, copy the tracked
-Compose override, updated `config/instructor-assistant.librechat.yaml`, and
-permission snapshot, then recreate the API container. The target marker is
-checked before database access. The hook also rejects a `librechat.yaml` that
+Compose override, copy the updated `config/instructor-assistant.librechat.yaml`
+to the runtime `librechat.yaml`, and bring in the permission snapshot. The
+target marker is checked before database access. The
+hook also rejects a `librechat.yaml` that
 still explicitly seeds Agent, MCP Server, or Skill role permissions, since those
 would overwrite the snapshot on a later restart. Run the matching hook before
 opening the new chat instance to users:
 
 ```bash
-bash config/ssmlabs/apply-role-permissions.sh stage
+bash config/ssmlabs/deploy-chat.sh stage
 # or, on the production chat host:
-bash config/ssmlabs/apply-role-permissions.sh production
+bash config/ssmlabs/deploy-chat.sh production
 ```
 
-The hook applies the three permission groups, preserves unrelated role settings,
+The deploy command starts the API and invokes the permission hook. The hook
+applies the three permission groups, preserves unrelated role settings,
 restarts the API when permissions changed to clear its role cache, and checks the
 result. It fails if a role is missing or the target marker does not match. A
 failed hook fails the chat release; do not treat an incomplete permission apply
