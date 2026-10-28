@@ -31,7 +31,7 @@ export default function OAuthSuccess() {
   }, []);
 
   return (
-    <div className="bg-surface-secondary flex min-h-[calc(100dvh-3.25rem)] items-center justify-center p-8">
+    <div className="bg-surface-secondary flex min-h-screen items-center justify-center p-8">
       <div className="bg-surface-primary w-full max-w-md rounded-xl p-8 text-center shadow-lg">
         <h1 className="text-text-primary mb-4 text-3xl font-bold">
           {localize('com_ui_oauth_success_title') || 'Authentication Successful'}

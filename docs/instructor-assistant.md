@@ -38,20 +38,10 @@ Variables:
 | `APP_TITLE` | `Ask Lesson Caddie Assistant` | Browser/app title (tab default, login logo alt). |
 | `APP_SHORT_NAME` | `Ask Caddie` | Apple web app / PWA short name. |
 | `SSMLABS_BRANDING_ASSET_VERSION` | `1` | Bumps favicon query string when icons change (PWA cache). |
-| `LESSONCADDIE_HOME_URL` | `https://lessoncaddie.ssmlabs.com/app` | Fallback destination for **LessonCaddie App**. |
-| `LESSONCADDIE_ALLOWED_ORIGINS` | `https://lessoncaddie.ssmlabs.com` | Comma-separated origins allowed as `returnUrl` / `lessoncaddieReturn` query values. The home URL origin is always included. |
+| `LESSONCADDIE_HOME_URL` | `https://lessoncaddie.ssmlabs.com/app` | LessonCaddie origin used by SSO return/allow-list helpers. |
+| `LESSONCADDIE_ALLOWED_ORIGINS` | `https://lessoncaddie.ssmlabs.com` | Comma-separated origins allowed as SSO `returnUrl` values. The home URL origin is always included. |
 
-## LessonCaddie App return link
-
-The chat header (welcome screen and every conversation) includes a same-tab **LessonCaddie App** control. Mobile shows a compact back-arrow button with that accessible name.
-
-Open LibreChat with a safe return URL when leaving a LessonCaddie screen:
-
-`https://chat.ssmlabs.com/c/new?returnUrl=https://lessoncaddie.ssmlabs.com/app/edit-lesson?lessonId=…`
-
-The value is stored in `sessionStorage` for that tab, so later conversations still return to the originating screen. Unsafe or off-allowlist URLs are ignored and the button uses `LESSONCADDIE_HOME_URL`. LibreChat auth cookies and saved chats are unchanged.
-
-This is an isolated overlay under `config/ssmlabs/` plus a one-line `Header.tsx` mount of `client/src/components/ssmlabs/BackToLessonCaddie.tsx` for a future client image rebuild. The published LibreChat image serves the overlay without rebuilding Vite.
+Chat uses LibreChat’s own header. App ↔ Assistant switching lives in the LessonCaddie shell, not inside chat.
 
 OpenAI credentials stay in the existing Compose/Doppler env. They are not written into yaml or browser config.
 

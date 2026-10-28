@@ -1,6 +1,5 @@
 import { ThemeSelector } from '@librechat/client';
 import { TStartupConfig } from 'librechat-data-provider';
-import LessonCaddieHeader from '~/components/ssmlabs/LessonCaddieHeader';
 import { ErrorMessage } from '~/components/Auth/ErrorMessage';
 import { hasPublishedPolicies } from '~/utils/policies';
 import { TranslationKeys, useLocalize } from '~/hooks';
@@ -90,7 +89,6 @@ function AuthLayout({
 
   return (
     <div className="bg-surface-primary relative flex min-h-screen flex-col">
-      <LessonCaddieHeader startupConfig={startupConfig ?? undefined} />
       <Banner />
       <BlinkAnimation active={isFetching}>
         <div className="mt-6 h-10 w-full bg-cover">

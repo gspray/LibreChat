@@ -43,7 +43,7 @@ export default function OAuthError() {
   };
 
   return (
-    <div className="bg-surface-secondary flex min-h-[calc(100dvh-3.25rem)] items-center justify-center p-8">
+    <div className="bg-surface-secondary flex min-h-screen items-center justify-center p-8">
       <div className="bg-surface-primary w-full max-w-md rounded-lg p-8 text-center shadow-lg">
         <div className="mb-4 flex justify-center">
           <div className="bg-status-error-subtle flex h-12 w-12 items-center justify-center rounded-full">

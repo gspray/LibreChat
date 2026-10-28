@@ -188,7 +188,7 @@ function SharedView() {
   let content: JSX.Element;
   if (!isAuthReady || isLoading || configLoading) {
     content = (
-      <div className="flex h-full items-center justify-center">
+      <div className="flex h-screen items-center justify-center">
         <Spinner className="" />
       </div>
     );
@@ -264,7 +264,7 @@ function SharedView() {
         value={{ isSharedConvo: true, shareId, hasConfiguredSender: data?.hasConfiguredSender }}
       >
         <AppChatSurface>
-          <div className="bg-presentation relative flex h-full w-full overflow-hidden">
+          <div className="bg-presentation relative flex h-screen w-full overflow-hidden">
             <main className="bg-presentation relative flex w-full grow overflow-hidden">
               {artifactsContainer}
             </main>
@@ -288,7 +288,7 @@ export function SharedLinkUnavailable({
   onRetry: () => void;
 }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 px-4 text-center">
+    <div className="flex h-screen flex-col items-center justify-center gap-4 px-4 text-center">
       <p>{message}</p>
       <Button type="button" variant="outline" onClick={onRetry} disabled={isRetrying}>
         {isRetrying ? (

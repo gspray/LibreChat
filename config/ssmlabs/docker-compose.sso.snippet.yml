@@ -6,6 +6,9 @@
 #   LESSONCADDIE_SSO_ISSUER: ${LESSONCADDIE_SSO_ISSUER:-}
 #   LESSONCADDIE_SSO_SHARED_SECRET: ${LESSONCADDIE_SSO_SHARED_SECRET:-}
 #   LESSONCADDIE_SSO_ENVIRONMENT: ${LESSONCADDIE_SSO_ENVIRONMENT:-stage}
+#   X_FRAME_OPTIONS: "off"
+#   CROSS_ORIGIN_RESOURCE_POLICY: same-site
+#   CSP_FRAME_ANCESTORS: "'self' https://lessoncaddie.ssmlabs.com http://127.0.0.1:3021"
 #
 #   volumes:
 #     - ./config/ssmlabs/lessoncaddie-sso.browser.js:/app/client/dist/ssmlabs/lessoncaddie-sso.js:ro

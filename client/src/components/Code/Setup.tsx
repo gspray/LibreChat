@@ -8,7 +8,6 @@ import type { TranslationKeys } from '~/hooks';
 import { useCodeSetupAttemptQuery, useCodeSetupDecisionMutation } from '~/data-provider/CodeSetup';
 import TermsAndConditionsModal from '~/components/ui/TermsAndConditionsModal';
 import { useUserTermsQuery, useGetStartupConfig } from '~/data-provider';
-import LessonCaddieHeader from '~/components/ssmlabs/LessonCaddieHeader';
 import { useAuthContext } from '~/hooks/AuthContext';
 import { getResponseStatus } from '~/utils/errors';
 import { useLocalize } from '~/hooks';
@@ -36,17 +35,13 @@ function Loading() {
 
 function Page({ children }: { children: ReactNode }) {
   const localize = useLocalize();
-  const { data: startupConfig } = useGetStartupConfig();
   return (
-    <div className="flex min-h-dvh flex-col">
-      <LessonCaddieHeader startupConfig={startupConfig} />
-      <main className="bg-surface-primary text-text-primary flex-1 px-4 py-8">
-        <div className="mx-auto flex max-w-2xl flex-col gap-6">
-          <h1 className="text-2xl font-semibold">{localize('com_ui_code_setup_title')}</h1>
-          {children}
-        </div>
-      </main>
-    </div>
+    <main className="bg-surface-primary text-text-primary min-h-dvh px-4 py-8">
+      <div className="mx-auto flex max-w-2xl flex-col gap-6">
+        <h1 className="text-2xl font-semibold">{localize('com_ui_code_setup_title')}</h1>
+        {children}
+      </div>
+    </main>
   );
 }
 

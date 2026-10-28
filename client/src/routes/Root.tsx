@@ -37,7 +37,6 @@ import KeyboardShortcutsDialog from '~/components/Nav/KeyboardShortcutsDialog';
 import { SteerHostProvider, appSteerHost } from '~/Providers/SteerHostContext';
 import KeyboardDeleteDialog from '~/components/Nav/KeyboardDeleteDialog';
 import { useUserTermsQuery, useGetStartupConfig } from '~/data-provider';
-import LessonCaddieHeader from '~/components/ssmlabs/LessonCaddieHeader';
 import { MobileDrawerScrim } from '~/components/UnifiedSidebar/mobile';
 import AnalyticsConsent from '~/components/System/AnalyticsConsent';
 import useKeyboardShortcuts from '~/hooks/useKeyboardShortcuts';
@@ -217,16 +216,13 @@ function RootLayout() {
                        *  too late and drops too early. */
                       inert={isSmallScreen && (sidebarExpanded || isSliding) ? '' : undefined}
                     >
-                      <LessonCaddieHeader startupConfig={config} />
-                      <div className="flex min-h-0 flex-1 flex-col">
-                        <MCPAppsPolicyProvider
-                          startupConfig={config}
-                          ready={isConfigReady && configError == null}
-                          userId={user?.id}
-                        >
-                          <Outlet />
-                        </MCPAppsPolicyProvider>
-                      </div>
+                      <MCPAppsPolicyProvider
+                        startupConfig={config}
+                        ready={isConfigReady && configError == null}
+                        userId={user?.id}
+                      >
+                        <Outlet />
+                      </MCPAppsPolicyProvider>
                     </div>
                     {/* Without the strip the scrim exists only for the travel:
                       through a close that began while the strip was still on

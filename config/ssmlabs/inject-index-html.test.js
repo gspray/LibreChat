@@ -51,7 +51,7 @@ test('enabling SSO leaves ordinary LibreChat login visits unchanged', () => {
   }
 });
 
-test('injectIndexHtml uses the React back link without a second DOM observer', () => {
+test('injectIndexHtml does not inject a LessonCaddie back-link overlay', () => {
   const html = injectIndexHtml(SAMPLE);
   assert.doesNotMatch(html, /back-to-lessoncaddie\.js/);
   assert.match(html, /hide-model-selector\.js/);
