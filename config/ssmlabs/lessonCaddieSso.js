@@ -111,6 +111,18 @@ function mapIdentityError(code) {
         'This email already has a LibreChat account. An administrator must link it before SSO can continue.',
     };
   }
+  if (code === 'LINK_MISSING') {
+    return {
+      status: 409,
+      message: 'The linked LibreChat account is missing. An administrator must repair the mapping.',
+    };
+  }
+  if (code === 'LINK_CONFLICT') {
+    return {
+      status: 409,
+      message: 'This LessonCaddie identity is already linked to a different LibreChat account.',
+    };
+  }
   return { status: 401, message: 'LibreChat sign-in failed.' };
 }
 
@@ -132,14 +144,23 @@ async function resolveLibreChatUser(identity, models) {
   const linkedId = trimString(identity.linkedLibreChatUserId);
   if (linkedId) {
     const linked = await findUser({ _id: linkedId });
-    if (linked) {
-      await updateUser(linked._id, {
-        provider: PROVIDER,
-        openidId: firebaseUid,
-        openidIssuer: ISSUER_NAME,
-      });
-      return findUser({ _id: linked._id });
+    if (!linked) {
+      const missing = new Error('Linked LibreChat account is missing');
+      missing.code = 'LINK_MISSING';
+      throw missing;
     }
+    const existingOpenId = trimString(linked.openidId);
+    if (existingOpenId && existingOpenId !== firebaseUid) {
+      const conflict = new Error('LibreChat account is linked to a different LessonCaddie user');
+      conflict.code = 'LINK_CONFLICT';
+      throw conflict;
+    }
+    await updateUser(linked._id, {
+      provider: PROVIDER,
+      openidId: firebaseUid,
+      openidIssuer: ISSUER_NAME,
+    });
+    return findUser({ _id: linked._id });
   }
 
   const created = await createUserIfAbsent({
