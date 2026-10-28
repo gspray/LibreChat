@@ -4,6 +4,16 @@ import { useLocalize } from '~/hooks';
 
 export default function LessonCaddieHeader({ startupConfig }: { startupConfig?: TStartupConfig }) {
   const localize = useLocalize();
+  let embedded = false;
+  try {
+    embedded = window.parent !== window;
+  } catch {
+    embedded = true;
+  }
+  if (embedded) {
+    return null;
+  }
+
   return (
     <header className="border-border-light bg-surface-canvas text-text-primary flex h-[3.25rem] shrink-0 items-center gap-2 border-b px-2">
       <BackToLessonCaddie startupConfig={startupConfig} />
