@@ -10,12 +10,13 @@ mcpServers:
     url: https://lessoncaddie.ssmlabs.com/api/instructor-mcp
     # LessonCaddie resolves chat context on each HTTP request.
     reuseConnection: true
-    requiresOAuth: true
+    requiresOAuth: false
     chatMenu: false
     serverInstructions: true
-    oauth:
-      scope: 'instructor:read instructor:write offline_access'
     requestHeaders:
+      X-LessonCaddie-Sso-Secret: '${LESSONCADDIE_SSO_SHARED_SECRET}'
+      X-LibreChat-Firebase-Uid: '{{LIBRECHAT_USER_OPENIDID}}'
+      X-LibreChat-User-Provider: '{{LIBRECHAT_USER_PROVIDER}}'
       X-LibreChat-User-Id: '{{LIBRECHAT_USER_ID}}'
       X-LibreChat-Conversation-Id: '{{LIBRECHAT_BODY_CONVERSATIONID}}'
       X-LibreChat-Message-Id: '{{LIBRECHAT_BODY_MESSAGEID}}'
