@@ -18,6 +18,7 @@ mcpServers:
     requestHeaders:
       X-LibreChat-User-Id: '{{LIBRECHAT_USER_ID}}'
       X-LibreChat-Conversation-Id: '{{LIBRECHAT_BODY_CONVERSATIONID}}'
+      X-LibreChat-Message-Id: '{{LIBRECHAT_BODY_MESSAGEID}}'
 mcpAppSandbox:
   url: https://mcp-sandbox.ssmlabs.com/api/mcp/sandbox
 interface:
