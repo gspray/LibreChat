@@ -218,6 +218,8 @@ type UserScopedConnectionConfig = Pick<
   ParsedServerConfig,
   'requiresOAuth' | 'source' | 'dbId' | 'startup'
 > & {
+  type?: string;
+  reuseConnection?: boolean;
   /** Loosened like the fields below: raw (pre-inspection) configs carry
    *  optional API-key fields, and the gating predicates only inspect them. */
   apiKey?: Partial<NonNullable<ParsedServerConfig['apiKey']>> | null;
@@ -486,8 +488,9 @@ export function getMissingRuntimeBodyPlaceholderFields(
  * `BODY` placeholders vary by chat request, so the normal userId:serverName
  * cache would reuse a connection built with stale request context.
  *
- * Ephemeral connections are created and torn down per tool call — configs using
- * these placeholders pay a full connect + initialize on every invocation.
+ * By default these connections live only for the request. Streamable HTTP servers
+ * can opt into reuse when BODY values affect only headers and the server handles
+ * those headers per request instead of capturing them at session initialization.
  *
  * User/OpenID/Graph placeholders still require user-scoped connections, but they
  * are not request-scoped by themselves. HTTP transports refresh resolved headers
@@ -495,6 +498,14 @@ export function getMissingRuntimeBodyPlaceholderFields(
  * connection without forcing a reconnect for every invocation.
  */
 export function requiresEphemeralUserConnection(config: UserScopedConnectionConfig): boolean {
+  if (
+    config.reuseConnection === true &&
+    (config.type === 'streamable-http' || config.type === 'http')
+  ) {
+    // A URL, process argument or OAuth handshake cannot change on a live transport.
+    return getMCPRequestScope({ ...config, headers: undefined, requestHeaders: undefined })
+      .requestScoped;
+  }
   return getMCPRequestScope(config).requestScoped;
 }
 

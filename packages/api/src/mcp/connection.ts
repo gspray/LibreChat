@@ -1,6 +1,7 @@
 import { isIP } from 'node:net';
 import { EventEmitter } from 'events';
 import { logger } from '@librechat/data-schemas';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { MCP_UI_EXTENSION_ID } from 'librechat-data-provider';
 import { fetch as undiciFetch, Agent, ProxyAgent } from 'undici';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -1106,6 +1107,13 @@ function requireToolsSnapshot(snapshot: MCPToolsSnapshot): MCPToolsSnapshot {
   return snapshot;
 }
 
+const callHeaders = new AsyncLocalStorage<WeakMap<MCPConnection, Record<string, string>>>();
+
+/** Isolates live transport headers across concurrent calls on pooled connections. */
+export function withMCPCallHeaders<T>(operation: () => Promise<T>): Promise<T> {
+  return callHeaders.run(new WeakMap(), operation);
+}
+
 export class MCPConnection extends EventEmitter {
   public client: Client;
   private options: t.MCPOptions;
@@ -1268,7 +1276,12 @@ export class MCPConnection extends EventEmitter {
     for (const [key, value] of Object.entries(headers)) {
       normalizedHeaders[key.toLowerCase()] = value;
     }
-    this.requestHeaders = normalizedHeaders;
+    const scope = callHeaders.getStore();
+    if (scope && 'reuseConnection' in this.options && this.options.reuseConnection === true) {
+      scope.set(this, normalizedHeaders);
+    } else {
+      this.requestHeaders = normalizedHeaders;
+    }
   }
 
   /** Stable routing identity captured by this connection, without live authorization headers. */
@@ -1277,7 +1290,7 @@ export class MCPConnection extends EventEmitter {
   }
 
   getRequestHeaders(): Record<string, string> | null | undefined {
-    return this.requestHeaders;
+    return callHeaders.getStore()?.get(this) ?? this.requestHeaders;
   }
 
   /**
@@ -1288,10 +1301,10 @@ export class MCPConnection extends EventEmitter {
    * keep winning on the retry.
    */
   setAuthorizationHeader(accessToken: string): void {
-    this.requestHeaders = {
-      ...(this.requestHeaders ?? {}),
+    this.setRequestHeaders({
+      ...(this.getRequestHeaders() ?? {}),
       authorization: `Bearer ${accessToken}`,
-    };
+    });
   }
 
   /**
