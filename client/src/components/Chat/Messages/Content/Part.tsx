@@ -42,6 +42,7 @@ import {
   getActivityLabelText,
   getPartKeyIndex,
 } from '~/utils';
+import LessonCaddieNavigationObserver from '~/utils/LessonCaddieNavigationObserver';
 import BackgroundTaskCall from './Parts/BackgroundTaskCall';
 import { getAskUserQuestionPart } from '~/utils/approval';
 import AskUserQuestionCall from './AskUserQuestionCall';
@@ -383,28 +384,40 @@ const renderDefaultTool: ToolRenderer = ({
   hideAttachments,
   onToolExpand,
 }) => (
-  <ToolCall
-    stepId={toolCall.stepId}
-    args={toolCall.args ?? ''}
-    name={toolCall.name || ''}
-    toolCallId={toolCallId}
-    output={toolCall.output ?? ''}
-    initialProgress={toolCall.progress ?? 0.1}
-    isSubmitting={isSubmitting}
-    attachments={attachments}
-    auth={toolCall.auth}
-    isLast={isLast}
-    hideAttachments={hideAttachments}
-    onExpand={onToolExpand}
-    runStepStatus={
-      toolCall.backgroundTask?.cancelled === true ? 'cancelled' : toolCall.runStepStatus
-    }
-    runStepDurationMs={toolCall.runStepDurationMs}
-    toolPreparationStartedAt={toolCall.toolPreparationStartedAt}
-    toolDispatchedAt={toolCall.toolDispatchedAt}
-    toolPreparationDurationMs={toolCall.toolPreparationDurationMs}
-    toolExecutionDurationMs={toolCall.toolExecutionDurationMs}
-  />
+  <>
+    <LessonCaddieNavigationObserver
+      name={toolCall.name || ''}
+      output={toolCall.output ?? ''}
+      isSubmitting={isSubmitting}
+      isLast={isLast}
+      toolCallId={toolCallId}
+      runStepStatus={
+        toolCall.backgroundTask?.cancelled === true ? 'cancelled' : toolCall.runStepStatus
+      }
+    />
+    <ToolCall
+      stepId={toolCall.stepId}
+      args={toolCall.args ?? ''}
+      name={toolCall.name || ''}
+      toolCallId={toolCallId}
+      output={toolCall.output ?? ''}
+      initialProgress={toolCall.progress ?? 0.1}
+      isSubmitting={isSubmitting}
+      attachments={attachments}
+      auth={toolCall.auth}
+      isLast={isLast}
+      hideAttachments={hideAttachments}
+      onExpand={onToolExpand}
+      runStepStatus={
+        toolCall.backgroundTask?.cancelled === true ? 'cancelled' : toolCall.runStepStatus
+      }
+      runStepDurationMs={toolCall.runStepDurationMs}
+      toolPreparationStartedAt={toolCall.toolPreparationStartedAt}
+      toolDispatchedAt={toolCall.toolDispatchedAt}
+      toolPreparationDurationMs={toolCall.toolPreparationDurationMs}
+      toolExecutionDurationMs={toolCall.toolExecutionDurationMs}
+    />
+  </>
 );
 
 /** Calls a name alone cannot route: programmatic bash by its arguments, handoffs by prefix. */

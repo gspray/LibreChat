@@ -3,10 +3,15 @@
 const fs = require('fs');
 const path = require('path');
 
+const { resolveLessonCaddieConfig } = require('./lessonCaddieReturn');
+
 const SELECTOR_SENTINEL = 'data-ssmlabs-hide-model-selector="true"';
 const BRANDING_SENTINEL = 'data-ssmlabs-branding="true"';
 const EMBED_SW_SENTINEL = 'data-ssmlabs-embed-sw="true"';
+const NAV_CONFIG_SENTINEL = 'data-ssmlabs-nav-config="true"';
+const NAV_BRIDGE_SENTINEL = 'data-ssmlabs-nav-bridge="true"';
 const SELECTOR_SCRIPT = `<script src="/ssmlabs/hide-model-selector.js?v=3" defer ${SELECTOR_SENTINEL}></script>`;
+const NAV_BRIDGE_SCRIPT = `<script src="/ssmlabs/lesson-caddie-navigation-bridge.js?v=1" ${NAV_BRIDGE_SENTINEL}></script>`;
 const EMBED_SW_SCRIPT = `<script ${EMBED_SW_SENTINEL}>
 (function clearFramedChatWorker() {
   if (window.parent === window) return;
@@ -96,6 +101,15 @@ function injectBaseHref(html) {
   return html.replace(/<head\b[^>]*>/i, (headTag) => `${headTag}\n    ${baseTag}`);
 }
 
+function buildNavConfigScript() {
+  const config = resolveLessonCaddieConfig(process.env);
+  const payload = JSON.stringify({
+    allowedOrigins: config.allowedOrigins,
+    homeUrl: config.homeUrl,
+  });
+  return `<script ${NAV_CONFIG_SENTINEL}>window.__LESSONCADDIE_NAV__=${payload};</script>`;
+}
+
 function injectOverlayScripts(html) {
   let next = html;
   if (!next.includes(SELECTOR_SENTINEL)) {
@@ -103,6 +117,12 @@ function injectOverlayScripts(html) {
   }
   if (!next.includes(EMBED_SW_SENTINEL)) {
     next = next.replace('</head>', `${EMBED_SW_SCRIPT}\n</head>`);
+  }
+  if (!next.includes(NAV_CONFIG_SENTINEL)) {
+    next = next.replace('</head>', `${buildNavConfigScript()}\n</head>`);
+  }
+  if (!next.includes(NAV_BRIDGE_SENTINEL)) {
+    next = next.replace('</head>', `${NAV_BRIDGE_SCRIPT}\n</head>`);
   }
   return next;
 }
