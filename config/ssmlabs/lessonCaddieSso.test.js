@@ -9,6 +9,7 @@ const {
   resolveSsoConfig,
   sanitizeAppReturnTo,
   buildLessonCaddieStartUrl,
+  ssoBrowserStateAllowsCallback,
   resolveLibreChatUser,
 } = require('./lessonCaddieSso');
 
@@ -48,6 +49,19 @@ test('start URL sends the user through LessonCaddie with a return path', () => {
   assert.equal(url.searchParams.get('librechatSsoState'), 'browser-state');
 });
 
+test('iframe callback may omit the /start cookie; mismatched cookies are still rejected', () => {
+  assert.equal(ssoBrowserStateAllowsCallback('', ''), false);
+  assert.equal(ssoBrowserStateAllowsCallback('issued-state-token-aaaaaaaa', ''), true);
+  assert.equal(
+    ssoBrowserStateAllowsCallback('issued-state-token-aaaaaaaa', 'issued-state-token-aaaaaaaa'),
+    true,
+  );
+  assert.equal(
+    ssoBrowserStateAllowsCallback('issued-state-token-aaaaaaaa', 'other-state-token-bbbbbbbbb'),
+    false,
+  );
+});
+
 test('callback replaces the chat session only with matching browser state', async () => {
   const app = express();
   app.use((req, _res, next) => {
@@ -85,6 +99,38 @@ test('callback replaces the chat session only with matching browser state', asyn
   assert.equal(valid.headers.location, '/c/new');
   assert.equal(redeemed, 1);
   assert.equal(signedInUser, 'chat-switched-user');
+});
+
+test('callback without lc_sso_state cookie redeems the LessonCaddie handoff', async () => {
+  const app = express();
+  app.use((req, _res, next) => {
+    req.cookies = {};
+    next();
+  });
+  let redeemed = 0;
+  app.use(
+    '/sso/lessoncaddie',
+    createLessonCaddieSsoRouter({
+      resolveSsoConfig: () => ({ enabled: true, homeUrl: 'https://lessoncaddie.ssmlabs.com/app' }),
+      redeemWithLessonCaddie: async (_config, payload) => {
+        redeemed += 1;
+        assert.equal(payload.code, 'iframe-code');
+        assert.equal(payload.state, 'iframe-state-token-aaaaaaaaaa');
+        return { firebaseUid: 'instructor-1', email: 'instructor@example.com' };
+      },
+      resolveLibreChatUser: async () => ({ _id: 'chat-instructor-1' }),
+      getModels: () => ({}),
+      getAuthService: () => ({
+        setAuthTokens: async () => {},
+      }),
+    }),
+  );
+  const response = await request(app).get(
+    '/sso/lessoncaddie/callback?code=iframe-code&state=iframe-state-token-aaaaaaaaaa&returnTo=%2Fc%2Fnew',
+  );
+  assert.equal(response.status, 302);
+  assert.equal(response.headers.location, '/c/new');
+  assert.equal(redeemed, 1);
 });
 
 test('resolveLibreChatUser creates on first login and does not merge by email', async () => {

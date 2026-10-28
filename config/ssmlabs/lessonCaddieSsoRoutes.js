@@ -6,6 +6,7 @@ const {
   resolveSsoConfig,
   sanitizeAppReturnTo,
   buildLessonCaddieStartUrl,
+  ssoBrowserStateAllowsCallback,
   mapIdentityError,
   resolveLibreChatUser,
   redeemWithLessonCaddie,
@@ -53,12 +54,7 @@ function createLessonCaddieSsoRouter(deps = {}) {
     const state = String(req.query.state || '');
     const cookieState = String(req.cookies?.lc_sso_state || '');
     res.clearCookie('lc_sso_state');
-    if (
-      !state ||
-      state.length !== cookieState.length ||
-      !cookieState ||
-      !crypto.timingSafeEqual(Buffer.from(state), Buffer.from(cookieState))
-    ) {
+    if (!ssoBrowserStateAllowsCallback(state, cookieState)) {
       res.status(401).send('Chat sign-in expired. Please start again from LessonCaddie.');
       return;
     }

@@ -1,5 +1,7 @@
 'use strict';
 
+const crypto = require('node:crypto');
+
 const PROVIDER = 'lessoncaddie';
 const ISSUER_NAME = 'lessoncaddie-firebase';
 const MAX_RETURN_TO_LENGTH = 2048;
@@ -83,6 +85,22 @@ function buildLessonCaddieStartUrl(config, returnTo, state) {
   url.searchParams.set('librechatSsoReturn', returnTo || '/c/new');
   url.searchParams.set('librechatSsoState', state);
   return url.toString();
+}
+
+function ssoBrowserStateAllowsCallback(queryState, cookieState) {
+  const state = trimString(queryState);
+  const cookie = trimString(cookieState);
+  if (!state) {
+    return false;
+  }
+  if (!cookie) {
+    // Persistent iframe SSO loads /callback directly. LessonCaddie redeem binds code+state.
+    return true;
+  }
+  if (state.length !== cookie.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(Buffer.from(state), Buffer.from(cookie));
 }
 
 function mapIdentityError(code) {
@@ -194,6 +212,7 @@ module.exports = {
   resolveSsoConfig,
   sanitizeAppReturnTo,
   buildLessonCaddieStartUrl,
+  ssoBrowserStateAllowsCallback,
   mapIdentityError,
   resolveLibreChatUser,
   redeemWithLessonCaddie,
