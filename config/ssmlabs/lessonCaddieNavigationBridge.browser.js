@@ -69,7 +69,15 @@
     try {
       return JSON.parse(value);
     } catch {
-      return null;
+      const start = value.indexOf('{"type":"lessoncaddie.navigation"');
+      if (start < 0) {
+        return null;
+      }
+      try {
+        return JSON.parse(value.slice(start));
+      } catch {
+        return null;
+      }
     }
   }
 
@@ -300,13 +308,15 @@
   }
 
   function hideResolvedDeepLinks(windowObject, result) {
-    const href = clean(result && result.deepLink);
     const doc = windowObject.document;
-    if (!href || !doc || typeof doc.querySelectorAll !== 'function') {
+    if (!doc || typeof doc.querySelectorAll !== 'function') {
       return;
     }
+    const href = clean(result && result.deepLink);
     doc.querySelectorAll('a[href]').forEach((anchor) => {
-      if (anchor.href === href) {
+      const link = clean(anchor.href);
+      const fromHref = resultFromHref(windowObject, link);
+      if ((href && link === href) || fromHref) {
         anchor.setAttribute('data-lc-nav-bridged', 'true');
         anchor.hidden = true;
       }

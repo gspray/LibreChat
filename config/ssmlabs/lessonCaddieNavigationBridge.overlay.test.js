@@ -31,6 +31,19 @@ test('extracts navigation from a completed MCP SSE payload', () => {
   assert.equal(extractNavigationFromPayload(payload)?.destination, 'start-lesson');
 });
 
+test('extracts navigation JSON that follows an Opened screen sentence', () => {
+  const payload = {
+    content: [
+      {
+        type: 'text',
+        text: 'Opened Start Lesson.\n{"type":"lessoncaddie.navigation","version":1,"destination":"start-lesson","params":{},"requestId":"req-1"}',
+      },
+    ],
+  };
+  assert.equal(extractNavigationFromPayload(payload)?.destination, 'start-lesson');
+  assert.equal(extractNavigationFromPayload(payload)?.requestId, 'req-1');
+});
+
 test('extracts start-lesson from an external markdown fallback link', () => {
   const payload = {
     content: [
