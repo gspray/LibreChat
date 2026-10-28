@@ -8,6 +8,8 @@ mcpServers:
   lessoncaddie-instructor:
     type: streamable-http
     url: https://lessoncaddie.ssmlabs.com/api/instructor-mcp
+    # LessonCaddie resolves chat context on each HTTP request.
+    reuseConnection: true
     requiresOAuth: true
     chatMenu: false
     serverInstructions: true
@@ -19,7 +21,7 @@ mcpServers:
 mcpAppSandbox:
   url: https://mcp-sandbox.ssmlabs.com/api/mcp/sandbox
 interface:
-  customWelcome: "Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?"
+  customWelcome: 'Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?'
   landingHeading: entity
   landingFooter: false
   # Endpoints/model chip off; modelSpecs still drive softDefault + landing. Chip hide is the ssmlabs overlay, not a ModelSelector.tsx fork.
@@ -49,7 +51,7 @@ modelSpecs:
   list:
     - name: instructor-assistant
       label: Instructor Assistant
-      description: "Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?"
+      description: 'Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?'
       softDefault: true
       showOnLanding: true
       hideBadgeRow: true
