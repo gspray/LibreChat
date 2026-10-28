@@ -1,6 +1,7 @@
 'use strict';
 
 /**
+ * SSM Labs overlay — docs/ssmlabs-fork-patches.md
  * Controlled linking for an existing LibreChat user to a Firebase UID.
  * Does not merge by email automatically.
  *

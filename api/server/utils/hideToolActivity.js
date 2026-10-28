@@ -1,3 +1,9 @@
+/**
+ * SSM Labs fork patch — docs/ssmlabs-fork-patches.md
+ * New file (not upstream). Server-side stand-in for hide_sequential_outputs, which does not
+ * hide MCP “Ran tool” cards on v0.8.9-rc1. Navigation tool events are not dropped so the
+ * config/ssmlabs navigation overlay can still read open_app_screen results.
+ */
 const { StepTypes, SystemRoles } = require('librechat-data-provider');
 
 const NAVIGATION_TOOL_NAME = 'open_app_screen';

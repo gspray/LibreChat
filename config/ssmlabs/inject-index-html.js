@@ -1,5 +1,10 @@
 'use strict';
 
+/**
+ * SSM Labs overlay — docs/ssmlabs-fork-patches.md
+ * Hooks fs.readFileSync so api/server/index.js stays upstream while we still inject
+ * branding, <base href="/"> for nested /c/... routes, and overlay scripts.
+ */
 const fs = require('fs');
 const path = require('path');
 

@@ -2,6 +2,8 @@
 
 Dedicated LessonCaddie instructor agent for this LibreChat deployment (v0.8.9-rc1).
 
+**Fork policy:** keep LibreChat source changes to the bind-mounts listed in [ssmlabs-fork-patches.md](ssmlabs-fork-patches.md). UI branding, nested-route asset base, model-chip hiding, iframe SW cleanup, SSO routes, and MCP navigation are overlays under `config/ssmlabs/`.
+
 ## User-facing name
 
 **Ask Lesson Caddie Assistant** (`APP_TITLE`) for browser tab, PWA manifest, and login chrome. **Ask Caddie** (`APP_SHORT_NAME`) for home-screen short name. The default agent remains **Instructor Assistant**; the MCP server identifier remains `lessoncaddie-instructor`.
@@ -62,7 +64,7 @@ Default selection: model spec `instructor-assistant` with `softDefault: true` an
 
 UI: `modelSelect` and `parameters` off; MCP `chatMenu` false; MCP create/share/public false; prompts off. Administrators retain agent create and tool diagnostics.
 
-On LibreChat **v0.8.9-rc1**, `interface.modelSelect: false` alone does **not** hide the header model/agent chip when `modelSpecs.list` is non-empty (the chip can still open “Search models”). Keep `modelSpecs` for `softDefault` and landing starters; hide the chip with the mounted `config/ssmlabs/hide-model-selector.browser.js` overlay (or rebuild the client after the `ModelSelector` fix). Do **not** set `showInMenu: false` on the only spec — that removes it from `/api/config` and breaks client-side default agent selection for new chats.
+On LibreChat **v0.8.9-rc1**, `interface.modelSelect: false` alone does **not** hide the header model/agent chip when `modelSpecs.list` is non-empty (the chip can still open “Search models”). Keep `modelSpecs` for `softDefault` and landing starters; hide the chip with the mounted `config/ssmlabs/hide-model-selector.browser.js` overlay. Do **not** fork `ModelSelector.tsx`. Do **not** set `showInMenu: false` on the only spec — that removes it from `/api/config` and breaks client-side default agent selection for new chats.
 
 ## Provision / update
 
@@ -82,13 +84,11 @@ The provision command is idempotent: it creates the agent if missing, otherwise 
 
 Native `hide_sequential_outputs` does not hide MCP “Ran tool” cards in v0.8.9-rc1.
 
-Server (`HIDE_TOOL_ACTIVITY`):
+Server (`HIDE_TOOL_ACTIVITY`), bind-mounted — do not fork `client/src` message components:
 
-- Drops tool SSE events for non-admins (OAuth prompts still stream).
+- Drops tool SSE events for non-admins (OAuth prompts still stream; `open_app_screen` still streams for the navigation overlay).
 - Redacts tool parts on message GET.
 - Returns 403 for tool-part detail routes for non-admins.
-
-The production image cannot rebuild the Vite client. Source patches in `client/src` are kept for a future rebuild. Do not rely on CSS alone.
 
 ## Identity status
 
@@ -96,4 +96,4 @@ Designed per LibreChat user OAuth → LessonCaddie instructor `userId`. This hos
 
 ## Upgrade notes
 
-Keep the bind-mounted API files listed in the compose override when pulling LibreChat images. Do not upgrade LibreChat as part of ordinary Instructor Assistant maintenance.
+Keep the bind-mounted API files listed in [ssmlabs-fork-patches.md](ssmlabs-fork-patches.md) when pulling LibreChat images. Do not upgrade LibreChat as part of ordinary Instructor Assistant maintenance. Do not bind-mount a custom `client/dist`.

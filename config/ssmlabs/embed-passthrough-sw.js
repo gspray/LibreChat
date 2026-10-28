@@ -1,4 +1,5 @@
-/* Cached Workbox responses kept X-Frame-Options: SAMEORIGIN and blocked
+/* SSM Labs overlay — docs/ssmlabs-fork-patches.md
+ * Cached Workbox responses kept X-Frame-Options: SAMEORIGIN and blocked
  * the LessonCaddie Assistant iframe. This worker claims clients, drops
  * those caches, and does not intercept fetches. */
 self.addEventListener('install', (event) => {

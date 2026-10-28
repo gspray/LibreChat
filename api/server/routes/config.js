@@ -39,6 +39,7 @@ const { hasCapability, getHeldCapabilities } = require('~/server/middleware/role
 const { getLdapConfig } = require('~/server/services/Config/ldap');
 const { getRumConfig } = require('~/server/services/Config/rum');
 const { getAppConfig } = require('~/server/services/Config/app');
+/** SSM Labs fork patch — docs/ssmlabs-fork-patches.md. Pre-login overlay flags (model-chip hide, nav origins). */
 const { resolveLessonCaddieConfig } = require('../../../config/ssmlabs/lessonCaddieReturn');
 
 const router = express.Router();
@@ -116,6 +117,7 @@ function buildPreLoginPayload() {
     emailEnabled: checkEmailConfig(),
     passwordResetEnabled,
     twoFactorAuthenticationRequired: isEnabled(process.env.ENFORCE_TWO_FACTOR_AUTHENTICATION),
+    // SSM Labs: consumed by config/ssmlabs browser overlays; keep on the pre-login payload.
     lessonCaddie: resolveLessonCaddieConfig(process.env),
   };
 
@@ -313,6 +315,7 @@ router.get('/', async function (req, res) {
 
     /** @type {TStartupConfig} */
     const payload = {
+      // SSM Labs fork patch — docs/ssmlabs-fork-patches.md. Instructs overlays; server still redacts.
       hideToolActivity: isEnabled(process.env.HIDE_TOOL_ACTIVITY),
       ...preLoginPayload,
       ...publicSharePayload,

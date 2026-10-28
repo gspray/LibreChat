@@ -2337,11 +2337,6 @@ export class MCPConnection extends EventEmitter {
         }
         this.setupTransportOnMessageHandler();
         this.connectionState = 'connected';
-        // The completed MCP initialize handshake already verified this transport.
-        // Avoid an immediate ping during connection setup; probe after the normal TTL.
-        this.lastConnectionCheckAt = Date.now();
-        this.lastConnectionCheckError = undefined;
-        this.lastConnectionCheckCredentialSetId = undefined;
         this.emit('connectionChange', 'connected');
         this.reconnectAttempts = 0;
         this.resetFailedRounds();

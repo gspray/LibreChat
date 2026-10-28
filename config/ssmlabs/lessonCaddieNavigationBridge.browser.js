@@ -1,3 +1,8 @@
+/**
+ * SSM Labs overlay — docs/ssmlabs-fork-patches.md
+ * Forwards open_app_screen results to the LessonCaddie parent. Do not restore the
+ * client/src lessonCaddieNavigationBridge React fork.
+ */
 (function lessonCaddieNavigationBridgeOverlay(root, factory) {
   'use strict';
   const api = factory();

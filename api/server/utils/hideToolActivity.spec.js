@@ -1,3 +1,4 @@
+/** SSM Labs fork patch tests — docs/ssmlabs-fork-patches.md */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 

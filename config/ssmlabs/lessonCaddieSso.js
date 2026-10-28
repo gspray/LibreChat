@@ -1,5 +1,6 @@
 'use strict';
 
+/** SSM Labs overlay — docs/ssmlabs-fork-patches.md. LessonCaddie SSO redeem/map; not an OIDC strategy fork. */
 const crypto = require('node:crypto');
 
 const PROVIDER = 'lessoncaddie';

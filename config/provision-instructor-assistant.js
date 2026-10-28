@@ -1,3 +1,7 @@
+/**
+ * SSM Labs — docs/ssmlabs-fork-patches.md
+ * Idempotent Instructor Assistant agent provision. Not a LibreChat UI fork.
+ */
 const path = require('path');
 const mongoose = require('mongoose');
 const {

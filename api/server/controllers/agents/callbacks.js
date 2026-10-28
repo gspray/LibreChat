@@ -44,6 +44,7 @@ const { processFileCitations } = require('~/server/services/Files/Citations');
 const { processCodeOutput, runPreviewFinalize } = require('~/server/services/Files/Code/process');
 const { preflightCodeOutputBatch } = require('~/server/services/Files/Code/preflight');
 const { saveBase64Image } = require('~/server/services/Files/process');
+/** SSM Labs fork patch — docs/ssmlabs-fork-patches.md. Drop tool SSE for non-admins; keep open_app_screen for the nav overlay. */
 const {
   shouldHideToolActivityForUser,
   shouldDropToolSse,
