@@ -9,6 +9,7 @@ services:
       SSMLABS_BRANDING_ASSET_VERSION: "1"
       HIDE_TOOL_ACTIVITY: "true"
       INSTRUCTOR_ASSISTANT_MODEL: gpt-4o
+      LIBRECHAT_INSTANCE_ENV: ${LIBRECHAT_INSTANCE_ENV:-}
       LESSONCADDIE_HOME_URL: https://lessoncaddie.ssmlabs.com/app
       LESSONCADDIE_ALLOWED_ORIGINS: https://lessoncaddie.ssmlabs.com,http://127.0.0.1:3021,http://localhost:3021
       X_FRAME_OPTIONS: "off"

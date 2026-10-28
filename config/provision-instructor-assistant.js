@@ -175,10 +175,6 @@ When tools fail, say what the instructor needs to know without disclosing intern
     grantedBy: owner._id,
   });
 
-  await mongoose.connection
-    .collection('roles')
-    .updateOne({ name: SystemRoles.USER }, { $set: { 'permissions.AGENTS.CREATE': false } });
-
   console.purple(
     JSON.stringify(
       {

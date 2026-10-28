@@ -33,16 +33,8 @@ interface:
   presets: false
   mascot: false
   defaultPinnedTools: []
-  mcpServers:
-    use: true
-    create: false
-    share: false
-    public: false
-  agents:
-    use: true
-    # Creation is role-controlled: ADMIN can create agents; USER cannot.
-    share: false
-    public: false
+  # Agent, MCP, and Skill role permissions come from role-permissions.json.
+  # Explicit interface permission fields would overwrite those roles at startup.
   prompts:
     use: false
     create: false

@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "source": "dev",
+  "roles": {
+    "ADMIN": {
+      "AGENTS": {
+        "USE": true,
+        "CREATE": true,
+        "SHARE": false,
+        "SHARE_PUBLIC": false
+      },
+      "MCP_SERVERS": {
+        "USE": true,
+        "CREATE": false,
+        "SHARE": false,
+        "SHARE_PUBLIC": false,
+        "CONFIGURE_OBO": true
+      },
+      "SKILLS": {
+        "USE": true,
+        "CREATE": true,
+        "SHARE": true,
+        "SHARE_PUBLIC": true
+      }
+    },
+    "USER": {
+      "AGENTS": {
+        "USE": true,
+        "CREATE": false,
+        "SHARE": false,
+        "SHARE_PUBLIC": false
+      },
+      "MCP_SERVERS": {
+        "USE": true,
+        "CREATE": false,
+        "SHARE": false,
+        "SHARE_PUBLIC": false,
+        "CONFIGURE_OBO": false
+      },
+      "SKILLS": {
+        "USE": true,
+        "CREATE": true,
+        "SHARE": false,
+        "SHARE_PUBLIC": false
+      }
+    }
+  }
+}
