@@ -180,16 +180,9 @@ async function main(args = process.argv.slice(2)) {
       if (changes.length) process.exitCode = 2;
       return;
     }
-    require('module-alias')({ base: path.resolve(__dirname, '../..', 'api') });
-    require('@librechat/data-schemas').createModels(mongoose);
-    const db = require('../../api/models');
     const updatesByRole = {};
     for (const roleName of roleNames) {
       const current = roles.find((role) => role.name === roleName);
-      const target = await db.getRoleByName(roleName);
-      if (!target || String(target._id) !== String(current._id)) {
-        throw new Error(`Role lookup did not resolve the base ${roleName} role`);
-      }
       const permissions = { ...current.permissions };
       for (const permissionType of permissionTypes) {
         permissions[permissionType] = snapshot.roles[roleName][permissionType];
@@ -198,7 +191,12 @@ async function main(args = process.argv.slice(2)) {
     }
     for (const roleName of roleNames) {
       if (changes.some((change) => change.roleName === roleName)) {
-        await db.updateRoleByName(roleName, { permissions: updatesByRole[roleName] });
+        const current = roles.find((role) => role.name === roleName);
+        const result = await collection.updateOne(
+          { _id: current._id, name: roleName },
+          { $set: { permissions: updatesByRole[roleName] } },
+        );
+        if (result.matchedCount !== 1) throw new Error(`Base ${roleName} role changed during apply`);
       }
     }
     const verified = await collection.find(roleFilter).toArray();
