@@ -60,6 +60,24 @@ test('extracts start-lesson from an external markdown fallback link', () => {
   );
 });
 
+test('forwards New Student details while the fallback link carries no personal data', () => {
+  const result = {
+    type: 'lessoncaddie.navigation',
+    version: 1,
+    destination: 'new-student',
+    params: { firstName: 'Alex', email: 'alex.doe@example.com' },
+    requestId: 'req-new-student',
+    deepLink: 'https://lessoncaddie.ssmlabs.com/app?view=new-student',
+  };
+  const extracted = extractNavigationFromPayload({
+    content: [{ type: 'text', text: JSON.stringify(result) }],
+  });
+  assert.equal(extracted.destination, 'new-student');
+  assert.equal(extracted.params.email, 'alex.doe@example.com');
+  assert.equal(resultFromHref(null, result.deepLink)?.destination, 'new-student');
+  assert.equal(result.deepLink.includes('alex.doe'), false);
+});
+
 test('parses SSE data lines into JSON events', () => {
   const found = [];
   const rest = parseSseChunk(`event: message\ndata: ${JSON.stringify({ ok: true })}\n`, (event) =>

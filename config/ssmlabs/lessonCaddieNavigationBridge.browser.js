@@ -38,6 +38,15 @@
     );
   }
 
+  function isSafePrefill(value) {
+    const text = clean(value);
+    return (
+      text.length > 0 &&
+      text.length <= 500 &&
+      ![...text].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127)
+    );
+  }
+
   function originOf(value) {
     try {
       return new URL(value).origin;
@@ -110,6 +119,8 @@
       destination = 'start-lesson';
     } else if (path === '/app' && url.searchParams.get('panel') === 'directory') {
       destination = 'student-list';
+    } else if (path === '/app' && url.searchParams.get('view') === 'new-student') {
+      destination = 'new-student';
     } else if (path === '/app' && url.searchParams.get('panel') === 'sessions') {
       destination = 'lesson-list';
     } else if (path === '/app' && url.searchParams.get('panel') === 'playbook') {
@@ -166,7 +177,10 @@
       if (!text) {
         continue;
       }
-      if (!isSafeId(key) || !isSafeId(text)) {
+      const prefill =
+        candidate.destination === 'new-student' &&
+        ['firstName', 'lastName', 'email', 'phone', 'nickname', 'notes'].includes(key);
+      if (!isSafeId(key) || !(prefill ? isSafePrefill(text) : isSafeId(text))) {
         return null;
       }
       params[key] = text;
