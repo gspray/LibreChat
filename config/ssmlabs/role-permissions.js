@@ -79,8 +79,16 @@ function snapshotFromRoles(roles) {
     if (!byName[roleName]) {
       throw new Error(`Missing ${roleName} role`);
     }
+    const liveGroups = Object.keys(byName[roleName].permissions || {}).sort();
+    if (liveGroups.join(',') !== permissionTypes.slice().sort().join(',')) {
+      throw new Error(`Unexpected ${roleName} permission groups; review the snapshot schema`);
+    }
     snapshot.roles[roleName] = {};
     for (const permissionType of permissionTypes) {
+      const liveKeys = Object.keys(byName[roleName].permissions[permissionType] || {}).sort();
+      if (liveKeys.join(',') !== permissionKeys[permissionType].slice().sort().join(',')) {
+        throw new Error(`Unexpected ${roleName}.${permissionType} permission keys`);
+      }
       snapshot.roles[roleName][permissionType] = {};
       for (const key of permissionKeys[permissionType]) {
         snapshot.roles[roleName][permissionType][key] =

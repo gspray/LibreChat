@@ -37,6 +37,9 @@ test('a changed target permission is reported without unrelated fields', () => {
 
 test('missing role or permission values fail closed', () => {
   assert.throws(() => snapshotFromRoles(roles.slice(0, 1)), /Missing USER role/);
+  const newPermissionGroup = structuredClone(roles);
+  newPermissionGroup[1].permissions.NEW_FEATURE = { USE: true };
+  assert.throws(() => snapshotFromRoles(newPermissionGroup), /Unexpected USER permission groups/);
   assert.throws(() => diffPermissions(snapshot, roles.slice(0, 1)), /Missing USER role/);
   const invalid = structuredClone(snapshot);
   delete invalid.roles.USER.MCP_SERVERS.USE;
