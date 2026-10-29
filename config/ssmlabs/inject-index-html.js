@@ -15,6 +15,7 @@ const BRANDING_SENTINEL = 'data-ssmlabs-branding="true"';
 const EMBED_SW_SENTINEL = 'data-ssmlabs-embed-sw="true"';
 const NAV_CONFIG_SENTINEL = 'data-ssmlabs-nav-config="true"';
 const NAV_BRIDGE_SENTINEL = 'data-ssmlabs-nav-bridge="true"';
+const LOGIN_FALLBACK_SENTINEL = 'data-ssmlabs-login-fallback="true"';
 const SELECTOR_SCRIPT = `<script src="/ssmlabs/hide-model-selector.js?v=3" defer ${SELECTOR_SENTINEL}></script>`;
 const NAV_BRIDGE_SCRIPT = `<script src="/ssmlabs/lesson-caddie-navigation-bridge.js?v=3" ${NAV_BRIDGE_SENTINEL}></script>`;
 const EMBED_SW_SCRIPT = `<script ${EMBED_SW_SENTINEL}>
@@ -115,6 +116,38 @@ function buildNavConfigScript() {
   return `<script ${NAV_CONFIG_SENTINEL}>window.__LESSONCADDIE_NAV__=${payload};</script>`;
 }
 
+function buildLoginFallbackScript() {
+  if (process.env.LESSONCADDIE_SSO_ENABLED !== 'true') {
+    return '';
+  }
+  const basePath = new URL(
+    process.env.DOMAIN_CLIENT || 'https://chat.ssmlabs.com',
+  ).pathname.replace(/\/$/, '');
+  return `<script ${LOGIN_FALLBACK_SENTINEL}>
+(function () {
+  var basePath = ${JSON.stringify(basePath)};
+  var loginPath = basePath + '/login';
+  var originalReplaceState = history.replaceState;
+  var originalPushState = history.pushState;
+  function redirectIfChatLogin(url) {
+    if (url == null || location.pathname === loginPath) return false;
+    var target;
+    try { target = new URL(url, location.href); } catch (_) { return false; }
+    if (target.origin !== location.origin || target.pathname !== loginPath || target.searchParams.get('local') === '1') return false;
+    var returnTo = location.pathname + location.search;
+    location.assign(basePath + '/sso/lessoncaddie/start?returnTo=' + encodeURIComponent(returnTo));
+    return true;
+  }
+  history.replaceState = function (state, title, url) {
+    if (!redirectIfChatLogin(url)) return originalReplaceState.apply(this, arguments);
+  };
+  history.pushState = function (state, title, url) {
+    if (!redirectIfChatLogin(url)) return originalPushState.apply(this, arguments);
+  };
+})();
+</script>`;
+}
+
 function injectOverlayScripts(html) {
   let next = html;
   if (!next.includes(SELECTOR_SENTINEL)) {
@@ -128,6 +161,9 @@ function injectOverlayScripts(html) {
   }
   if (!next.includes(NAV_BRIDGE_SENTINEL)) {
     next = next.replace('</head>', `${NAV_BRIDGE_SCRIPT}\n</head>`);
+  }
+  if (!next.includes(LOGIN_FALLBACK_SENTINEL)) {
+    next = next.replace('</head>', `${buildLoginFallbackScript()}\n</head>`);
   }
   return next;
 }

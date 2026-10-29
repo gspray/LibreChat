@@ -2,6 +2,7 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const vm = require('node:vm');
 const { injectBaseHref, injectBranding, injectIndexHtml } = require('./inject-index-html');
 
 const SAMPLE = `<!doctype html>
@@ -48,6 +49,60 @@ test('enabling SSO leaves ordinary LibreChat login visits unchanged', () => {
   } finally {
     if (previous === undefined) delete process.env.LESSONCADDIE_SSO_ENABLED;
     else process.env.LESSONCADDIE_SSO_ENABLED = previous;
+  }
+});
+
+test('client-side login navigation returns through LessonCaddie SSO', () => {
+  const previous = {
+    enabled: process.env.LESSONCADDIE_SSO_ENABLED,
+    domain: process.env.DOMAIN_CLIENT,
+  };
+  process.env.LESSONCADDIE_SSO_ENABLED = 'true';
+  process.env.DOMAIN_CLIENT = 'https://stage.lessoncaddie.app/chat';
+  try {
+    const html = injectIndexHtml(SAMPLE);
+    const script = html.match(
+      /<script data-ssmlabs-login-fallback="true">([\s\S]*?)<\/script>/,
+    )?.[1];
+    assert.ok(script);
+    const calls = [];
+    const browser = {
+      location: {
+        href: 'https://stage.lessoncaddie.app/chat/c/abc',
+        origin: 'https://stage.lessoncaddie.app',
+        pathname: '/chat/c/abc',
+        search: '',
+        assign(url) {
+          calls.push(['assign', url]);
+        },
+      },
+      history: {
+        replaceState(...args) {
+          calls.push(['replace', ...args]);
+        },
+        pushState(...args) {
+          calls.push(['push', ...args]);
+        },
+      },
+      URL,
+      encodeURIComponent,
+    };
+    vm.runInNewContext(script, browser);
+    browser.history.replaceState({}, '', '/chat/login');
+    assert.deepEqual(calls, [
+      ['assign', '/chat/sso/lessoncaddie/start?returnTo=%2Fchat%2Fc%2Fabc'],
+    ]);
+    calls.length = 0;
+    browser.history.pushState({}, '', '/chat/login?local=1');
+    assert.equal(calls[0][0], 'push');
+    calls.length = 0;
+    browser.history.replaceState({}, '', '/chat/c/other');
+    assert.equal(calls[0][0], 'replace');
+  } finally {
+    if (previous.enabled === undefined) delete process.env.LESSONCADDIE_SSO_ENABLED;
+    else process.env.LESSONCADDIE_SSO_ENABLED = previous.enabled;
+    if (previous.domain === undefined) delete process.env.DOMAIN_CLIENT;
+    else process.env.DOMAIN_CLIENT = previous.domain;
   }
 });
 
