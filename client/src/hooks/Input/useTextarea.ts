@@ -25,6 +25,7 @@ import {
   getEntity,
   checkIfScrollable,
 } from '~/utils';
+import { useGetStartupConfig, useInteractionHealthCheck } from '~/data-provider';
 import { useAssistantsMapContext } from '~/Providers/AssistantsMapContext';
 import { useLatestMessageMeta } from '~/hooks/Messages/useLatestMessage';
 import { useChatFormContext, useUploadModalContext } from '~/Providers';
@@ -34,7 +35,6 @@ import { useAgentsMapContext } from '~/Providers/AgentsMapContext';
 import { useChatSettings } from '~/Providers/ChatSettingsContext';
 import useGetSender from '~/hooks/Conversations/useGetSender';
 import useUploadOptions from '~/hooks/Files/useUploadOptions';
-import { useInteractionHealthCheck } from '~/data-provider';
 import { resolveComposerKeyDown } from '~/utils/shortcuts';
 import { useChatContext } from '~/Providers/ChatContext';
 import { globalAudioId } from '~/common';
@@ -70,6 +70,7 @@ export default function useTextarea({
   enterToSend: boolean;
 }) {
   const localize = useLocalize();
+  const { data: startupConfig } = useGetStartupConfig();
   const getSender = useGetSender();
   const { setValue } = useChatFormContext();
   const isComposing = useRef(false);
@@ -202,6 +203,10 @@ export default function useTextarea({
         return placeholder;
       }
 
+      if (startupConfig?.interface?.composerPlaceholder) {
+        return startupConfig.interface.composerPlaceholder;
+      }
+
       const sender =
         isAssistant || isAgent
           ? getEntityName({ name: entityName, isAgent, localize })
@@ -245,6 +250,7 @@ export default function useTextarea({
     latestMessage,
     isNotAppendable,
     placeholder,
+    startupConfig?.interface?.composerPlaceholder,
   ]);
 
   const handleKeyDown = useCallback(
