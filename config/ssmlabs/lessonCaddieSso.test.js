@@ -49,6 +49,23 @@ test('start URL sends the user through LessonCaddie with a return path', () => {
   assert.equal(url.searchParams.get('librechatSsoState'), 'browser-state');
 });
 
+test('SSO start keeps the configured chat base path', async () => {
+  const previous = process.env.DOMAIN_CLIENT;
+  process.env.DOMAIN_CLIENT = 'https://stage.lessoncaddie.app/chat';
+  try {
+    const app = express();
+    app.use('/sso/lessoncaddie', createLessonCaddieSsoRouter({
+      resolveSsoConfig: () => ({ enabled: true, homeUrl: 'https://stage.lessoncaddie.app/app' }),
+    }));
+    const response = await request(app).get('/sso/lessoncaddie/start');
+    assert.equal(response.status, 302);
+    assert.equal(new URL(response.headers.location).searchParams.get('librechatSsoReturn'), '/chat/c/new');
+  } finally {
+    if (previous === undefined) delete process.env.DOMAIN_CLIENT;
+    else process.env.DOMAIN_CLIENT = previous;
+  }
+});
+
 test('iframe callback may omit the /start cookie; mismatched cookies are still rejected', () => {
   assert.equal(ssoBrowserStateAllowsCallback('', ''), false);
   assert.equal(ssoBrowserStateAllowsCallback('issued-state-token-aaaaaaaa', ''), true);

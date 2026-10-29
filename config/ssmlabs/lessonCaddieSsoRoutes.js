@@ -21,7 +21,9 @@ function createLessonCaddieSsoRouter(deps = {}) {
   const getModels = deps.getModels || (() => require('~/models'));
   const getAuthService = deps.getAuthService || (() => require('~/server/services/AuthService'));
   const logger = deps.logger || console;
-  const chatOrigin = () => new URL(process.env.DOMAIN_CLIENT || 'https://chat.ssmlabs.com').origin;
+  const chatUrl = () => new URL(process.env.DOMAIN_CLIENT || 'https://chat.ssmlabs.com');
+  const chatOrigin = () => chatUrl().origin;
+  const defaultReturnTo = () => `${chatUrl().pathname.replace(/\/$/, '')}/c/new`;
 
   router.get('/start', (req, res) => {
     const config = loadConfig();
@@ -32,7 +34,7 @@ function createLessonCaddieSsoRouter(deps = {}) {
     const returnTo = sanitizeAppReturnTo(
       req.query.returnTo || req.query.redirect_uri,
       [chatOrigin()],
-      '/c/new',
+      defaultReturnTo(),
     );
     const state = crypto.randomBytes(24).toString('base64url');
     res.cookie('lc_sso_state', state, {
@@ -51,7 +53,7 @@ function createLessonCaddieSsoRouter(deps = {}) {
       return;
     }
     const origin = chatOrigin();
-    const returnTo = sanitizeAppReturnTo(req.query.returnTo, [origin], '/c/new');
+    const returnTo = sanitizeAppReturnTo(req.query.returnTo, [origin], defaultReturnTo());
     const state = String(req.query.state || '');
     const cookieState = String(req.cookies?.lc_sso_state || '');
     res.clearCookie('lc_sso_state');
