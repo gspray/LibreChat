@@ -181,6 +181,7 @@ async function main(args = process.argv.slice(2)) {
       return;
     }
     require('module-alias')({ base: path.resolve(__dirname, '../..', 'api') });
+    require('@librechat/data-schemas').createModels(mongoose);
     const db = require('../../api/models');
     const updatesByRole = {};
     for (const roleName of roleNames) {
