@@ -61,6 +61,19 @@ test('injectIndexHtml does not inject a LessonCaddie back-link overlay', () => {
   assert.match(html, /lesson-caddie-navigation-bridge\.js/);
 });
 
+test('injectIndexHtml includes the configured composer placeholder', () => {
+  const previous = process.env.SSMLABS_COMPOSER_PLACEHOLDER;
+  process.env.SSMLABS_COMPOSER_PLACEHOLDER = 'Message Assistance';
+  try {
+    const html = injectIndexHtml(SAMPLE);
+    assert.match(html, /composer-placeholder\.js\?v=1/);
+    assert.match(html, /data-composer-placeholder="Message Assistance"/);
+  } finally {
+    if (previous === undefined) delete process.env.SSMLABS_COMPOSER_PLACEHOLDER;
+    else process.env.SSMLABS_COMPOSER_PLACEHOLDER = previous;
+  }
+});
+
 test('injectBaseHref anchors relative assets at the app root on nested routes', () => {
   const prevDomainClient = process.env.DOMAIN_CLIENT;
   process.env.DOMAIN_CLIENT = 'https://chat.ssmlabs.com';

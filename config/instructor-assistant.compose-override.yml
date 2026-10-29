@@ -7,6 +7,7 @@ services:
       APP_TITLE: Ask Lesson Caddie Assistant
       APP_SHORT_NAME: Ask Caddie
       SSMLABS_BRANDING_ASSET_VERSION: "1"
+      SSMLABS_COMPOSER_PLACEHOLDER: Message Assistance
       HIDE_TOOL_ACTIVITY: "true"
       INSTRUCTOR_ASSISTANT_MODEL: gpt-4o
       LESSONCADDIE_HOME_URL: https://lessoncaddie.ssmlabs.com/app
@@ -26,6 +27,7 @@ services:
       - ./config/provision-instructor-assistant.js:/app/config/provision-instructor-assistant.js:ro
       - ./config/ssmlabs:/app/config/ssmlabs:ro
       - ./config/ssmlabs/hide-model-selector.browser.js:/app/client/dist/ssmlabs/hide-model-selector.js:ro
+      - ./config/ssmlabs/composer-placeholder.browser.js:/app/client/dist/ssmlabs/composer-placeholder.js:ro
       - ./config/ssmlabs/lessonCaddieNavigationBridge.browser.js:/app/client/dist/ssmlabs/lesson-caddie-navigation-bridge.js:ro
       - ./config/ssmlabs/embed-passthrough-sw.js:/app/client/dist/sw.js:ro
       - ./config/ssmlabs/branding/manifest.webmanifest:/app/client/dist/manifest.webmanifest:ro

@@ -3077,7 +3077,6 @@ export const interfaceSchema = z
       .optional(),
     termsOfService: termsOfServiceSchema.optional(),
     customWelcome: z.string().optional(),
-    composerPlaceholder: z.string().optional(),
     /** What heads the welcome screen when an agent, assistant or branded spec is
      *  selected: its name (`entity`), or the time-of-day greeting with the user's
      *  name (`greeting`) for deployments whose header selector already names it. */

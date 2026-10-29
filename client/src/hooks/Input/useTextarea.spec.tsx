@@ -30,7 +30,6 @@ let mockIndex = 0;
 let mockIsSubmitting = false;
 let mockIsUploadConfigPending = false;
 let mockIsUnifiedMode = false;
-let mockComposerPlaceholder: string | undefined;
 let mockConversation: { endpoint: string; conversationId?: string } = {
   endpoint: 'openAI',
   conversationId: 'convo-1',
@@ -109,9 +108,6 @@ jest.mock('~/hooks/Files/useUploadOptions', () => ({
 }));
 
 jest.mock('~/data-provider', () => ({
-  useGetStartupConfig: jest.fn(() => ({
-    data: { interface: { composerPlaceholder: mockComposerPlaceholder } },
-  })),
   useInteractionHealthCheck: jest.fn(() => jest.fn(async () => true)),
 }));
 
@@ -186,7 +182,6 @@ describe('useTextarea long-paste fallback', () => {
     mockIsSubmitting = false;
     mockIsUploadConfigPending = false;
     mockIsUnifiedMode = false;
-    mockComposerPlaceholder = undefined;
     mockConversation = { endpoint: 'openAI', conversationId: 'convo-1' };
     mockGetUploadOptions.mockReturnValue([EToolResources.context]);
     mockSetValue.mockReset();
@@ -194,13 +189,6 @@ describe('useTextarea long-paste fallback', () => {
       file: new File([text], 'pasted-text.txt', { type: 'text/plain' }),
       toolResource: EToolResources.context,
     }));
-  });
-
-  it('uses the configured composer placeholder', async () => {
-    mockComposerPlaceholder = 'Message Assistance';
-    const { textArea } = renderTextareaHook();
-
-    await waitFor(() => expect(textArea).toHaveAttribute('placeholder', 'Message Assistance'));
   });
 
   it('inserts a preset prompt when the textarea refuses focus', () => {

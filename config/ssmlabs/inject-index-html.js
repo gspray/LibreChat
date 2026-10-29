@@ -11,11 +11,13 @@ const path = require('path');
 const { resolveLessonCaddieConfig } = require('./lessonCaddieReturn');
 
 const SELECTOR_SENTINEL = 'data-ssmlabs-hide-model-selector="true"';
+const COMPOSER_SENTINEL = 'data-ssmlabs-composer-placeholder="true"';
 const BRANDING_SENTINEL = 'data-ssmlabs-branding="true"';
 const EMBED_SW_SENTINEL = 'data-ssmlabs-embed-sw="true"';
 const NAV_CONFIG_SENTINEL = 'data-ssmlabs-nav-config="true"';
 const NAV_BRIDGE_SENTINEL = 'data-ssmlabs-nav-bridge="true"';
 const SELECTOR_SCRIPT = `<script src="/ssmlabs/hide-model-selector.js?v=3" defer ${SELECTOR_SENTINEL}></script>`;
+const COMPOSER_SCRIPT = '/ssmlabs/composer-placeholder.js?v=1';
 const NAV_BRIDGE_SCRIPT = `<script src="/ssmlabs/lesson-caddie-navigation-bridge.js?v=3" ${NAV_BRIDGE_SENTINEL}></script>`;
 const EMBED_SW_SCRIPT = `<script ${EMBED_SW_SENTINEL}>
 (function clearFramedChatWorker() {
@@ -119,6 +121,11 @@ function injectOverlayScripts(html) {
   let next = html;
   if (!next.includes(SELECTOR_SENTINEL)) {
     next = next.replace('</head>', `${SELECTOR_SCRIPT}\n</head>`);
+  }
+  const composerPlaceholder = (process.env.SSMLABS_COMPOSER_PLACEHOLDER || '').trim();
+  if (composerPlaceholder && !next.includes(COMPOSER_SENTINEL)) {
+    const script = `<script src="${COMPOSER_SCRIPT}" defer ${COMPOSER_SENTINEL} data-composer-placeholder="${escapeHtml(composerPlaceholder)}"></script>`;
+    next = next.replace('</head>', `${script}\n</head>`);
   }
   if (!next.includes(EMBED_SW_SENTINEL)) {
     next = next.replace('</head>', `${EMBED_SW_SCRIPT}\n</head>`);
