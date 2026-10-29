@@ -105,7 +105,7 @@ describe('Landing agent contact', () => {
     mockAssistantMap = undefined;
   });
 
-  it('shows contact for the selected agent from agentsMap', () => {
+  it('omits owner contact from the agent welcome screen', () => {
     mockConversation = {
       endpoint: 'agents',
       agent_id: 'agent-1',
@@ -123,12 +123,11 @@ describe('Landing agent contact', () => {
 
     expect(screen.getByText('Portal Remote Agent')).toBeInTheDocument();
     expect(screen.getByText('Remote Agent Showcase')).toBeInTheDocument();
-    expect(screen.getByText('Contact:')).toBeInTheDocument();
-    expect(screen.getByText('Owner User')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Owner User' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Contact:')).not.toBeInTheDocument();
+    expect(screen.queryByText('Owner User')).not.toBeInTheDocument();
   });
 
-  it('renders the email link without inline baseline space beside the contact label', () => {
+  it('omits support contact from the agent welcome screen', () => {
     mockConversation = {
       endpoint: 'agents',
       agent_id: 'agent-1',
@@ -144,11 +143,8 @@ describe('Landing agent contact', () => {
 
     renderLanding();
 
-    const link = screen.getByRole('link', { name: 'messagedaniel@pm.me' });
-    expect(link).toHaveAttribute('href', 'mailto:messagedaniel@pm.me');
-    expect(link).toHaveClass('block');
-    expect(link).not.toHaveClass('inline-block');
-    expect(screen.getByText('Contact:').parentElement).toHaveClass('items-center');
+    expect(screen.queryByText('Contact:')).not.toBeInTheDocument();
+    expect(screen.queryByText('messagedaniel@pm.me')).not.toBeInTheDocument();
   });
 
   it('does not show contact when the selected agent is missing from agentsMap', () => {
