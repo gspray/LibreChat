@@ -27,12 +27,7 @@ import {
   useFailedReveal,
   useFailedRevealTrigger,
 } from './reveal';
-import {
-  useLocalize,
-  useExpandCollapse,
-  useHideToolActivity,
-  scheduleMessageContentLayoutReconcile,
-} from '~/hooks';
+import { useLocalize, useExpandCollapse, scheduleMessageContentLayoutReconcile } from '~/hooks';
 import { ASK_USER_QUESTION, getSubmittedAskAnswer } from '~/utils/approval';
 import { useMessagePartsHost } from '~/Providers/MessagePartsHostContext';
 import { ToolAuthWarning, ToolAuthWarningContext } from './auth';
@@ -102,7 +97,6 @@ export default function ToolCallGroup({
   parentPhaseOwnsFailurePill = false,
 }: ToolCallGroupProps) {
   const localize = useLocalize();
-  const hideToolActivity = useHideToolActivity();
   const mcpIconMap = useMCPIconMap();
   const mcpServerNames = useMCPServerNames();
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -642,7 +636,6 @@ export default function ToolCallGroup({
 
   return (
     <div className="mt-1 mb-2" ref={rootRef} data-fold-root="">
-      {!hideToolActivity && (
       <div className="flex w-full items-center gap-2" ref={headerRef}>
         <button
           type="button"
@@ -718,14 +711,13 @@ export default function ToolCallGroup({
           />
         )}
       </div>
-      )}
       <div
-        style={hideToolActivity ? undefined : expandStyle}
+        style={expandStyle}
         onTransitionEnd={handleTransitionEnd}
-        aria-hidden={hideToolActivity ? false : !isExpanded}
+        aria-hidden={!isExpanded}
         data-testid="tool-call-group-panel"
       >
-        {(hideToolActivity || shouldRenderBody) && (
+        {shouldRenderBody && (
           <div
             className={cn('overflow-hidden', FOLD_RAIL_CLASSES)}
             ref={expandRef}

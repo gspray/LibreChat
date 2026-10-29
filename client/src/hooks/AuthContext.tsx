@@ -93,6 +93,8 @@ const AuthContextProvider = ({
 }) => {
   const isExternalRedirectRef = useRef(false);
   const prerenderRefreshDeferredRef = useRef(false);
+  /** A second request can rotate the same refresh cookie before the first response is applied. */
+  const refreshAttemptedRef = useRef(false);
   const [user, setUser] = useRecoilState(store.user);
   const logoutRedirectRef = useRef<string | undefined>(undefined);
   const [token, setToken] = useState<string | undefined>(undefined);
@@ -310,6 +312,9 @@ const AuthContextProvider = ({
     if (isExternalRedirectRef.current) {
       return;
     }
+    if (refreshAttemptedRef.current) {
+      return;
+    }
     /** A prerendered page can be discarded without ever being shown. Refreshing from it rotates
      * the session for a page the user never sees, and the browser aborts the request mid-flight. */
     if (isPrerendering()) {
@@ -319,6 +324,7 @@ const AuthContextProvider = ({
       }
       return;
     }
+    refreshAttemptedRef.current = true;
     refreshToken.mutate(undefined, {
       onSuccess: (data: t.TRefreshTokenResponse | undefined) => {
         if (isExternalRedirectRef.current) {
@@ -395,6 +401,9 @@ const AuthContextProvider = ({
   }, []);
 
   useEffect(() => {
+    if (token && isAuthenticated) {
+      refreshAttemptedRef.current = false;
+    }
     if (isExternalRedirectRef.current) {
       return;
     }

@@ -1,5 +1,6 @@
 'use strict';
 
+/** SSM Labs overlay — docs/ssmlabs-fork-patches.md. Express routes mounted by attach-lessoncaddie-sso.js. */
 const express = require('express');
 const crypto = require('node:crypto');
 const {

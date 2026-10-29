@@ -1,5 +1,6 @@
 'use strict';
 
+/** SSM Labs overlay — docs/ssmlabs-fork-patches.md. Allow-list + lessonCaddie /api/config payload. */
 const STORAGE_KEY = 'ssmlabs.lessoncaddie.returnUrl';
 const QUERY_KEYS = ['returnUrl', 'lessoncaddieReturn'];
 const DEFAULT_HOME_URL = 'https://lessoncaddie.ssmlabs.com/app';
@@ -61,7 +62,11 @@ function normalizeAllowedOrigins(raw, homeUrl) {
     .filter(Boolean)
     .forEach((part) => {
       const parsed = parseAbsoluteUrl(part.includes('://') ? part : `https://${part}`);
-      if (parsed && (parsed.protocol === 'https:' || (parsed.protocol === 'http:' && isLocalHttpHost(parsed.hostname)))) {
+      if (
+        parsed &&
+        (parsed.protocol === 'https:' ||
+          (parsed.protocol === 'http:' && isLocalHttpHost(parsed.hostname)))
+      ) {
         origins.add(parsed.origin);
       }
     });

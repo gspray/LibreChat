@@ -49,6 +49,7 @@ const {
   prepareMessageRequestValidation,
 } = require('~/server/middleware');
 const db = require('~/models');
+/** SSM Labs fork patch — docs/ssmlabs-fork-patches.md. Hide MCP tool cards for non-admins without forking the Vite client. */
 const {
   shouldHideToolActivityForUser,
   redactMessagesForClient,
@@ -582,9 +583,11 @@ router.get('/:conversationId', prepareMessageRequestValidation, async (req, res)
 
     const messages = messagesResult?.messages ?? [];
     const previewed = await previewToolCalls(messages);
-    res.status(200).json(
-      shouldHideToolActivityForUser(req.user) ? redactMessagesForClient(previewed) : previewed,
-    );
+    res
+      .status(200)
+      .json(
+        shouldHideToolActivityForUser(req.user) ? redactMessagesForClient(previewed) : previewed,
+      );
   } catch (error) {
     logger.error('Error fetching messages:', error);
     res.status(500).json({ error: 'Internal server error' });

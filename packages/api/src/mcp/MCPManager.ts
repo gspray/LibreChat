@@ -74,6 +74,7 @@ import { assertToolApprovalTransportEpoch } from '~/tools/approval';
 import { getToolUiResourceUri, isToolHiddenFromApp } from './apps';
 import { MCPServerInspector } from './registry/MCPServerInspector';
 import { MCPServersRegistry } from './registry/MCPServersRegistry';
+import { MCPConnection, withMCPCallHeaders } from './connection';
 import { UserConnectionManager } from './UserConnectionManager';
 import { ConnectionsRepository } from './ConnectionsRepository';
 import { MCPConnectionFactory } from './MCPConnectionFactory';
@@ -82,8 +83,36 @@ import { OAuthLifecycleRelay } from './oauth/pending';
 import { isOwnedAbortError } from '~/utils/errors';
 import { markMCPToolResultError } from './status';
 import { withMCPRequestSignal } from './signal';
-import { MCPConnection } from './connection';
 import { mcpConfig } from './mcpConfig';
+
+type MCPToolCallOptions = {
+  scheduledBearerInvocation?: ScheduledMCPBearerInvocation;
+  scheduledMCPInvocation?: ScheduledMCPInvocation;
+  user?: IUser;
+  serverName: string;
+  /** Pre-resolved config from tool creation context — avoids readThrough TTL and cross-tenant issues */
+  serverConfig?: t.ParsedServerConfig;
+  toolName: string;
+  provider: t.Provider;
+  toolArguments?: Record<string, unknown>;
+  options?: RequestOptions;
+  requestBody?: RequestBody;
+  requestScopedConnections?: t.RequestScopedMCPConnectionStore;
+  tokenMethods?: TokenMethods;
+  customUserVars?: Record<string, string>;
+  flowManager: FlowStateManager<MCPOAuthTokens | null>;
+  oauthStart?: t.OAuthStartHandler;
+  oauthEnd?: () => Promise<void>;
+  graphTokenResolver?: GraphTokenResolver;
+  oboTokenResolver?: OboTokenResolver;
+  oboTrustChecker?: OboTrustChecker;
+  upstreamTokenProvider?: UpstreamTokenProvider;
+  upstreamTokenProviderResolver?: UpstreamTokenProviderResolver;
+  oboIdentityContext?: AuthIdentityContext;
+  onOAuthCredentialsChanged?: t.UserConnectionContext['onOAuthCredentialsChanged'];
+  onOAuthCredentialsChanging?: t.UserConnectionContext['onOAuthCredentialsChanging'];
+  mcpApps?: TMCPAppsPolicy;
+};
 
 function createOboToolCallErrorMessage(
   logPrefix: string,
@@ -1483,7 +1512,11 @@ Please follow these instructions when using tools from the respective MCP server
    *   When provided and the server config contains `{{LIBRECHAT_GRAPH_ACCESS_TOKEN}}` placeholders,
    *   they will be resolved to actual Graph API tokens before the tool call.
    */
-  async callTool({
+  async callTool(args: MCPToolCallOptions): Promise<t.FormattedToolResponse> {
+    return withMCPCallHeaders(() => this.callToolWithHeaders(args));
+  }
+
+  private async callToolWithHeaders({
     user,
     scheduledBearerInvocation,
     serverName,
@@ -1509,34 +1542,7 @@ Please follow these instructions when using tools from the respective MCP server
     onOAuthCredentialsChanging,
     mcpApps,
     scheduledMCPInvocation,
-  }: {
-    scheduledBearerInvocation?: ScheduledMCPBearerInvocation;
-    scheduledMCPInvocation?: ScheduledMCPInvocation;
-    user?: IUser;
-    serverName: string;
-    /** Pre-resolved config from tool creation context — avoids readThrough TTL and cross-tenant issues */
-    serverConfig?: t.ParsedServerConfig;
-    toolName: string;
-    provider: t.Provider;
-    toolArguments?: Record<string, unknown>;
-    options?: RequestOptions;
-    requestBody?: RequestBody;
-    requestScopedConnections?: t.RequestScopedMCPConnectionStore;
-    tokenMethods?: TokenMethods;
-    customUserVars?: Record<string, string>;
-    flowManager: FlowStateManager<MCPOAuthTokens | null>;
-    oauthStart?: t.OAuthStartHandler;
-    oauthEnd?: () => Promise<void>;
-    graphTokenResolver?: GraphTokenResolver;
-    oboTokenResolver?: OboTokenResolver;
-    oboTrustChecker?: OboTrustChecker;
-    upstreamTokenProvider?: UpstreamTokenProvider;
-    upstreamTokenProviderResolver?: UpstreamTokenProviderResolver;
-    oboIdentityContext?: AuthIdentityContext;
-    onOAuthCredentialsChanged?: t.UserConnectionContext['onOAuthCredentialsChanged'];
-    onOAuthCredentialsChanging?: t.UserConnectionContext['onOAuthCredentialsChanging'];
-    mcpApps?: TMCPAppsPolicy;
-  }): Promise<t.FormattedToolResponse> {
+  }: MCPToolCallOptions): Promise<t.FormattedToolResponse> {
     if (scheduledBearerInvocation) requestScopedConnections = scheduledBearerInvocation.context;
     const userId = user?.id;
     const enforceSchedule =

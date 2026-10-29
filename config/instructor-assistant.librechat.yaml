@@ -8,21 +8,26 @@ mcpServers:
   lessoncaddie-instructor:
     type: streamable-http
     url: https://lessoncaddie.ssmlabs.com/api/instructor-mcp
-    requiresOAuth: true
+    # LessonCaddie resolves chat context on each HTTP request.
+    reuseConnection: true
+    requiresOAuth: false
     chatMenu: false
     serverInstructions: true
-    oauth:
-      scope: 'instructor:read instructor:write offline_access'
+    headers:
+      X-LessonCaddie-Sso-Secret: '${LESSONCADDIE_SSO_SHARED_SECRET}'
+      X-LibreChat-Firebase-Uid: '{{LIBRECHAT_USER_OPENIDID}}'
+      X-LibreChat-User-Provider: '{{LIBRECHAT_USER_PROVIDER}}'
     requestHeaders:
       X-LibreChat-User-Id: '{{LIBRECHAT_USER_ID}}'
       X-LibreChat-Conversation-Id: '{{LIBRECHAT_BODY_CONVERSATIONID}}'
+      X-LibreChat-Message-Id: '{{LIBRECHAT_BODY_MESSAGEID}}'
 mcpAppSandbox:
   url: https://mcp-sandbox.ssmlabs.com/api/mcp/sandbox
 interface:
-  customWelcome: "Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?"
+  customWelcome: 'Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?'
   landingHeading: entity
   landingFooter: false
-  # Endpoints/model chip off; modelSpecs below still drive softDefault + landing (v0.8.9-rc1 needs ssmlabs hide-model-selector overlay until client rebuild).
+  # Endpoints/model chip off; modelSpecs still drive softDefault + landing. Chip hide is the ssmlabs overlay, not a ModelSelector.tsx fork.
   modelSelect: false
   parameters: false
   presets: false
@@ -49,7 +54,7 @@ modelSpecs:
   list:
     - name: instructor-assistant
       label: Instructor Assistant
-      description: "Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?"
+      description: 'Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?'
       softDefault: true
       showOnLanding: true
       hideBadgeRow: true

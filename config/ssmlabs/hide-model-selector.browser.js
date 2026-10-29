@@ -1,3 +1,8 @@
+/**
+ * SSM Labs overlay — docs/ssmlabs-fork-patches.md
+ * Hides the header model/agent chip when interface.modelSelect is false.
+ * Do not restore the ModelSelector.tsx fork; this overlay is the supported path.
+ */
 (function ssmlabsHideModelSelectorWhenDisabled() {
   'use strict';
 

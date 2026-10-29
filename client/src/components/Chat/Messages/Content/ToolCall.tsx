@@ -15,13 +15,7 @@ import {
   LoneGroupContext,
   SoleToolContext,
 } from './disclosure';
-import {
-  useLocalize,
-  useProgress,
-  useExpandCollapse,
-  useLazyCollapseBody,
-  useHideToolActivity,
-} from '~/hooks';
+import { useLocalize, useProgress, useExpandCollapse, useLazyCollapseBody } from '~/hooks';
 import { ToolIcon, getToolIconType, isError, hasRenderableOutput } from './ToolOutput';
 import { cn, getToolDisplayLabel, logger, openInNewTab } from '~/utils';
 import { isToolCallPreparing, useToolPreparation } from './preparation';
@@ -78,7 +72,6 @@ export default function ToolCall({
   toolExecutionDurationMs?: PartMetadata['toolExecutionDurationMs'];
 }) {
   const localize = useLocalize();
-  const hideToolActivity = useHideToolActivity();
   const [oauthError, setOAuthError] = useState<string | null>(null);
   const [oauthBinding, setOAuthBinding] = useState<'pending' | 'bound' | 'failed'>('pending');
 
@@ -416,63 +409,6 @@ export default function ToolCall({
 
   if (!isLast && (!function_name || function_name.length === 0) && !output) {
     return null;
-  }
-
-  if (hideToolActivity) {
-    const apps = !hideAttachments && attachments && attachments.length > 0 && (
-      <>
-        <AttachmentGroup attachments={attachments} />
-        <MCPAppViews attachments={attachments} />
-      </>
-    );
-    if (showOAuth) {
-      return (
-        <>
-          <div className="flex w-full flex-col gap-2.5">
-            <div className="mt-2 mb-1">
-              <Button
-                className="inline-flex items-center justify-center rounded-xl font-medium"
-                variant="default"
-                rel="noopener noreferrer"
-                disabled={oauthBinding === 'pending'}
-                aria-busy={oauthBinding === 'pending'}
-                onClick={handleOAuthClick}
-              >
-                {localize('com_ui_sign_in_to_domain', { 0: authDomain || 'LessonCaddie' })}
-              </Button>
-            </div>
-            {oauthError && (
-              <p role="alert" className="text-text-destructive text-sm">
-                {oauthError}
-              </p>
-            )}
-            <ToolAuthWarning />
-          </div>
-          {apps}
-        </>
-      );
-    }
-    if (phase === 'failed') {
-      return (
-        <>
-          <p role="alert" className="text-text-secondary py-1 text-sm">
-            I couldn’t complete that. Please try again.
-          </p>
-          {apps}
-        </>
-      );
-    }
-    if (phase === 'running') {
-      return (
-        <>
-          <p className="text-text-secondary py-1 text-sm" role="status">
-            Working…
-          </p>
-          {apps}
-        </>
-      );
-    }
-    return apps || null;
   }
 
   return (
