@@ -17,8 +17,8 @@ const EMBED_SW_SENTINEL = 'data-ssmlabs-embed-sw="true"';
 const NAV_CONFIG_SENTINEL = 'data-ssmlabs-nav-config="true"';
 const NAV_BRIDGE_SENTINEL = 'data-ssmlabs-nav-bridge="true"';
 const LOGIN_FALLBACK_SENTINEL = 'data-ssmlabs-login-fallback="true"';
-const SELECTOR_SCRIPT = `<script src="/ssmlabs/hide-model-selector.js?v=3" defer ${SELECTOR_SENTINEL}></script>`;
-const NAV_BRIDGE_SCRIPT = `<script src="/ssmlabs/lesson-caddie-navigation-bridge.js?v=3" ${NAV_BRIDGE_SENTINEL}></script>`;
+const SELECTOR_SCRIPT = `<script src="ssmlabs/hide-model-selector.js?v=3" defer ${SELECTOR_SENTINEL}></script>`;
+const NAV_BRIDGE_SCRIPT = `<script src="ssmlabs/lesson-caddie-navigation-bridge.js?v=3" ${NAV_BRIDGE_SENTINEL}></script>`;
 const EMBED_SW_SCRIPT = `<script ${EMBED_SW_SENTINEL}>
 (function clearFramedChatWorker() {
   if (window.parent === window) return;

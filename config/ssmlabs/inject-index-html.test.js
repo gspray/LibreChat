@@ -212,3 +212,27 @@ test('injectBaseHref preserves configured subdirectory deployments', () => {
     }
   }
 });
+
+test('navigation overlay assets load from the configured Chat subdirectory', () => {
+  const prevDomainClient = process.env.DOMAIN_CLIENT;
+  process.env.DOMAIN_CLIENT = 'https://lessoncaddie.ssmlabs.com/chat';
+  try {
+    const html = injectIndexHtml(SAMPLE);
+    const baseHref = html.match(/<base href="([^"]+)">/)?.[1];
+    const navSrc = html.match(/<script src="([^"]+)" data-ssmlabs-nav-bridge/)?.[1];
+    const selectorSrc = html.match(
+      /<script src="([^"]+)" defer data-ssmlabs-hide-model-selector/,
+    )?.[1];
+    assert.equal(
+      new URL(navSrc, `https://lessoncaddie.ssmlabs.com${baseHref}`).pathname,
+      '/chat/ssmlabs/lesson-caddie-navigation-bridge.js',
+    );
+    assert.equal(
+      new URL(selectorSrc, `https://lessoncaddie.ssmlabs.com${baseHref}`).pathname,
+      '/chat/ssmlabs/hide-model-selector.js',
+    );
+  } finally {
+    if (prevDomainClient === undefined) delete process.env.DOMAIN_CLIENT;
+    else process.env.DOMAIN_CLIENT = prevDomainClient;
+  }
+});
