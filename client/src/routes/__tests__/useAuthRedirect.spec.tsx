@@ -62,6 +62,7 @@ describe('useAuthRedirect', () => {
     (useAuthContext as jest.Mock).mockReturnValue({
       user: { id: '123', email: 'test@example.com' },
       isAuthenticated: true,
+      isAuthReady: true,
     });
 
     const router = createTestRouter();
@@ -82,6 +83,7 @@ describe('useAuthRedirect', () => {
     (useAuthContext as jest.Mock).mockReturnValue({
       user: null,
       isAuthenticated: false,
+      isAuthReady: true,
     });
 
     const router = createTestRouter();
@@ -105,10 +107,35 @@ describe('useAuthRedirect', () => {
     expect(router.state.historyAction).toBe('REPLACE');
   });
 
+  it('waits for a slow session refresh before redirecting', async () => {
+    (useAuthContext as jest.Mock).mockReturnValue({
+      user: null,
+      isAuthenticated: false,
+      isAuthReady: false,
+    });
+
+    const router = createTestRouter();
+    const { rerender } = render(<RouterProvider router={router} />);
+
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(router.state.location.pathname).toBe('/');
+
+    (useAuthContext as jest.Mock).mockReturnValue({
+      user: { id: '123', email: 'test@example.com' },
+      isAuthenticated: true,
+      isAuthReady: true,
+    });
+    rerender(<RouterProvider router={router} />);
+
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(router.state.location.pathname).toBe('/');
+  });
+
   it('should respect router basename when redirecting (subdirectory deployment)', async () => {
     (useAuthContext as jest.Mock).mockReturnValue({
       user: null,
       isAuthenticated: false,
+      isAuthReady: true,
     });
 
     // Test with basename="/librechat" (simulates subdirectory deployment)
@@ -137,6 +164,7 @@ describe('useAuthRedirect', () => {
     (useAuthContext as jest.Mock).mockReturnValue({
       user: null,
       isAuthenticated: false,
+      isAuthReady: true,
     });
 
     const router = createTestRouter('/librechat');
@@ -160,6 +188,7 @@ describe('useAuthRedirect', () => {
     (useAuthContext as jest.Mock).mockReturnValue({
       user: null,
       isAuthenticated: false,
+      isAuthReady: true,
     });
 
     const router = createTestRouter();
@@ -180,6 +209,7 @@ describe('useAuthRedirect', () => {
     (useAuthContext as jest.Mock).mockReturnValue({
       user: mockUser,
       isAuthenticated: true,
+      isAuthReady: true,
     });
 
     const router = createTestRouter();
@@ -197,6 +227,7 @@ describe('useAuthRedirect', () => {
     (useAuthContext as jest.Mock).mockReturnValue({
       user: null,
       isAuthenticated: false,
+      isAuthReady: true,
     });
 
     const router = createTestRouter('/', '/c/abc123');
@@ -219,6 +250,7 @@ describe('useAuthRedirect', () => {
     (useAuthContext as jest.Mock).mockReturnValue({
       user: null,
       isAuthenticated: false,
+      isAuthReady: true,
     });
 
     const router = createTestRouter('/', '/c/abc123?q=hello&submit=true#section');
@@ -239,6 +271,7 @@ describe('useAuthRedirect', () => {
     (useAuthContext as jest.Mock).mockReturnValue({
       user: null,
       isAuthenticated: false,
+      isAuthReady: true,
     });
 
     /**
@@ -270,6 +303,7 @@ describe('useAuthRedirect', () => {
     (useAuthContext as jest.Mock).mockReturnValue({
       user: null,
       isAuthenticated: false,
+      isAuthReady: true,
     });
 
     const router = createMemoryRouter(
