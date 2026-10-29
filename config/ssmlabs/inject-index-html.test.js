@@ -56,9 +56,13 @@ test('client-side login navigation returns through LessonCaddie SSO', () => {
   const previous = {
     enabled: process.env.LESSONCADDIE_SSO_ENABLED,
     domain: process.env.DOMAIN_CLIENT,
+    secret: process.env.LESSONCADDIE_SSO_SHARED_SECRET,
+    home: process.env.LESSONCADDIE_HOME_URL,
   };
   process.env.LESSONCADDIE_SSO_ENABLED = 'true';
+  process.env.LESSONCADDIE_SSO_SHARED_SECRET = 'test-secret';
   process.env.DOMAIN_CLIENT = 'https://stage.lessoncaddie.app/chat';
+  process.env.LESSONCADDIE_HOME_URL = 'https://stage.lessoncaddie.app/app';
   try {
     const html = injectIndexHtml(SAMPLE);
     const script = html.match(
@@ -87,6 +91,8 @@ test('client-side login navigation returns through LessonCaddie SSO', () => {
       URL,
       encodeURIComponent,
     };
+    browser.window = browser;
+    browser.parent = browser;
     vm.runInNewContext(script, browser);
     browser.history.replaceState({}, '', '/chat/login');
     assert.deepEqual(calls, [
@@ -98,11 +104,72 @@ test('client-side login navigation returns through LessonCaddie SSO', () => {
     calls.length = 0;
     browser.history.replaceState({}, '', '/chat/c/other');
     assert.equal(calls[0][0], 'replace');
+    calls.length = 0;
+    const listeners = {};
+    class FakeXhr {
+      open() {}
+      send() {}
+      addEventListener(name, listener) {
+        listeners[name] = listener;
+      }
+    }
+    browser.XMLHttpRequest = FakeXhr;
+    browser.setTimeout = (callback) => callback();
+    vm.runInNewContext(script, browser);
+    const xhr = new FakeXhr();
+    xhr.open('POST', '/chat/api/auth/logout');
+    xhr.send();
+    browser.history.replaceState({}, '', '/chat/login');
+    assert.deepEqual(calls, []);
+    xhr.status = 200;
+    listeners.loadend.call(xhr);
+    assert.deepEqual(calls, [['assign', 'https://stage.lessoncaddie.app/app']]);
+    const parentMessages = [];
+    const frameListeners = {};
+    class FrameXhr {
+      open() {}
+      send() {}
+      addEventListener(name, listener) {
+        frameListeners[name] = listener;
+      }
+    }
+    const frame = {
+      location: { ...browser.location },
+      history: { replaceState() {}, pushState() {} },
+      XMLHttpRequest: FrameXhr,
+      URL,
+      encodeURIComponent,
+      setTimeout(callback) {
+        callback();
+      },
+      parent: {
+        postMessage(message, origin) {
+          parentMessages.push({ message, origin });
+        },
+      },
+    };
+    frame.window = frame;
+    vm.runInNewContext(script, frame);
+    const frameXhr = new FrameXhr();
+    frameXhr.open('POST', '/chat/api/auth/logout');
+    frameXhr.send();
+    frameXhr.status = 200;
+    frameListeners.loadend.call(frameXhr);
+    assert.deepEqual(JSON.parse(JSON.stringify(parentMessages)), [
+      {
+        message: { source: 'lessoncaddie-assistant', type: 'logout' },
+        origin: 'https://stage.lessoncaddie.app',
+      },
+    ]);
   } finally {
     if (previous.enabled === undefined) delete process.env.LESSONCADDIE_SSO_ENABLED;
     else process.env.LESSONCADDIE_SSO_ENABLED = previous.enabled;
     if (previous.domain === undefined) delete process.env.DOMAIN_CLIENT;
     else process.env.DOMAIN_CLIENT = previous.domain;
+    if (previous.secret === undefined) delete process.env.LESSONCADDIE_SSO_SHARED_SECRET;
+    else process.env.LESSONCADDIE_SSO_SHARED_SECRET = previous.secret;
+    if (previous.home === undefined) delete process.env.LESSONCADDIE_HOME_URL;
+    else process.env.LESSONCADDIE_HOME_URL = previous.home;
   }
 });
 

@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { resolveLessonCaddieConfig } = require('./lessonCaddieReturn');
+const { resolveSsoConfig } = require('./lessonCaddieSso');
 
 const SELECTOR_SENTINEL = 'data-ssmlabs-hide-model-selector="true"';
 const BRANDING_SENTINEL = 'data-ssmlabs-branding="true"';
@@ -117,7 +118,8 @@ function buildNavConfigScript() {
 }
 
 function buildLoginFallbackScript() {
-  if (process.env.LESSONCADDIE_SSO_ENABLED !== 'true') {
+  const sso = resolveSsoConfig(process.env);
+  if (!sso.enabled) {
     return '';
   }
   const basePath = new URL(
@@ -126,14 +128,62 @@ function buildLoginFallbackScript() {
   return `<script ${LOGIN_FALLBACK_SENTINEL}>
 (function () {
   var basePath = ${JSON.stringify(basePath)};
+  var appUrl = ${JSON.stringify(sso.homeUrl)};
+  var appOrigin = new URL(appUrl).origin;
   var loginPath = basePath + '/login';
+  var logoutPath = basePath + '/api/auth/logout';
+  var logoutPending = false;
+  var logoutHandled = false;
   var originalReplaceState = history.replaceState;
   var originalPushState = history.pushState;
+  function isLogout(url, method) {
+    if (String(method || 'GET').toUpperCase() !== 'POST') return false;
+    try { var target = new URL(url, location.href); return target.origin === location.origin && target.pathname === logoutPath; }
+    catch (_) { return false; }
+  }
+  function finishLogout(ok) {
+    if (!ok) { logoutPending = false; return; }
+    if (logoutHandled) return;
+    logoutHandled = true;
+    setTimeout(function () {
+      if (window.parent !== window) {
+        window.parent.postMessage({ source: 'lessoncaddie-assistant', type: 'logout' }, appOrigin);
+      } else {
+        location.assign(appUrl);
+      }
+    }, 0);
+  }
+  if (typeof XMLHttpRequest !== 'undefined') {
+    var originalOpen = XMLHttpRequest.prototype.open;
+    var originalSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (method, url) {
+      this.__lessonCaddieLogout = isLogout(url, method);
+      return originalOpen.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.send = function () {
+      if (this.__lessonCaddieLogout) {
+        logoutPending = true;
+        this.addEventListener('loadend', function () { finishLogout(this.status >= 200 && this.status < 300); }, { once: true });
+      }
+      return originalSend.apply(this, arguments);
+    };
+  }
+  if (typeof window.fetch === 'function') {
+    var originalFetch = window.fetch;
+    window.fetch = function (input, options) {
+      var logout = isLogout(input && input.url || input, options && options.method || input && input.method);
+      if (logout) logoutPending = true;
+      var result = originalFetch.apply(this, arguments);
+      if (!logout) return result;
+      return result.then(function (response) { finishLogout(response.ok); return response; }, function (error) { finishLogout(false); throw error; });
+    };
+  }
   function redirectIfChatLogin(url) {
     if (url == null || location.pathname === loginPath) return false;
     var target;
     try { target = new URL(url, location.href); } catch (_) { return false; }
     if (target.origin !== location.origin || target.pathname !== loginPath || target.searchParams.get('local') === '1') return false;
+    if (logoutPending) return true;
     var returnTo = location.pathname + location.search;
     location.assign(basePath + '/sso/lessoncaddie/start?returnTo=' + encodeURIComponent(returnTo));
     return true;
