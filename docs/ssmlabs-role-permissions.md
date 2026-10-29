@@ -1,22 +1,21 @@
 # LessonCaddie Chat role permissions
 
-`config/ssmlabs/role-permissions.json` is the reviewed snapshot of the dev chat
-role settings for Agents, MCP Servers, and Skills. It contains only `ADMIN` and
-`USER` role permissions in these three areas. Other role settings remain owned
-by each LibreChat instance.
+`config/ssmlabs/role-permissions.json` is the reviewed snapshot of all dev chat
+role settings for `ADMIN` and `USER`. The release check compares every permission
+group with dev, and the target hook applies them without changing other roles.
 
-The current dev chat is hosted at `chat.ssmlabs.com`. Stage and production chat
-instances for `stage.lessoncaddie.app` and `lessoncaddie.app` are planned but
-not yet configured. Do not run the target apply command against the dev stack.
+Dev chat is hosted at `chat.ssmlabs.com`. Stage and production Chat run under
+`/chat` on `stage.lessoncaddie.app` and `lessoncaddie.app`. Never run the target
+apply command against dev.
 
 ## Capture from dev
 
-Set `LIBRECHAT_INSTANCE_ENV=dev` in the dev Compose environment and recreate the
-API container so it receives the marker. After changing permissions in the dev
-admin UI, capture and review the new snapshot:
+After changing permissions in the dev admin UI, capture and review the new
+snapshot. The check reads the local dev `LibreChat` container:
 
 ```bash
-docker compose exec -T api node config/ssmlabs/role-permissions.js export dev \
+docker exec LibreChat node -e 'require("dotenv").config({path:"/app/.env"}); const mongoose=require("mongoose"); (async()=>{await mongoose.connect(process.env.MONGO_URI); const roles=await mongoose.connection.db.collection("roles").find({name:{$in:["ADMIN","USER"]},tenantId:{$in:[null,undefined]}}).toArray(); console.log(JSON.stringify(roles.map(({name,permissions})=>({name,permissions})))); await mongoose.disconnect()})().catch(e=>{console.error(e.message);process.exitCode=1})' \
+  | node -e 'const {snapshotFromRoles}=require("./config/ssmlabs/role-permissions");let input="";process.stdin.on("data",chunk=>input+=chunk);process.stdin.on("end",()=>console.log(JSON.stringify(snapshotFromRoles(JSON.parse(input)),null,2)))' \
   > config/ssmlabs/role-permissions.json.new
 diff -u config/ssmlabs/role-permissions.json config/ssmlabs/role-permissions.json.new
 mv config/ssmlabs/role-permissions.json.new config/ssmlabs/role-permissions.json
@@ -24,8 +23,8 @@ node --test config/ssmlabs/role-permissions.test.js
 ```
 
 Commit the reviewed snapshot. Export fails if either role or a required permission
-is missing. `USER` must retain `AGENTS.USE` and `MCP_SERVERS.USE` so Instructor
-Assistant can use the LessonCaddie MCP tools.
+is missing. `USER` retains `AGENTS.USE` and `MCP_SERVERS.USE` for Instructor
+Assistant, while agent creation, MCP server creation, and skills stay disabled.
 
 Before releasing to stage or production, run
 `bash config/ssmlabs/check-dev-role-permissions.sh` on dev. It fails if the
@@ -34,15 +33,12 @@ commit the new snapshot before retrying.
 
 ## Apply during a chat release
 
-On each future target host, set `LIBRECHAT_INSTANCE_ENV=stage` or
-`LIBRECHAT_INSTANCE_ENV=production` in the Compose environment, copy the tracked
-Compose override, copy the updated `config/instructor-assistant.librechat.yaml`
-to the runtime `librechat.yaml`, and bring in the permission snapshot. The
-target marker is checked before database access. The
-hook also rejects a `librechat.yaml` that
-still explicitly seeds Agent, MCP Server, or Skill role permissions, since those
-would overwrite the snapshot on a later restart. Run the matching hook before
-opening the new chat instance to users:
+Each target host has `LIBRECHAT_INSTANCE_ENV=stage` or `production` in its
+Compose override. The target marker is checked before database access. The
+hook rejects a `librechat.yaml` that explicitly seeds Agent, MCP Server, Skill,
+or Prompt role permissions because those would overwrite the snapshot on a
+later restart. Run the matching hook after pulling this Chat branch and before
+opening a new Chat release to users:
 
 ```bash
 bash config/ssmlabs/deploy-chat.sh stage
@@ -51,13 +47,12 @@ bash config/ssmlabs/deploy-chat.sh production
 ```
 
 The deploy command starts the API and invokes the permission hook. The hook
-applies the three permission groups, preserves unrelated role settings,
+applies all Admin and User permission groups, preserves other roles,
 restarts the API when permissions changed to clear its role cache, and checks the
 result. It fails if a role is missing or the target marker does not match. A
 failed hook fails the chat release; do not treat an incomplete permission apply
 as successful. Repeat the hook safely if an interrupted apply needs recovery.
 
-This hook belongs after the target LibreChat API container is recreated in the
-future chat release process. LessonCaddie’s app deploy script does not deploy
-LibreChat and does not invoke this hook. No stage or production chat instance is
-configured yet, so there is currently no live target to attach it to.
+The LessonCaddie Lightsail deploy helper runs the dev snapshot check, updates
+the target Chat checkout, and runs this hook after deploying the app. A release
+fails if the dev settings differ from the reviewed snapshot or target apply fails.

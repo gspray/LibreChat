@@ -7,12 +7,26 @@ const path = require('node:path');
 
 const manifestPath = path.join(__dirname, 'role-permissions.json');
 const roleNames = ['ADMIN', 'USER'];
-const permissionTypes = ['AGENTS', 'MCP_SERVERS', 'SKILLS'];
 const permissionKeys = {
+  BOOKMARKS: ['USE'],
+  PROMPTS: ['USE', 'CREATE', 'SHARE', 'SHARE_PUBLIC'],
+  MEMORIES: ['USE', 'CREATE', 'READ', 'UPDATE', 'OPT_OUT'],
   AGENTS: ['USE', 'CREATE', 'SHARE', 'SHARE_PUBLIC'],
+  MULTI_CONVO: ['USE'],
+  TEMPORARY_CHAT: ['USE'],
+  RUN_CODE: ['USE'],
+  WEB_SEARCH: ['USE'],
+  PEOPLE_PICKER: ['VIEW_USERS', 'VIEW_ROLES', 'VIEW_GROUPS'],
+  MARKETPLACE: ['USE'],
+  FILE_SEARCH: ['USE'],
+  FILE_CITATIONS: ['USE'],
   MCP_SERVERS: ['USE', 'CREATE', 'SHARE', 'SHARE_PUBLIC', 'CONFIGURE_OBO'],
+  REMOTE_AGENTS: ['USE', 'CREATE', 'SHARE', 'SHARE_PUBLIC'],
   SKILLS: ['USE', 'CREATE', 'SHARE', 'SHARE_PUBLIC'],
+  SHARED_LINKS: ['CREATE', 'SHARE', 'SHARE_PUBLIC'],
+  SCHEDULES: ['USE', 'CREATE'],
 };
+const permissionTypes = Object.keys(permissionKeys);
 
 function validateSnapshot(snapshot) {
   if (
@@ -50,6 +64,10 @@ function validateSnapshot(snapshot) {
   }
   if (snapshot.roles.USER.AGENTS.USE !== true || snapshot.roles.USER.MCP_SERVERS.USE !== true) {
     throw new Error('USER must retain agent and MCP use for Instructor Assistant');
+  }
+  if (snapshot.roles.USER.AGENTS.CREATE || snapshot.roles.USER.MCP_SERVERS.CREATE
+    || snapshot.roles.USER.SKILLS.USE || snapshot.roles.USER.SKILLS.CREATE) {
+    throw new Error('USER cannot create agents or MCP servers or use skills');
   }
   return snapshot;
 }
@@ -103,7 +121,7 @@ function requireInstanceEnvironment(expected) {
 }
 
 function assertNoYamlRolePermissions(config) {
-  for (const field of ['agents', 'mcpServers', 'skills']) {
+  for (const field of ['agents', 'mcpServers', 'skills', 'prompts']) {
     const value = config?.interface?.[field];
     if (
       typeof value === 'boolean' ||

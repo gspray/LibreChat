@@ -22,15 +22,15 @@ test('the checked-in permission snapshot has the complete expected shape', () =>
 
 test('a changed target permission is reported without unrelated fields', () => {
   const changed = structuredClone(roles);
-  changed[1].permissions.SKILLS.CREATE = false;
-  changed[1].permissions.PROMPTS = { USE: false };
+  changed[1].permissions.SKILLS.CREATE = true;
+  changed[1].permissions.CUSTOM = { USE: false };
   assert.deepEqual(diffPermissions(snapshot, changed), [
     {
       roleName: 'USER',
       permissionType: 'SKILLS',
       key: 'CREATE',
-      from: false,
-      to: true,
+      from: true,
+      to: false,
     },
   ]);
 });
@@ -44,6 +44,9 @@ test('missing role or permission values fail closed', () => {
   const disabledAssistant = structuredClone(snapshot);
   disabledAssistant.roles.USER.MCP_SERVERS.USE = false;
   assert.throws(() => validateSnapshot(disabledAssistant), /must retain agent and MCP use/);
+  const enabledSkills = structuredClone(snapshot);
+  enabledSkills.roles.USER.SKILLS.USE = true;
+  assert.throws(() => validateSnapshot(enabledSkills), /cannot create agents or MCP servers or use skills/);
 });
 
 test('target environment mismatch stops before database access', async () => {
