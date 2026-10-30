@@ -477,16 +477,17 @@
     if (!href || !isAllowedOrigin(windowObject, originOf(href))) {
       return false;
     }
-    event.preventDefault();
-    event.stopPropagation();
     const result =
       state.lastResult && state.lastResult.deepLink === href
         ? state.lastResult
         : resultFromHref(windowObject, href);
-    if (result) {
-      state.processedIds.delete(result.requestId);
-      postNavigate(windowObject, state, result);
+    if (!result) {
+      return false;
     }
+    event.preventDefault();
+    event.stopPropagation();
+    state.processedIds.delete(result.requestId);
+    postNavigate(windowObject, state, result);
     return true;
   }
 

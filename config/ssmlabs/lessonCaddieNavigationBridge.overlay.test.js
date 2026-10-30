@@ -4,6 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   extractNavigationFromPayload,
+  handleDeepLinkClick,
   parseSseChunk,
   resultFromHref,
 } = require('./lessonCaddieNavigationBridge.browser.js');
@@ -76,6 +77,46 @@ test('forwards New Student details while the fallback link carries no personal d
   assert.equal(extracted.params.email, 'alex.doe@example.com');
   assert.equal(resultFromHref(null, result.deepLink)?.destination, 'new-student');
   assert.equal(result.deepLink.includes('alex.doe'), false);
+});
+
+test('leaves Chat navigation links alone while forwarding LessonCaddie handoff links', () => {
+  const sent = [];
+  const windowObject = {
+    parent: { postMessage: (...args) => sent.push(args) },
+    setTimeout: () => 1,
+  };
+  const state = {
+    appNavigationBridge: true,
+    parentOrigin: 'https://lessoncaddie.ssmlabs.com',
+    processedIds: new Set(),
+    fallbackTimers: {},
+    lastResult: null,
+  };
+  const click = (href) => {
+    const event = {
+      target: { closest: () => ({ href }) },
+      preventDefault() {
+        this.prevented = true;
+      },
+      stopPropagation() {
+        this.stopped = true;
+      },
+    };
+    const handled = handleDeepLinkClick(windowObject, state, event);
+    return { handled, event };
+  };
+
+  const chat = click('https://lessoncaddie.ssmlabs.com/c/new');
+  assert.equal(chat.handled, false);
+  assert.equal(chat.event.prevented, undefined);
+  assert.equal(chat.event.stopped, undefined);
+  assert.equal(sent.length, 0);
+
+  const app = click('https://lessoncaddie.ssmlabs.com/app?view=start-lesson');
+  assert.equal(app.handled, true);
+  assert.equal(app.event.prevented, true);
+  assert.equal(app.event.stopped, true);
+  assert.equal(sent[0][0].destination, 'start-lesson');
 });
 
 test('parses SSE data lines into JSON events', () => {
