@@ -14,9 +14,15 @@ function runDeploy(target, marker) {
     const docker = path.join(temp, 'docker');
     const log = path.join(temp, 'docker.log');
     const fixture = path.join(temp, 'roles.json');
-    fs.writeFileSync(fixture, JSON.stringify(Object.entries(snapshot.roles)
-      .map(([name, permissions]) => ({ name, permissions }))));
-    fs.writeFileSync(docker, `#!/usr/bin/env bash
+    fs.writeFileSync(
+      fixture,
+      JSON.stringify(
+        Object.entries(snapshot.roles).map(([name, permissions]) => ({ name, permissions })),
+      ),
+    );
+    fs.writeFileSync(
+      docker,
+      `#!/usr/bin/env bash
 set -euo pipefail
 printf '%s\\n' "$*" >> "$DOCKER_LOG"
 if [[ "$1" == compose && "$2" == config ]]; then
@@ -24,7 +30,9 @@ if [[ "$1" == compose && "$2" == config ]]; then
 elif [[ "$1" == exec ]]; then
   cat "$ROLE_FIXTURE"
 fi
-`, { mode: 0o755 });
+`,
+      { mode: 0o755 },
+    );
     const result = spawnSync('bash', ['config/ssmlabs/deploy-chat.sh', target], {
       cwd: root,
       encoding: 'utf8',
