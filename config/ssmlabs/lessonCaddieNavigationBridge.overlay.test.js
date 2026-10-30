@@ -119,6 +119,29 @@ test('leaves Chat navigation links alone while forwarding LessonCaddie handoff l
   assert.equal(sent[0][0].destination, 'start-lesson');
 });
 
+test('New Chat links keep the Chat subdirectory and reach the native click handler', () => {
+  const anchor = { href: 'https://lessoncaddie.ssmlabs.com/c/new' };
+  const windowObject = {
+    location: { href: 'https://lessoncaddie.ssmlabs.com/chat/c/old' },
+    document: { querySelector: () => ({ getAttribute: () => '/chat/' }) },
+    parent: {},
+  };
+  const event = {
+    target: { closest: () => anchor },
+    preventDefault() {
+      this.prevented = true;
+    },
+    stopPropagation() {
+      this.stopped = true;
+    },
+  };
+  const handled = handleDeepLinkClick(windowObject, { appNavigationBridge: true }, event);
+  assert.equal(handled, false);
+  assert.equal(anchor.href, 'https://lessoncaddie.ssmlabs.com/chat/c/new');
+  assert.equal(event.prevented, undefined);
+  assert.equal(event.stopped, undefined);
+});
+
 test('parses SSE data lines into JSON events', () => {
   const found = [];
   const rest = parseSseChunk(`event: message\ndata: ${JSON.stringify({ ok: true })}\n`, (event) =>

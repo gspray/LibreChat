@@ -467,7 +467,24 @@
     return false;
   }
 
+  function correctNewChatLink(windowObject, event) {
+    const anchor = event?.target?.closest?.('a[href]');
+    const href = anchor?.href;
+    const baseHref = windowObject.document?.querySelector?.('base[href]')?.getAttribute?.('href');
+    if (!href || !baseHref || !windowObject.location?.href) return;
+    try {
+      const base = new URL(baseHref, windowObject.location.href);
+      const link = new URL(href);
+      if (base.pathname === '/' || base.origin !== link.origin || link.pathname !== '/c/new')
+        return;
+      anchor.href = new URL(`c/new${link.search}${link.hash}`, base).toString();
+    } catch {
+      // Keep the original link if the deployment URL is malformed.
+    }
+  }
+
   function handleDeepLinkClick(windowObject, state, event) {
+    correctNewChatLink(windowObject, event);
     if (state.appNavigationBridge !== true || !isFramed(windowObject)) {
       return false;
     }
@@ -610,6 +627,16 @@
     windowObject.addEventListener(
       'click',
       (event) => handleDeepLinkClick(windowObject, state, event),
+      true,
+    );
+    windowObject.addEventListener(
+      'pointerover',
+      (event) => correctNewChatLink(windowObject, event),
+      true,
+    );
+    windowObject.addEventListener(
+      'focusin',
+      (event) => correctNewChatLink(windowObject, event),
       true,
     );
     announceBridgeReady(windowObject);
