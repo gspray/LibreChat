@@ -6,7 +6,9 @@ group with dev, and the target hook applies them without changing other roles.
 
 Dev Chat runs under `/chat` on `lessoncaddie.ssmlabs.com`. Stage and production
 Chat run under `/chat` on `stage.lessoncaddie.app` and `lessoncaddie.app`.
-All three checkouts use the reviewed `codex/chat-role-permissions` branch. The
+All three checkouts use the reviewed `codex/chat-role-permissions` commit. Dev's
+live checkout uses a local `dev-chat-deploy` branch that fast-forwards from it;
+the source branch remains checked out in a separate worktree. The
 dev Admin UI remains the source of role permissions: the dev deploy checks its
 roles against the snapshot, while stage and production apply the snapshot.
 
