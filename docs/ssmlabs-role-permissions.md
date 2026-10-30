@@ -4,9 +4,11 @@
 role settings for `ADMIN` and `USER`. The release check compares every permission
 group with dev, and the target hook applies them without changing other roles.
 
-Dev chat is hosted at `chat.ssmlabs.com`. Stage and production Chat run under
-`/chat` on `stage.lessoncaddie.app` and `lessoncaddie.app`. Never run the target
-apply command against dev.
+Dev Chat runs under `/chat` on `lessoncaddie.ssmlabs.com`. Stage and production
+Chat run under `/chat` on `stage.lessoncaddie.app` and `lessoncaddie.app`.
+All three checkouts use the reviewed `codex/chat-role-permissions` branch. The
+dev Admin UI remains the source of role permissions: the dev deploy checks its
+roles against the snapshot, while stage and production apply the snapshot.
 
 ## Capture from dev
 
@@ -33,26 +35,31 @@ commit the new snapshot before retrying.
 
 ## Apply during a chat release
 
-Each target host has `LIBRECHAT_INSTANCE_ENV=stage` or `production` in its
-Compose override. The target marker is checked before database access. The
+Each host has `LIBRECHAT_INSTANCE_ENV=dev`, `stage`, or `production` in its
+Compose override. The marker is checked before the API is recreated. The
 hook rejects a `librechat.yaml` that explicitly seeds Agent, MCP Server, Skill,
 or Prompt role permissions because those would overwrite the snapshot on a
 later restart. Run the matching hook after pulling this Chat branch and before
 opening a new Chat release to users:
 
 ```bash
+bash config/ssmlabs/deploy-chat.sh dev
+# or, on the stage chat host:
 bash config/ssmlabs/deploy-chat.sh stage
 # or, on the production chat host:
 bash config/ssmlabs/deploy-chat.sh production
 ```
 
-The deploy command starts the API and invokes the permission hook. The hook
+The deploy command recreates the API, reconciles the target roles, and
+provisions the Instructor Assistant from the reviewed agent spec. The hook
 applies all Admin and User permission groups, preserves other roles,
 restarts the API when permissions changed to clear its role cache, and checks the
 result. It fails if a role is missing or the target marker does not match. A
 failed hook fails the chat release; do not treat an incomplete permission apply
 as successful. Repeat the hook safely if an interrupted apply needs recovery.
 
-The LessonCaddie Lightsail deploy helper runs the dev snapshot check, updates
-the target Chat checkout, and runs this hook after deploying the app. A release
-fails if the dev settings differ from the reviewed snapshot or target apply fails.
+The LessonCaddie Lightsail deploy helper updates and deploys dev Chat first,
+then updates and deploys the target Chat checkout after the app. A release
+fails if dev roles differ from the reviewed snapshot or any target step fails.
+Each host keeps its own ignored Compose override, `librechat.yaml`, `.env`,
+database, and volumes; no environment secrets are copied between hosts.
