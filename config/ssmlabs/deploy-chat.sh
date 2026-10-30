@@ -34,3 +34,5 @@ if [[ "$target" != dev ]]; then
   bash config/ssmlabs/apply-role-permissions.sh "$target"
 fi
 docker compose exec -T api node config/provision-instructor-assistant.js
+docker compose exec -T api node config/ssmlabs/ensure-student-caddie-spec.js
+docker compose restart api

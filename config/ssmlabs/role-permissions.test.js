@@ -49,7 +49,10 @@ test('missing role or permission values fail closed', () => {
   assert.throws(() => validateSnapshot(disabledAssistant), /must retain agent and MCP use/);
   const enabledSkills = structuredClone(snapshot);
   enabledSkills.roles.USER.SKILLS.USE = true;
-  assert.throws(() => validateSnapshot(enabledSkills), /cannot create agents or MCP servers or use skills/);
+  assert.throws(
+    () => validateSnapshot(enabledSkills),
+    /cannot create agents or MCP servers or use skills/,
+  );
 });
 
 test('target environment mismatch stops before database access', async () => {
@@ -78,5 +81,22 @@ test('explicit YAML role permissions cannot override the snapshot on restart', (
   assert.throws(
     () => assertNoYamlRolePermissions({ interface: { mcpServers: false } }),
     /interface.mcpServers/,
+  );
+});
+
+test('student Caddie selects the student MCP server', () => {
+  const template = yaml.load(
+    fs.readFileSync(path.join(__dirname, '..', 'instructor-assistant.librechat.yaml'), 'utf8'),
+  );
+  assert.equal(
+    template.mcpServers['lessoncaddie-student'].url,
+    'https://lessoncaddie.ssmlabs.com/api/student-mcp',
+  );
+  const studentSpec = template.modelSpecs.list.find((spec) => spec.name === 'student-caddie');
+  assert.equal(studentSpec.preset.endpoint, 'openAI');
+  assert.deepEqual(studentSpec.mcpServers, ['lessoncaddie-student']);
+  assert.equal(
+    template.modelSpecs.list.find((spec) => spec.softDefault)?.name,
+    'instructor-assistant',
   );
 });

@@ -5,6 +5,17 @@ mcpSettings:
   allowedDomains:
     - lessoncaddie.ssmlabs.com
 mcpServers:
+  lessoncaddie-student:
+    type: streamable-http
+    url: https://lessoncaddie.ssmlabs.com/api/student-mcp
+    reuseConnection: true
+    requiresOAuth: false
+    chatMenu: false
+    serverInstructions: true
+    headers:
+      X-LessonCaddie-Sso-Secret: '${LESSONCADDIE_SSO_SHARED_SECRET}'
+      X-LibreChat-Firebase-Uid: '{{LIBRECHAT_USER_OPENIDID}}'
+      X-LibreChat-User-Provider: '{{LIBRECHAT_USER_PROVIDER}}'
   lessoncaddie-instructor:
     type: streamable-http
     url: https://lessoncaddie.ssmlabs.com/api/instructor-mcp
@@ -53,3 +64,13 @@ modelSpecs:
       preset:
         endpoint: agents
         agent_id: agent_instructor_assistant
+    - name: student-caddie
+      label: Caddie
+      description: 'Ask Caddie about your lessons, practices, and notifications.'
+      showOnLanding: false
+      hideBadgeRow: true
+      mcpServers:
+        - lessoncaddie-student
+      preset:
+        endpoint: openAI
+        model: gpt-4o-mini
