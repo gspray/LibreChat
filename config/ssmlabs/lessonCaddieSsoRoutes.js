@@ -3,6 +3,8 @@
 /** SSM Labs overlay — docs/ssmlabs-fork-patches.md. Express routes mounted by attach-lessoncaddie-sso.js. */
 const express = require('express');
 const crypto = require('node:crypto');
+const { version: chatVersion } = require('../../package.json');
+const CHAT_STARTED_AT = new Date().toISOString();
 const {
   resolveSsoConfig,
   sanitizeAppReturnTo,
@@ -24,6 +26,16 @@ function createLessonCaddieSsoRouter(deps = {}) {
   const chatUrl = () => new URL(process.env.DOMAIN_CLIENT || 'https://chat.ssmlabs.com');
   const chatOrigin = () => chatUrl().origin;
   const defaultReturnTo = () => `${chatUrl().pathname.replace(/\/$/, '')}/c/new`;
+
+  router.get('/version', (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      name: 'LessonCaddie Chat',
+      version: chatVersion,
+      startedAt: CHAT_STARTED_AT,
+      retrievedAt: new Date().toISOString(),
+    });
+  });
 
   router.get('/start', (req, res) => {
     const config = loadConfig();

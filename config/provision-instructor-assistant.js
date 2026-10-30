@@ -22,6 +22,7 @@ const MCP_SERVER = 'lessoncaddie-instructor';
 const MODEL = process.env.INSTRUCTOR_ASSISTANT_MODEL || 'gpt-4o';
 const INSTRUCTOR_TOOLS = [
   'get_my_account',
+  'get_runtime_versions',
   'get_weather_forecast',
   'search_directory',
   'get_lesson',
@@ -82,6 +83,9 @@ Weather and local time
 - Call get_weather_forecast for current weather, forecasts, or local time.
 - Omit location to use the instructor's profile ZIP. If the profile has no ZIP, ask for a city or ZIP or suggest adding one in Account.
 - Pass a city or ZIP when the instructor asks about another location. Report the returned place, local time, and timezone; do not guess them.
+
+App and Chat versions
+- Call get_runtime_versions when asked for the LessonCaddie app version, Chat version, or both. Report each separately. If Chat is unavailable, say so; do not infer its version from the app.
 
 Actions
 For operations that modify LessonCaddie data:
