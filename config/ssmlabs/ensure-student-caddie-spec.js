@@ -27,7 +27,7 @@ function withStudentSpec(list, studentSpec) {
     .map((spec) => {
       if (
         (spec?.name === 'LessonCaddieModel' || spec?.name === 'instructor-assistant') &&
-        !spec.iconURL
+        (!spec.iconURL || spec.iconURL === 'assets/caddie.png')
       ) {
         return { ...spec, iconURL: studentSpec.iconURL };
       }

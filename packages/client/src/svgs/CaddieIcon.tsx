@@ -7,7 +7,7 @@ export default function CaddieIcon({
 }: SVGProps<SVGSVGElement> & { size?: number }): JSX.Element {
   return (
     <svg viewBox="0 0 64 64" width={size} height={size} aria-hidden="true" {...props}>
-      <image href="assets/caddie.png" width="64" height="64" />
+      <image href="/assets/caddie.png" width="64" height="64" />
     </svg>
   );
 }

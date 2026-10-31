@@ -7,7 +7,7 @@ describe('ProviderIcon', () => {
   it('renders component art with an accessible label', () => {
     const { container } = render(<ProviderIcon provider={ProviderId.openai} />);
     expect(screen.getByRole('img', { name: 'OpenAI' })).toBeInTheDocument();
-    expect(container.querySelector('image')).toHaveAttribute('href', 'assets/caddie.png');
+    expect(container.querySelector('image')).toHaveAttribute('href', '/assets/caddie.png');
   });
 
   it('renders brand marks as inline art that follows the theme', () => {
