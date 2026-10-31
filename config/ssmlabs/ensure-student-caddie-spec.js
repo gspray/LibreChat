@@ -22,7 +22,18 @@ function studentSpecFromTemplate(
 
 function withStudentSpec(list, studentSpec) {
   if (!Array.isArray(list)) return null;
-  return [...list.filter((spec) => spec?.name !== SPEC_NAME), studentSpec];
+  const instructorSpecs = list
+    .filter((spec) => spec?.name !== SPEC_NAME)
+    .map((spec) => {
+      if (
+        (spec?.name === 'LessonCaddieModel' || spec?.name === 'instructor-assistant') &&
+        !spec.iconURL
+      ) {
+        return { ...spec, iconURL: studentSpec.iconURL };
+      }
+      return spec;
+    });
+  return [...instructorSpecs, studentSpec];
 }
 
 async function main() {
