@@ -89,6 +89,14 @@ function createLessonCaddieSsoRouter(deps = {}) {
       res.redirect(302, returnTo.startsWith('/') ? returnTo : returnTo);
     } catch (error) {
       logger.error('[ssmlabs-lessoncaddie-sso] callback failed', error?.code || error?.message);
+      if (['EAI_AGAIN', 'ENOTFOUND', 'EHOSTUNREACH', 'ENETUNREACH'].includes(error?.cause?.code)) {
+        res
+          .status(503)
+          .send(
+            "Chat cannot reach LessonCaddie. Please retry from LessonCaddie. If this continues, ask your administrator to check the server's Tailscale connection.",
+          );
+        return;
+      }
       const mapped = mapIdentityError(error?.code);
       if (
         error?.code === 'LINK_REQUIRED' ||

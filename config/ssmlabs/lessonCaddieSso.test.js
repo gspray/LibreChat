@@ -54,12 +54,18 @@ test('SSO start keeps the configured chat base path', async () => {
   process.env.DOMAIN_CLIENT = 'https://stage.lessoncaddie.app/chat';
   try {
     const app = express();
-    app.use('/sso/lessoncaddie', createLessonCaddieSsoRouter({
-      resolveSsoConfig: () => ({ enabled: true, homeUrl: 'https://stage.lessoncaddie.app/app' }),
-    }));
+    app.use(
+      '/sso/lessoncaddie',
+      createLessonCaddieSsoRouter({
+        resolveSsoConfig: () => ({ enabled: true, homeUrl: 'https://stage.lessoncaddie.app/app' }),
+      }),
+    );
     const response = await request(app).get('/sso/lessoncaddie/start');
     assert.equal(response.status, 302);
-    assert.equal(new URL(response.headers.location).searchParams.get('librechatSsoReturn'), '/chat/c/new');
+    assert.equal(
+      new URL(response.headers.location).searchParams.get('librechatSsoReturn'),
+      '/chat/c/new',
+    );
   } finally {
     if (previous === undefined) delete process.env.DOMAIN_CLIENT;
     else process.env.DOMAIN_CLIENT = previous;
@@ -148,6 +154,24 @@ test('callback without lc_sso_state cookie redeems the LessonCaddie handoff', as
   assert.equal(response.status, 302);
   assert.equal(response.headers.location, '/c/new');
   assert.equal(redeemed, 1);
+});
+
+test('callback reports a retry hint when LessonCaddie DNS is unavailable', async () => {
+  const app = express();
+  app.use(
+    '/sso/lessoncaddie',
+    createLessonCaddieSsoRouter({
+      resolveSsoConfig: () => ({ enabled: true, homeUrl: 'https://lessoncaddie.ssmlabs.com/app' }),
+      redeemWithLessonCaddie: async () => {
+        throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'EAI_AGAIN' } });
+      },
+      logger: { error() {} },
+    }),
+  );
+  const response = await request(app).get('/sso/lessoncaddie/callback?code=code&state=state');
+  assert.equal(response.status, 503);
+  assert.match(response.text, /retry from LessonCaddie/);
+  assert.match(response.text, /server's Tailscale connection/);
 });
 
 test('resolveLibreChatUser creates on first login and does not merge by email', async () => {

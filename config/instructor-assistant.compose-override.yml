@@ -2,6 +2,8 @@
 # Do not bind-mount ./client/dist — overlays patch the published image instead.
 services:
   api:
+    dns:
+      - 100.100.100.100
     environment:
       SCHEDULES_SINGLE_PROCESS: "true"
       APP_TITLE: Ask Lesson Caddie Assistant
