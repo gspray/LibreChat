@@ -1,23 +1,23 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
-const { studentSpecFromTemplate, withStudentSpec } = require('./ensure-student-caddie-spec');
+const { caddieSpecsFromTemplate, withCaddieSpecs } = require('./ensure-student-caddie-spec');
 
 test('student spec comes from the tracked Chat configuration', () => {
-  const student = studentSpecFromTemplate();
+  const { instructor, student } = caddieSpecsFromTemplate();
+  assert.equal(instructor.name, 'instructor-assistant');
+  assert.equal(instructor.preset.agent_id, 'agent_instructor_assistant');
   assert.equal(student.name, 'student-caddie');
   assert.equal(student.iconURL, '/assets/caddie.png');
   assert.deepEqual(student.mcpServers, ['lessoncaddie-student']);
 });
 
-test('Admin model list keeps instructor entries and gets one student entry', () => {
-  const instructor = { name: 'LessonCaddieModel', mcpServers: ['lessoncaddie-instructor'] };
-  const student = studentSpecFromTemplate();
-  const once = withStudentSpec([instructor], student);
-  assert.deepEqual(once, [{ ...instructor, iconURL: '/assets/caddie.png' }, student]);
-  assert.deepEqual(withStudentSpec(once, student), once);
-  assert.equal(
-    withStudentSpec([{ ...instructor, iconURL: 'assets/caddie.png' }], student)[0].iconURL,
-    '/assets/caddie.png',
+test('Admin model list replaces the legacy OpenAI instructor entry and remains stable', () => {
+  const specs = caddieSpecsFromTemplate();
+  const once = withCaddieSpecs(
+    [{ name: 'LessonCaddieModel', preset: { endpoint: 'openAI' } }, { name: 'other-model' }],
+    specs,
   );
-  assert.equal(withStudentSpec(null, student), null);
+  assert.deepEqual(once, [specs.instructor, specs.student, { name: 'other-model' }]);
+  assert.deepEqual(withCaddieSpecs(once, specs), once);
+  assert.equal(withCaddieSpecs(null, specs), null);
 });

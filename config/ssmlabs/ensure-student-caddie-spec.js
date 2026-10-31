@@ -4,36 +4,36 @@ const path = require('node:path');
 const yaml = require('js-yaml');
 
 const SPEC_NAME = 'student-caddie';
+const INSTRUCTOR_SPEC_NAME = 'instructor-assistant';
 
-function studentSpecFromTemplate(
+function caddieSpecsFromTemplate(
   filePath = path.resolve(__dirname, '../instructor-assistant.librechat.yaml'),
 ) {
   const template = yaml.load(fs.readFileSync(filePath, 'utf8'));
-  const spec = template.modelSpecs?.list?.find((item) => item.name === SPEC_NAME);
+  const student = template.modelSpecs?.list?.find((item) => item.name === SPEC_NAME);
+  const instructor = template.modelSpecs?.list?.find((item) => item.name === INSTRUCTOR_SPEC_NAME);
   if (
-    !spec ||
-    spec.preset?.endpoint !== 'openAI' ||
-    JSON.stringify(spec.mcpServers) !== JSON.stringify(['lessoncaddie-student'])
+    !student ||
+    student.preset?.endpoint !== 'openAI' ||
+    JSON.stringify(student.mcpServers) !== JSON.stringify(['lessoncaddie-student']) ||
+    !instructor ||
+    instructor.preset?.endpoint !== 'agents' ||
+    instructor.preset?.agent_id !== 'agent_instructor_assistant'
   ) {
-    throw new Error('The student Caddie model specification is missing or invalid.');
+    throw new Error('The Caddie model specifications are missing or invalid.');
   }
-  return spec;
+  return { instructor, student };
 }
 
-function withStudentSpec(list, studentSpec) {
+function withCaddieSpecs(list, { instructor, student }) {
   if (!Array.isArray(list)) return null;
-  const instructorSpecs = list
-    .filter((spec) => spec?.name !== SPEC_NAME)
-    .map((spec) => {
-      if (
-        (spec?.name === 'LessonCaddieModel' || spec?.name === 'instructor-assistant') &&
-        (!spec.iconURL || spec.iconURL === 'assets/caddie.png')
-      ) {
-        return { ...spec, iconURL: studentSpec.iconURL };
-      }
-      return spec;
-    });
-  return [...instructorSpecs, studentSpec];
+  const otherSpecs = list.filter(
+    (spec) =>
+      spec?.name !== SPEC_NAME &&
+      spec?.name !== INSTRUCTOR_SPEC_NAME &&
+      spec?.name !== 'LessonCaddieModel',
+  );
+  return [instructor, student, ...otherSpecs];
 }
 
 async function main() {
@@ -48,9 +48,9 @@ async function main() {
     await mongoose.disconnect();
     return;
   }
-  const next = withStudentSpec(
+  const next = withCaddieSpecs(
     current,
-    studentSpecFromTemplate(path.resolve(__dirname, '../../librechat.yaml')),
+    caddieSpecsFromTemplate(path.resolve(__dirname, '../../librechat.yaml')),
   );
   const result = await collection.updateOne(
     { _id: base._id, 'overrides.modelSpecs.list': current },
@@ -59,7 +59,7 @@ async function main() {
   if (result.matchedCount !== 1) {
     throw new Error('Admin model list changed during student Caddie update.');
   }
-  console.log('Student Caddie model specification is available in Admin config.');
+  console.log('Instructor and student Caddie model specifications are current in Admin config.');
   await mongoose.disconnect();
 }
 
@@ -70,4 +70,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { studentSpecFromTemplate, withStudentSpec };
+module.exports = { caddieSpecsFromTemplate, withCaddieSpecs };
