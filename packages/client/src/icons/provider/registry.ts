@@ -8,7 +8,7 @@ import AnthropicIcon from '../../svgs/AnthropicIcon';
 import MoonshotIcon from '../../svgs/MoonshotIcon';
 import BedrockIcon from '../../svgs/BedrockIcon';
 import GeminiIcon from '../../svgs/GeminiIcon';
-import GPTIcon from '../../svgs/GPTIcon';
+import CaddieIcon from '../../svgs/CaddieIcon';
 import XAIcon from '../../svgs/XAIcon';
 import { brandMarks } from './marks';
 import { createMark } from './Mark';
@@ -60,7 +60,7 @@ const googleByModel = (model: string): Partial<ProviderIconDef> | undefined => {
 
 export const providerIcons: Record<ProviderId, ProviderIconDef> = {
   [ProviderId.openai]: {
-    art: component(GPTIcon),
+    art: component(CaddieIcon),
     label: 'OpenAI',
     mono: true,
     brandColor: 'var(--provider-openai, #19C37D)',

@@ -37,3 +37,4 @@ services:
       - ./config/ssmlabs/branding/assets/icon-512x512.png:/app/client/dist/assets/icon-512x512.png:ro
       - ./config/ssmlabs/branding/assets/maskable-icon.png:/app/client/dist/assets/maskable-icon.png:ro
       - ./config/ssmlabs/branding/assets/logo.svg:/app/client/dist/assets/logo.svg:ro
+      - ./config/ssmlabs/branding/assets/caddie.png:/app/client/dist/assets/caddie.png:ro

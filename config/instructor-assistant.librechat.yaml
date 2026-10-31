@@ -52,6 +52,7 @@ modelSpecs:
   list:
     - name: instructor-assistant
       label: Instructor Assistant
+      iconURL: assets/caddie.png
       description: 'Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?'
       softDefault: true
       showOnLanding: true
@@ -66,6 +67,7 @@ modelSpecs:
         agent_id: agent_instructor_assistant
     - name: student-caddie
       label: Caddie
+      iconURL: assets/caddie.png
       description: 'Ask Caddie about your lessons, practices, and notifications.'
       showOnLanding: false
       hideBadgeRow: true
