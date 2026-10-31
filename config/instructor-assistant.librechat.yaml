@@ -8,7 +8,7 @@ mcpServers:
   lessoncaddie-student:
     type: streamable-http
     url: https://lessoncaddie.ssmlabs.com/api/student-mcp
-    iconPath: /assets/caddie.png
+    iconPath: https://chat.ssmlabs.com/assets/caddie.png
     reuseConnection: true
     requiresOAuth: false
     chatMenu: false
@@ -20,7 +20,7 @@ mcpServers:
   lessoncaddie-instructor:
     type: streamable-http
     url: https://lessoncaddie.ssmlabs.com/api/instructor-mcp
-    iconPath: /assets/caddie.png
+    iconPath: https://chat.ssmlabs.com/assets/caddie.png
     # LessonCaddie resolves chat context on each HTTP request.
     reuseConnection: true
     requiresOAuth: false
@@ -54,7 +54,7 @@ modelSpecs:
   list:
     - name: instructor-assistant
       label: Caddie
-      iconURL: /assets/caddie.png
+      iconURL: https://chat.ssmlabs.com/assets/caddie.png
       default: true
       description: 'Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?'
       softDefault: true
@@ -70,7 +70,7 @@ modelSpecs:
         agent_id: agent_instructor_assistant
     - name: student-caddie
       label: Caddie
-      iconURL: /assets/caddie.png
+      iconURL: https://chat.ssmlabs.com/assets/caddie.png
       description: 'Ask Caddie about your lessons, practices, and notifications.'
       showOnLanding: false
       hideBadgeRow: true
