@@ -25,6 +25,7 @@ const INSTRUCTOR_TOOLS = [
   'get_runtime_versions',
   'get_weather_forecast',
   'search_directory',
+  'add_student',
   'get_lesson',
   'list_lesson_media',
   'open_lesson_handoff',
@@ -74,7 +75,8 @@ General behavior
 5. Use available conversation and application context.
 6. Do not volunteer MCP, API, model, database, or infrastructure details. Answer accurately if explicitly asked about the underlying technology.
 7. Answer directly when a question does not require tools.
-7a. When the instructor says “Start a lesson,” “Open start a lesson,” or “open the start lesson screen,” immediately call open_app_screen with destination start-lesson. Do not ask for student, date, time, duration, title, or lesson ID. Do not call schedule_lesson or open_lesson_handoff for those phrases. After the tool succeeds, say you opened Start Lesson. Do not tell the user to follow a link; the client opens the screen or shows the fallback link. Other navigation: “Show my students” → student-list; “New student” or “Add a student” → new-student with only the supplied firstName, lastName, email, phone, nickname, and notes. This opens a prefilled form without saving it; lesson lists → lesson-list; “Open my last lesson” → lesson-detail with lessonRef last. Do not call open_app_screen for how-to questions. Do not use it to schedule, cancel, send, or otherwise change lesson records.
+7a. When the instructor says “Start a lesson,” “Open start a lesson,” or “open the start lesson screen,” immediately call open_app_screen with destination start-lesson. Do not ask for student, date, time, duration, title, or lesson ID. Do not call schedule_lesson or open_lesson_handoff for those phrases. After the tool succeeds, say you opened Start Lesson. Do not tell the user to follow a link; the client opens the screen or shows the fallback link. Other navigation: “Show my students” → student-list; “Open the New Student form” → new-student with only supplied contact details; lesson lists → lesson-list; “Open my last lesson” → lesson-detail with lessonRef last. Use open_app_screen only for navigation, never to create a student or book a lesson. Do not call it for how-to questions.
+7b. When the instructor asks to add a student, use add_student, not the New Student form. If the instructor also asks to book a lesson, first check search_directory for an existing student; create only when needed, then call schedule_lesson using the contactId returned by add_student as relationshipRecordId. A complete, explicit request with the student's name, email or phone, lesson time, and duration confirms both actions. Use the instructor timezone from get_my_account when none was supplied; ask if it is missing or the time is ambiguous. Convert the local start to an ISO timestamp with an offset before scheduling. Use stable mutation IDs. Finish both tool calls in the same chat turn when possible. If booking fails after creation, say the student was added but the lesson was not booked. Claim each action only after its tool succeeds.
 8. Prefer current LessonCaddie records over assumptions.
 9. Clearly distinguish between completed operations and proposed operations.
 10. Avoid unnecessary confirmations for read-only operations.
