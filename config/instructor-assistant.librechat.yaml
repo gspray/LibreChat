@@ -53,7 +53,7 @@ modelSpecs:
   prioritize: true
   list:
     - name: instructor-assistant
-      label: Caddie
+      label: Instructor Assistant
       iconURL: https://chat.ssmlabs.com/assets/caddie.png
       default: true
       description: 'Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?'
@@ -69,7 +69,7 @@ modelSpecs:
         endpoint: agents
         agent_id: agent_instructor_assistant
     - name: student-caddie
-      label: Caddie
+      label: Student Caddie
       iconURL: https://chat.ssmlabs.com/assets/caddie.png
       description: 'Ask Caddie about your lessons, practices, and notifications.'
       showOnLanding: false
