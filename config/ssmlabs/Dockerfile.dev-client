@@ -1,0 +1,4 @@
+# Dev Chat client patch. Build with client/dist as the context after npm run build:client.
+FROM registry.librechat.ai/librechat-ai/librechat-dev@sha256:25b46e212db5a23a9f1f4264645d7817757d16cd20f32748a6ce06b414c6d59c
+
+COPY --chown=1000:1000 . /app/client/dist/
