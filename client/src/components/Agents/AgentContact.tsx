@@ -10,7 +10,7 @@ type AgentContactProps = {
 };
 
 /**
- * Public contact for an agent: an explicit support contact wins over the owner,
+ * Public contact for an agent: only an explicit support contact is shown,
  * and a missing name falls back to the address. Exported so a caller can tell
  * whether a contact row exists at all before wiring it into a layout animation.
  */
@@ -19,12 +19,8 @@ export const resolveAgentContact = (
 ): { name: string; email: string } | null => {
   const supportName = agent?.support_contact?.name?.trim() ?? '';
   const supportEmail = agent?.support_contact?.email?.trim() ?? '';
-  const ownerName = agent?.owner_contact?.name?.trim() ?? '';
   if (supportName || supportEmail) {
     return { name: supportName, email: supportEmail };
-  }
-  if (ownerName) {
-    return { name: ownerName, email: '' };
   }
   return null;
 };
