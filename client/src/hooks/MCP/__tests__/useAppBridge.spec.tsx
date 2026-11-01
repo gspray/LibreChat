@@ -734,6 +734,20 @@ describe('useAppBridge', () => {
       });
     });
 
+    it('delegates fullscreen only to the LessonCaddie Library video app', async () => {
+      const { iframe } = mountBridge(
+        makeResource({
+          serverName: 'lessoncaddie-instructor',
+          toolName: 'play_library_item',
+          uri: 'ui://lessoncaddie-instructor/video-player/v4.html',
+        }),
+        client,
+      );
+      await flush();
+
+      expect(iframe.getAttribute('allow')).toBe('fullscreen');
+    });
+
     it('removes an ineffective media-only allow attribute', async () => {
       mockFetchHtml.mockResolvedValue({
         html: '<p>app</p>',

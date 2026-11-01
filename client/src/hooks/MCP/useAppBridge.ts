@@ -14,6 +14,7 @@ import type { AppToolResult } from '~/utils/mcpApps';
 import type { MCPAppAction } from './approval';
 import {
   callMCPAppTool,
+  allowsLibraryVideoFullscreen,
   fetchMCPResourceHtml,
   readMCPResource,
   listMCPResources,
@@ -261,9 +262,12 @@ export function useAppBridge({
     };
 
     const applyOuterPermissions = (permissions: UIResource['permissions']) => {
-      const allowAttr = buildAllowAttribute(
+      const permissionsAllow = buildAllowAttribute(
         permissions as Parameters<typeof buildAllowAttribute>[0],
       );
+      const allowAttr = [permissionsAllow, allowsLibraryVideoFullscreen(resource) && 'fullscreen']
+        .filter(Boolean)
+        .join('; ');
       if (allowAttr) {
         iframe.setAttribute('allow', allowAttr);
       } else {
