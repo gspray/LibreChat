@@ -70,7 +70,7 @@ modelSpecs:
         agent_id: agent_instructor_assistant
     - name: student-caddie
       label: Student Caddie
-      iconURL: https://chat.ssmlabs.com/assets/caddie.png
+      iconURL: https://chat.ssmlabs.com/assets/student-caddie.png
       description: 'Ask Caddie about your lessons, practices, and notifications.'
       showOnLanding: false
       hideBadgeRow: true
