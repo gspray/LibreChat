@@ -23,6 +23,10 @@ const MODEL = process.env.INSTRUCTOR_ASSISTANT_MODEL || 'gpt-4o';
 const INSTRUCTOR_TOOLS = [
   'get_my_account',
   'search_directory',
+  'read_notices',
+  'create_notice',
+  'delete_notice',
+  'reach_out',
   'get_lesson',
   'list_lesson_media',
   'open_lesson_handoff',
