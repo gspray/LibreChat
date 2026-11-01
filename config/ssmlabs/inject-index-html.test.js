@@ -117,6 +117,12 @@ test('injectIndexHtml does not inject a LessonCaddie back-link overlay', () => {
   assert.match(html, /lesson-caddie-navigation-bridge\.js\?v=5/);
 });
 
+test('injectIndexHtml loads the owner-contact overlay once', () => {
+  const html = injectIndexHtml(SAMPLE);
+  assert.match(html, /hide-agent-owner-contact\.js\?v=1/);
+  assert.equal(injectIndexHtml(html).match(/hide-agent-owner-contact\.js/g)?.length, 1);
+});
+
 test('injectBaseHref anchors relative assets at the app root on nested routes', () => {
   const prevDomainClient = process.env.DOMAIN_CLIENT;
   process.env.DOMAIN_CLIENT = 'https://chat.ssmlabs.com';

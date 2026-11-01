@@ -29,6 +29,7 @@ services:
       - ./config/provision-instructor-assistant.js:/app/config/provision-instructor-assistant.js:ro
       - ./config/ssmlabs:/app/config/ssmlabs:ro
       - ./config/ssmlabs/hide-model-selector.browser.js:/app/client/dist/ssmlabs/hide-model-selector.js:ro
+      - ./config/ssmlabs/hide-agent-owner-contact.browser.js:/app/client/dist/ssmlabs/hide-agent-owner-contact.js:ro
       - ./config/ssmlabs/lessonCaddieNavigationBridge.browser.js:/app/client/dist/ssmlabs/lesson-caddie-navigation-bridge.js:ro
       - ./config/ssmlabs/embed-passthrough-sw.js:/app/client/dist/sw.js:ro
       - ./config/ssmlabs/branding/manifest.webmanifest:/app/client/dist/manifest.webmanifest:ro
