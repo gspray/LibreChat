@@ -192,7 +192,9 @@ async function postMCPAppRequest<T>(
     signal,
   });
   if (!response.ok) {
-    throw new Error(`MCP App request failed (${response.status})`);
+    throw Object.assign(new Error(`MCP App request failed (${response.status})`), {
+      status: response.status,
+    });
   }
   return (await response.json()) as T;
 }

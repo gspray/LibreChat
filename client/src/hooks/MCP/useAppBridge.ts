@@ -527,8 +527,16 @@ export function useAppBridge({
       };
     };
 
+    let permanentResourceFailure = false;
+    const rememberPermanentFailure = (error: unknown) => {
+      const status = (error as { status?: unknown } | null)?.status;
+      if (typeof status === 'number' && status >= 400 && status < 500 && status !== 429) {
+        permanentResourceFailure = true;
+      }
+    };
+
     const sendResource = async () => {
-      if (resourceSent || sendingResource || cancelled) {
+      if (resourceSent || sendingResource || cancelled || permanentResourceFailure) {
         return;
       }
       sendingResource = true;
@@ -558,6 +566,7 @@ export function useAppBridge({
         });
       } catch (err) {
         resourceSent = false;
+        rememberPermanentFailure(err);
         logger.error('[MCP App] Failed to send sandbox resource', err);
         if (!cancelled) {
           onFailedRef.current?.();
@@ -628,6 +637,7 @@ export function useAppBridge({
       // Both sandbox policies are built from this URL before the document loads. The content-level
       // _meta.ui.csp is authoritative, which requires resolving the resource before navigation.
       const next = await resolveResource().catch((err: unknown) => {
+        rememberPermanentFailure(err);
         logger.error('[MCP App] Failed to read app resource', err);
         if (!cancelled) {
           onFailedRef.current?.();
