@@ -459,9 +459,7 @@ export default function ToolCall({
             toolExecutionDurationMs={toolExecutionDurationMs}
             phaseStartAt={toolDispatchedAt ?? toolPreparationStartedAt}
             icon={
-              hideLessonCaddieToolIcon ? (
-                <span className="size-4" />
-              ) : (
+              hideLessonCaddieToolIcon ? null : (
                 <ToolIcon
                   type={toolIconType}
                   iconUrl={mcpIconUrl}
