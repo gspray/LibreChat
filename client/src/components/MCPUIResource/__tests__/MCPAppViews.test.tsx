@@ -105,7 +105,7 @@ describe('MCPAppViews', () => {
     expect(mockUseAppBridge).not.toHaveBeenCalled();
   });
 
-  it('shows a LessonCaddie profile photo App inline when a photo is available', () => {
+  it('shows a LessonCaddie profile photo directly without an App frame', () => {
     const photoApp = app({
       uri: 'ui://lessoncaddie-instructor/profile-photo/v1.html',
       serverName: 'lessoncaddie-instructor',
@@ -121,11 +121,13 @@ describe('MCPAppViews', () => {
       </MCPAppsPolicyProvider>,
     );
 
-    expect(view.container.querySelector('iframe[data-sandbox-url]')).toBeInTheDocument();
-    expect(view.queryByRole('button', { name: /com_ui_mcp_app_open_named/ })).toBeNull();
-    fireEvent.click(view.getByRole('button', { name: /com_ui_mcp_app_close_named/ }));
+    expect(view.getByRole('img', { name: 'com_ui_student_profile_photo' })).toHaveAttribute(
+      'src',
+      'data:image/jpeg;base64,AQID',
+    );
     expect(view.container.querySelector('iframe[data-sandbox-url]')).toBeNull();
-    expect(view.getByRole('button', { name: /com_ui_mcp_app_open_named/ })).toBeInTheDocument();
+    expect(view.queryByRole('button', { name: /com_ui_mcp_app_open_named/ })).toBeNull();
+    expect(mockUseAppBridge).not.toHaveBeenCalled();
   });
 
   it('retains every wrapper occurrence and gives each App only its own input and result', () => {

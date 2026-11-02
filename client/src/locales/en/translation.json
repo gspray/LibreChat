@@ -2235,6 +2235,7 @@
   "com_ui_mcp_app_close": "Close app",
   "com_ui_mcp_app_open_named": "Open app: {{0}} ({{1}})",
   "com_ui_mcp_app_close_named": "Close app: {{0}} ({{1}})",
+  "com_ui_student_profile_photo": "Student profile photo",
   "com_ui_mcp_app_stop": "Close app and stop requests",
   "com_ui_mcp_app_cancel_pauses": "Cancel pauses further action requests until you close and reopen this app.",
   "com_ui_mcp_app_at_capacity": "Close another app before opening this one.",
