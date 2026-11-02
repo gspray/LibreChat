@@ -119,6 +119,9 @@
       destination = 'start-lesson';
     } else if (path === '/app' && url.searchParams.get('panel') === 'directory') {
       destination = 'student-list';
+    } else if (path === '/app/contact-edit' && url.searchParams.get('contactId')) {
+      destination = 'student-detail';
+      params.contactId = url.searchParams.get('contactId');
     } else if (path === '/app' && url.searchParams.get('view') === 'new-student') {
       destination = 'new-student';
     } else if (path === '/app' && url.searchParams.get('panel') === 'sessions') {
