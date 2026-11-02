@@ -57,6 +57,8 @@ and checks you could not run.
 
 For SSM Labs work in this fork, read `/home/gspray/node/dev-workflow/POLICY.md` (or the current cloud clone). Development checks are deferred unless Greg requests them; merge and deployment checkpoints remain required. Honor explicit modes, requested scope, accumulated-change testing, and exact-candidate result reuse. Preserve this repository's branch, review, data, and security boundaries.
 
+For LessonCaddie Chat development on the current authorized fork branch, use the policy's Chat development lane. Commit and push to the branch's configured writable tracking remote (`fork` here); never assume upstream `origin` is writable. The required pre-commit hook is authorized as part of a development commit and does not need a separate approval. Defer optional checks, PR creation, review, and CI waiting until Greg requests a checkpoint. Reload existing development Chat services only when Greg asks for the change to work in the development runtime.
+
 For startup, auth, config, file, or message-loading changes, avoid serial database
 reads and reuse loaded request data. Run `npm run lighthouse` at an authorized merge/deployment checkpoint when the change requires it:
 the CI lane adds 250 ms per Mongo query and checks the visible conversation's LCP.
