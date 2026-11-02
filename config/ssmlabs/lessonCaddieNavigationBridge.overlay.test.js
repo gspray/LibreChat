@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const {
   extractNavigationFromPayload,
   handleDeepLinkClick,
+  install,
   parseSseChunk,
   resultFromHref,
 } = require('./lessonCaddieNavigationBridge.browser.js');
@@ -77,6 +78,61 @@ test('forwards New Student details while the fallback link carries no personal d
   assert.equal(extracted.params.email, 'alex.doe@example.com');
   assert.equal(resultFromHref(null, result.deepLink)?.destination, 'new-student');
   assert.equal(result.deepLink.includes('alex.doe'), false);
+});
+
+test('opens a named student page directly from standalone Chat', () => {
+  const opened = [];
+  const browser = {
+    location: { assign: (href) => opened.push(href) },
+    addEventListener() {},
+  };
+  browser.parent = browser;
+  install(browser);
+  const result = {
+    ...RESULT,
+    destination: 'student-detail',
+    params: { contactId: 'contact-1' },
+    deepLink: 'https://lessoncaddie.ssmlabs.com/app/contact-edit?lc_nav=1&contactId=contact-1',
+  };
+  assert.equal(
+    browser.LessonCaddieNavigationOverlay.onPayload({
+      content: [{ text: JSON.stringify(result) }],
+    }),
+    true,
+  );
+  assert.deepEqual(opened, [result.deepLink]);
+});
+
+test('opens a named student page when the embedded app does not acknowledge navigation', () => {
+  const opened = [];
+  const timers = [];
+  const browser = {
+    location: {},
+    document: { referrer: 'https://lessoncaddie.ssmlabs.com/app' },
+    parent: { postMessage() {} },
+    top: { location: { assign: (href) => opened.push(href) } },
+    addEventListener() {},
+    setTimeout(callback) {
+      timers.push(callback);
+      return timers.length;
+    },
+  };
+  install(browser);
+  const result = {
+    ...RESULT,
+    destination: 'student-detail',
+    params: { contactId: 'contact-1' },
+    deepLink: 'https://lessoncaddie.ssmlabs.com/app/contact-edit?lc_nav=1&contactId=contact-1',
+  };
+  assert.equal(
+    browser.LessonCaddieNavigationOverlay.onPayload({
+      content: [{ text: JSON.stringify(result) }],
+    }),
+    true,
+  );
+  assert.equal(opened.length, 0);
+  timers.at(-1)();
+  assert.deepEqual(opened, [result.deepLink]);
 });
 
 test('leaves Chat navigation links alone while forwarding LessonCaddie handoff links', () => {

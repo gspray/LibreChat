@@ -17,7 +17,7 @@ const NAV_CONFIG_SENTINEL = 'data-ssmlabs-nav-config="true"';
 const NAV_BRIDGE_SENTINEL = 'data-ssmlabs-nav-bridge="true"';
 const LOGIN_FALLBACK_SENTINEL = 'data-ssmlabs-login-fallback="true"';
 const OWNER_CONTACT_SCRIPT = `<script src="ssmlabs/hide-agent-owner-contact.js?v=1" defer ${OWNER_CONTACT_SENTINEL}></script>`;
-const NAV_BRIDGE_SCRIPT = `<script src="ssmlabs/lesson-caddie-navigation-bridge.js?v=5" ${NAV_BRIDGE_SENTINEL}></script>`;
+const NAV_BRIDGE_SCRIPT = `<script src="ssmlabs/lesson-caddie-navigation-bridge.js?v=6" ${NAV_BRIDGE_SENTINEL}></script>`;
 const EMBED_SW_SCRIPT = `<script ${EMBED_SW_SENTINEL}>
 (function clearFramedChatWorker() {
   if (window.parent === window) return;

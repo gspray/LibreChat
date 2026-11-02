@@ -340,6 +340,36 @@
     });
   }
 
+  function openStudentDetailFallback(windowObject, state, result, reason) {
+    if (result?.destination !== 'student-detail') return false;
+    const link = resultFromHref(windowObject, clean(result.deepLink));
+    if (
+      !link ||
+      link.destination !== result.destination ||
+      link.params.contactId !== result.params?.contactId ||
+      !remember(state, `${result.requestId}:fallback`)
+    )
+      return false;
+    try {
+      const target = isFramed(windowObject) ? windowObject.top : windowObject;
+      target.location.assign(result.deepLink);
+      logNav('fallback_opened', {
+        requestId: result.requestId,
+        destination: result.destination,
+        code: reason,
+      });
+      return true;
+    } catch (error) {
+      logNav('fallback_failed', {
+        requestId: result.requestId,
+        destination: result.destination,
+        code: reason,
+      });
+      console.warn('LessonCaddie student page handoff failed', error);
+      return false;
+    }
+  }
+
   function scheduleFallback(windowObject, state, result) {
     const requestId = result.requestId;
     if (state.fallbackTimers[requestId]) {
@@ -348,6 +378,7 @@
     state.fallbackTimers[requestId] = windowObject.setTimeout(() => {
       delete state.fallbackTimers[requestId];
       if (!state.processedIds.has(`${requestId}:acked`)) {
+        if (openStudentDetailFallback(windowObject, state, result, 'bridge_timeout')) return;
         logNav('fallback_link', {
           requestId,
           destination: result.destination,
@@ -431,6 +462,8 @@
       if (event.data.ok === true && state.lastResult) {
         hideResolvedDeepLinks(windowObject, state.lastResult);
         windowObject.setTimeout(() => hideResolvedDeepLinks(windowObject, state.lastResult), 800);
+      } else if (event.data.ok === false && state.lastResult?.requestId === requestId) {
+        openStudentDetailFallback(windowObject, state, state.lastResult, 'bridge_rejected');
       }
       logNav('ack_received', {
         requestId,
@@ -447,6 +480,7 @@
     }
     state.lastResult = result;
     if (!isFramed(windowObject)) {
+      if (openStudentDetailFallback(windowObject, state, result, 'standalone')) return true;
       logNav('external_client', { requestId: result.requestId, destination: result.destination });
       return false;
     }
@@ -460,6 +494,7 @@
           postNavigate(windowObject, state, result);
           return;
         }
+        if (openStudentDetailFallback(windowObject, state, result, 'unknown_client')) return;
         logNav('fallback_link', {
           requestId: result.requestId,
           destination: result.destination,
