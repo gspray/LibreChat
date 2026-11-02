@@ -7,11 +7,7 @@
   'use strict';
 
   const SELECTOR_TEST_ID = 'model-selector-button';
-  let shouldHide = false;
-
-  function envHideEnabled() {
-    return shouldHide === true;
-  }
+  const STYLE_ID = 'ssmlabs-hide-model-selector';
 
   function readHideFlagFromStartup(startup) {
     if (!startup || typeof startup !== 'object') {
@@ -26,41 +22,18 @@
     return false;
   }
 
-  function hideModelSelectorChip() {
-    if (!envHideEnabled()) {
-      return false;
-    }
-    const button = document.querySelector(`[data-testid="${SELECTOR_TEST_ID}"]`);
-    if (!button) {
-      return false;
-    }
-    // Hide only the control. `.relative.flex` also matches the chat canvas
-    // (`Presentation` drag-drop wrapper) and blanks the authenticated UI.
-    button.setAttribute('data-ssmlabs-model-selector-hidden', 'true');
-    button.style.display = 'none';
-    button.setAttribute('aria-hidden', 'true');
-    return true;
-  }
-
-  function observeUntilHidden() {
-    if (!envHideEnabled()) {
-      return;
-    }
-    if (hideModelSelectorChip()) {
-      return;
-    }
-    const observer = new MutationObserver(() => {
-      hideModelSelectorChip();
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-    window.setTimeout(() => observer.disconnect(), 120000);
-  }
-
   function applyStartup(startup) {
-    shouldHide = readHideFlagFromStartup(startup);
-    if (shouldHide) {
-      observeUntilHidden();
-      hideModelSelectorChip();
+    const existingStyle = document.getElementById(STYLE_ID);
+    if (!readHideFlagFromStartup(startup)) {
+      existingStyle?.remove();
+      return;
+    }
+    if (!existingStyle) {
+      const style = document.createElement('style');
+      style.id = STYLE_ID;
+      // Hide only the control. Its parent also matches the chat canvas layout.
+      style.textContent = `[data-testid="${SELECTOR_TEST_ID}"] { display: none !important; }`;
+      document.head.appendChild(style);
     }
   }
 
