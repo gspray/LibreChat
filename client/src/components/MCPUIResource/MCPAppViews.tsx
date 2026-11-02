@@ -20,6 +20,29 @@ import { useLocalize } from '~/hooks';
 
 const DEFAULT_APP_VIEW_HEIGHT = 320;
 
+function getLessonCaddieProfilePhoto(app: UIResource): { mimeType: string; data: string } | null {
+  if (
+    app.serverName !== 'lessoncaddie-instructor' ||
+    app.toolName !== 'get_student' ||
+    app.uri !== 'ui://lessoncaddie-instructor/profile-photo/v1.html'
+  ) {
+    return null;
+  }
+  const photo = app.resultMeta?.profilePhoto;
+  if (!photo || typeof photo !== 'object' || Array.isArray(photo)) return null;
+  const { mimeType, data } = photo as Record<string, unknown>;
+  if (
+    typeof mimeType !== 'string' ||
+    !['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(mimeType) ||
+    typeof data !== 'string' ||
+    data.length > 3_000_000 ||
+    !/^[A-Za-z0-9+/]+={0,2}$/.test(data)
+  ) {
+    return null;
+  }
+  return { mimeType, data };
+}
+
 function CapacityNotice() {
   const localize = useLocalize();
   return useMCPAppViewAtCapacity() ? (
@@ -246,6 +269,7 @@ export function MCPAppViews({
 }) {
   const suppressedAttachments = React.useContext(MCPAppSuppressionContext);
   const { policy, userId } = useMCPAppsHost();
+  const localize = useLocalize();
   const visibleAttachments = useMemo(
     () =>
       suppressedAttachments == null
@@ -266,14 +290,24 @@ export function MCPAppViews({
 
   return (
     <>
-      {apps.map(({ key, resource }, index) => (
-        <MCPAppView
-          key={JSON.stringify([userId, key])}
-          app={resource}
-          userId={userId}
-          ordinal={ordinalStart + index}
-        />
-      ))}
+      {apps.map(({ key, resource }, index) => {
+        const photo = getLessonCaddieProfilePhoto(resource);
+        return photo ? (
+          <img
+            key={JSON.stringify([userId, key])}
+            src={`data:${photo.mimeType};base64,${photo.data}`}
+            alt={localize('com_ui_student_profile_photo')}
+            className="my-2 block max-h-96 max-w-full rounded-lg object-contain"
+          />
+        ) : (
+          <MCPAppView
+            key={JSON.stringify([userId, key])}
+            app={resource}
+            userId={userId}
+            ordinal={ordinalStart + index}
+          />
+        );
+      })}
     </>
   );
 }

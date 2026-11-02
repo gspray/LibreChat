@@ -138,6 +138,7 @@ export default function ToolCall({
   );
   const mcpIconMap = useMCPIconMap();
   const mcpIconUrl = isMCPToolCall ? mcpIconMap.get(mcpServerName) : undefined;
+  const hideLessonCaddieToolIcon = isMCPToolCall && mcpServerName === 'lessoncaddie-instructor';
 
   const actionId = useMemo(() => {
     if (isMCPToolCall || !parsedAuthUrl) {
@@ -458,11 +459,13 @@ export default function ToolCall({
             toolExecutionDurationMs={toolExecutionDurationMs}
             phaseStartAt={toolDispatchedAt ?? toolPreparationStartedAt}
             icon={
-              <ToolIcon
-                type={toolIconType}
-                iconUrl={mcpIconUrl}
-                isAnimating={phase === 'running'}
-              />
+              hideLessonCaddieToolIcon ? null : (
+                <ToolIcon
+                  type={toolIconType}
+                  iconUrl={mcpIconUrl}
+                  isAnimating={phase === 'running'}
+                />
+              )
             }
             hasInput={hasInfo}
             isExpanded={showInfo}

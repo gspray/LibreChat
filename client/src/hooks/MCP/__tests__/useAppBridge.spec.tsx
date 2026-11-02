@@ -734,6 +734,20 @@ describe('useAppBridge', () => {
       });
     });
 
+    it('delegates fullscreen only to the LessonCaddie Library video app', async () => {
+      const { iframe } = mountBridge(
+        makeResource({
+          serverName: 'lessoncaddie-instructor',
+          toolName: 'play_library_item',
+          uri: 'ui://lessoncaddie-instructor/video-player/v4.html',
+        }),
+        client,
+      );
+      await flush();
+
+      expect(iframe.getAttribute('allow')).toBe('fullscreen');
+    });
+
     it('removes an ineffective media-only allow attribute', async () => {
       mockFetchHtml.mockResolvedValue({
         html: '<p>app</p>',
@@ -881,6 +895,23 @@ describe('useAppBridge', () => {
   });
 
   describe('failure handling', () => {
+    it('does not repeat a rejected inline binding check on proxy announcements', async () => {
+      mockValidateBinding.mockRejectedValue(
+        Object.assign(new Error('invalid binding'), { status: 400 }),
+      );
+      mountBridge(makeResource({ text: '<p>inline app</p>' }), client);
+      await flush();
+
+      await act(async () => {
+        latest().emit('sandboxready');
+        latest().emit('sandboxready');
+      });
+      await flush();
+
+      expect(mockValidateBinding).toHaveBeenCalledTimes(1);
+      expect(latest().resourceReady).toHaveLength(0);
+    });
+
     it('retries on the next proxy announcement instead of latching', async () => {
       mockFetchHtml.mockRejectedValueOnce(new Error('boom'));
       mountBridge(makeResource(), client);

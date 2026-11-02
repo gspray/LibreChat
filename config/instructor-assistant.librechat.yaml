@@ -5,9 +5,22 @@ mcpSettings:
   allowedDomains:
     - lessoncaddie.ssmlabs.com
 mcpServers:
+  lessoncaddie-student:
+    type: streamable-http
+    url: https://lessoncaddie.ssmlabs.com/api/student-mcp
+    iconPath: https://chat.ssmlabs.com/assets/caddie.png
+    reuseConnection: true
+    requiresOAuth: false
+    chatMenu: false
+    serverInstructions: true
+    headers:
+      X-LessonCaddie-Sso-Secret: '${LESSONCADDIE_SSO_SHARED_SECRET}'
+      X-LibreChat-Firebase-Uid: '{{LIBRECHAT_USER_OPENIDID}}'
+      X-LibreChat-User-Provider: '{{LIBRECHAT_USER_PROVIDER}}'
   lessoncaddie-instructor:
     type: streamable-http
     url: https://lessoncaddie.ssmlabs.com/api/instructor-mcp
+    iconPath: https://chat.ssmlabs.com/assets/caddie.png
     # LessonCaddie resolves chat context on each HTTP request.
     reuseConnection: true
     requiresOAuth: false
@@ -19,15 +32,13 @@ mcpServers:
       X-LibreChat-User-Provider: '{{LIBRECHAT_USER_PROVIDER}}'
     requestHeaders:
       X-LibreChat-User-Id: '{{LIBRECHAT_USER_ID}}'
-      X-LibreChat-Conversation-Id: '{{LIBRECHAT_BODY_CONVERSATIONID}}'
-      X-LibreChat-Message-Id: '{{LIBRECHAT_BODY_MESSAGEID}}'
 mcpAppSandbox:
   url: https://mcp-sandbox.ssmlabs.com/api/mcp/sandbox
 interface:
   customWelcome: 'Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?'
   landingHeading: entity
   landingFooter: false
-  # Endpoints/model chip off; modelSpecs still drive softDefault + landing. Chip hide is the ssmlabs overlay, not a ModelSelector.tsx fork.
+  # Hide the model picker; modelSpecs still drive the default agent and landing page.
   modelSelect: false
   parameters: false
   presets: false
@@ -41,6 +52,8 @@ modelSpecs:
   list:
     - name: instructor-assistant
       label: Instructor Assistant
+      iconURL: https://chat.ssmlabs.com/assets/caddie.png
+      default: true
       description: 'Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?'
       softDefault: true
       showOnLanding: true
@@ -53,3 +66,14 @@ modelSpecs:
       preset:
         endpoint: agents
         agent_id: agent_instructor_assistant
+    - name: student-caddie
+      label: Student Caddie
+      iconURL: https://chat.ssmlabs.com/assets/student-caddie.png
+      description: 'Ask Caddie about your lessons, practices, and notifications.'
+      showOnLanding: false
+      hideBadgeRow: true
+      mcpServers:
+        - lessoncaddie-student
+      preset:
+        endpoint: openAI
+        model: gpt-4o-mini

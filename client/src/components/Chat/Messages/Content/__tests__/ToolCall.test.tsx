@@ -74,13 +74,16 @@ jest.mock('../ProgressText', () => ({
     inProgressText,
     finishedText,
     subtitle,
+    icon,
   }: {
     onClick?: () => void;
     inProgressText?: string;
     finishedText?: string;
     subtitle?: string;
+    icon?: React.ReactNode;
   }) => (
     <div data-testid="progress-text" onClick={onClick}>
+      {icon != null && <span data-testid="tool-line-icon" />}
       {finishedText || inProgressText}
       {subtitle && <span data-testid="subtitle">{subtitle}</span>}
     </div>
@@ -204,6 +207,17 @@ describe('ToolCall', () => {
       );
       expect(screen.getByText('Calling testFunction')).toBeInTheDocument();
     });
+  });
+
+  it('omits the LessonCaddie icon from the tool line', () => {
+    renderWithRecoil(
+      <ToolCall
+        {...mockProps}
+        name={`search_directory${Constants.mcp_delimiter}lessoncaddie-instructor`}
+      />,
+    );
+
+    expect(screen.queryByTestId('tool-line-icon')).not.toBeInTheDocument();
   });
 
   describe('intent label', () => {

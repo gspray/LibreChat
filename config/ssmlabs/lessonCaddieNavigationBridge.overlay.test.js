@@ -4,6 +4,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   extractNavigationFromPayload,
+  handleDeepLinkClick,
+  install,
   parseSseChunk,
   resultFromHref,
 } = require('./lessonCaddieNavigationBridge.browser.js');
@@ -76,6 +78,124 @@ test('forwards New Student details while the fallback link carries no personal d
   assert.equal(extracted.params.email, 'alex.doe@example.com');
   assert.equal(resultFromHref(null, result.deepLink)?.destination, 'new-student');
   assert.equal(result.deepLink.includes('alex.doe'), false);
+});
+
+test('opens a named student page directly from standalone Chat', () => {
+  const opened = [];
+  const browser = {
+    location: { assign: (href) => opened.push(href) },
+    addEventListener() {},
+  };
+  browser.parent = browser;
+  install(browser);
+  const result = {
+    ...RESULT,
+    destination: 'student-detail',
+    params: { contactId: 'contact-1' },
+    deepLink: 'https://lessoncaddie.ssmlabs.com/app/contact-edit?lc_nav=1&contactId=contact-1',
+  };
+  assert.equal(
+    browser.LessonCaddieNavigationOverlay.onPayload({
+      content: [{ text: JSON.stringify(result) }],
+    }),
+    true,
+  );
+  assert.deepEqual(opened, [result.deepLink]);
+});
+
+test('opens a named student page when the embedded app does not acknowledge navigation', () => {
+  const opened = [];
+  const timers = [];
+  const browser = {
+    location: {},
+    document: { referrer: 'https://lessoncaddie.ssmlabs.com/app' },
+    parent: { postMessage() {} },
+    top: { location: { assign: (href) => opened.push(href) } },
+    addEventListener() {},
+    setTimeout(callback) {
+      timers.push(callback);
+      return timers.length;
+    },
+  };
+  install(browser);
+  const result = {
+    ...RESULT,
+    destination: 'student-detail',
+    params: { contactId: 'contact-1' },
+    deepLink: 'https://lessoncaddie.ssmlabs.com/app/contact-edit?lc_nav=1&contactId=contact-1',
+  };
+  assert.equal(
+    browser.LessonCaddieNavigationOverlay.onPayload({
+      content: [{ text: JSON.stringify(result) }],
+    }),
+    true,
+  );
+  assert.equal(opened.length, 0);
+  timers.at(-1)();
+  assert.deepEqual(opened, [result.deepLink]);
+});
+
+test('leaves Chat navigation links alone while forwarding LessonCaddie handoff links', () => {
+  const sent = [];
+  const windowObject = {
+    parent: { postMessage: (...args) => sent.push(args) },
+    setTimeout: () => 1,
+  };
+  const state = {
+    appNavigationBridge: true,
+    parentOrigin: 'https://lessoncaddie.ssmlabs.com',
+    processedIds: new Set(),
+    fallbackTimers: {},
+    lastResult: null,
+  };
+  const click = (href) => {
+    const event = {
+      target: { closest: () => ({ href }) },
+      preventDefault() {
+        this.prevented = true;
+      },
+      stopPropagation() {
+        this.stopped = true;
+      },
+    };
+    const handled = handleDeepLinkClick(windowObject, state, event);
+    return { handled, event };
+  };
+
+  const chat = click('https://lessoncaddie.ssmlabs.com/c/new');
+  assert.equal(chat.handled, false);
+  assert.equal(chat.event.prevented, undefined);
+  assert.equal(chat.event.stopped, undefined);
+  assert.equal(sent.length, 0);
+
+  const app = click('https://lessoncaddie.ssmlabs.com/app?view=start-lesson');
+  assert.equal(app.handled, true);
+  assert.equal(app.event.prevented, true);
+  assert.equal(app.event.stopped, true);
+  assert.equal(sent[0][0].destination, 'start-lesson');
+});
+
+test('New Chat links keep the Chat subdirectory and reach the native click handler', () => {
+  const anchor = { href: 'https://lessoncaddie.ssmlabs.com/c/new' };
+  const windowObject = {
+    location: { href: 'https://lessoncaddie.ssmlabs.com/chat/c/old' },
+    document: { querySelector: () => ({ getAttribute: () => '/chat/' }) },
+    parent: {},
+  };
+  const event = {
+    target: { closest: () => anchor },
+    preventDefault() {
+      this.prevented = true;
+    },
+    stopPropagation() {
+      this.stopped = true;
+    },
+  };
+  const handled = handleDeepLinkClick(windowObject, { appNavigationBridge: true }, event);
+  assert.equal(handled, false);
+  assert.equal(anchor.href, 'https://lessoncaddie.ssmlabs.com/chat/c/new');
+  assert.equal(event.prevented, undefined);
+  assert.equal(event.stopped, undefined);
 });
 
 test('parses SSE data lines into JSON events', () => {

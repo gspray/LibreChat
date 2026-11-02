@@ -117,7 +117,7 @@ function buildPreLoginPayload() {
     emailEnabled: checkEmailConfig(),
     passwordResetEnabled,
     twoFactorAuthenticationRequired: isEnabled(process.env.ENFORCE_TWO_FACTOR_AUTHENTICATION),
-    // SSM Labs: consumed by config/ssmlabs browser overlays; keep on the pre-login payload.
+    // SSM Labs: consumed by the Chat client and browser overlays; keep on the pre-login payload.
     lessonCaddie: resolveLessonCaddieConfig(process.env),
   };
 

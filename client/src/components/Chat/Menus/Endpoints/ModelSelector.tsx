@@ -130,11 +130,11 @@ function ModelSelectorContent() {
 }
 
 export default function ModelSelector({ startupConfig }: ModelSelectorProps) {
-  const interfaceConfig = startupConfig?.interface ?? defaultInterface;
-  const modelSpecs = startupConfig?.modelSpecs?.list ?? [];
-
-  // Hide the selector when modelSelect is false and there are no model specs to show
-  if (interfaceConfig.modelSelect === false && modelSpecs.length === 0) {
+  // Wait for the actual interface policy before rendering a model switcher.
+  if (
+    startupConfig == null ||
+    (startupConfig.interface ?? defaultInterface).modelSelect === false
+  ) {
     return null;
   }
 

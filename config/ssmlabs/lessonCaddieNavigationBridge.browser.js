@@ -119,6 +119,9 @@
       destination = 'start-lesson';
     } else if (path === '/app' && url.searchParams.get('panel') === 'directory') {
       destination = 'student-list';
+    } else if (path === '/app/contact-edit' && url.searchParams.get('contactId')) {
+      destination = 'student-detail';
+      params.contactId = url.searchParams.get('contactId');
     } else if (path === '/app' && url.searchParams.get('view') === 'new-student') {
       destination = 'new-student';
     } else if (path === '/app' && url.searchParams.get('panel') === 'sessions') {
@@ -337,6 +340,36 @@
     });
   }
 
+  function openStudentDetailFallback(windowObject, state, result, reason) {
+    if (result?.destination !== 'student-detail') return false;
+    const link = resultFromHref(windowObject, clean(result.deepLink));
+    if (
+      !link ||
+      link.destination !== result.destination ||
+      link.params.contactId !== result.params?.contactId ||
+      !remember(state, `${result.requestId}:fallback`)
+    )
+      return false;
+    try {
+      const target = isFramed(windowObject) ? windowObject.top : windowObject;
+      target.location.assign(result.deepLink);
+      logNav('fallback_opened', {
+        requestId: result.requestId,
+        destination: result.destination,
+        code: reason,
+      });
+      return true;
+    } catch (error) {
+      logNav('fallback_failed', {
+        requestId: result.requestId,
+        destination: result.destination,
+        code: reason,
+      });
+      console.warn('LessonCaddie student page handoff failed', error);
+      return false;
+    }
+  }
+
   function scheduleFallback(windowObject, state, result) {
     const requestId = result.requestId;
     if (state.fallbackTimers[requestId]) {
@@ -345,6 +378,7 @@
     state.fallbackTimers[requestId] = windowObject.setTimeout(() => {
       delete state.fallbackTimers[requestId];
       if (!state.processedIds.has(`${requestId}:acked`)) {
+        if (openStudentDetailFallback(windowObject, state, result, 'bridge_timeout')) return;
         logNav('fallback_link', {
           requestId,
           destination: result.destination,
@@ -428,6 +462,8 @@
       if (event.data.ok === true && state.lastResult) {
         hideResolvedDeepLinks(windowObject, state.lastResult);
         windowObject.setTimeout(() => hideResolvedDeepLinks(windowObject, state.lastResult), 800);
+      } else if (event.data.ok === false && state.lastResult?.requestId === requestId) {
+        openStudentDetailFallback(windowObject, state, state.lastResult, 'bridge_rejected');
       }
       logNav('ack_received', {
         requestId,
@@ -444,6 +480,7 @@
     }
     state.lastResult = result;
     if (!isFramed(windowObject)) {
+      if (openStudentDetailFallback(windowObject, state, result, 'standalone')) return true;
       logNav('external_client', { requestId: result.requestId, destination: result.destination });
       return false;
     }
@@ -457,6 +494,7 @@
           postNavigate(windowObject, state, result);
           return;
         }
+        if (openStudentDetailFallback(windowObject, state, result, 'unknown_client')) return;
         logNav('fallback_link', {
           requestId: result.requestId,
           destination: result.destination,
@@ -467,7 +505,24 @@
     return false;
   }
 
+  function correctNewChatLink(windowObject, event) {
+    const anchor = event?.target?.closest?.('a[href]');
+    const href = anchor?.href;
+    const baseHref = windowObject.document?.querySelector?.('base[href]')?.getAttribute?.('href');
+    if (!href || !baseHref || !windowObject.location?.href) return;
+    try {
+      const base = new URL(baseHref, windowObject.location.href);
+      const link = new URL(href);
+      if (base.pathname === '/' || base.origin !== link.origin || link.pathname !== '/c/new')
+        return;
+      anchor.href = new URL(`c/new${link.search}${link.hash}`, base).toString();
+    } catch {
+      // Keep the original link if the deployment URL is malformed.
+    }
+  }
+
   function handleDeepLinkClick(windowObject, state, event) {
+    correctNewChatLink(windowObject, event);
     if (state.appNavigationBridge !== true || !isFramed(windowObject)) {
       return false;
     }
@@ -477,16 +532,17 @@
     if (!href || !isAllowedOrigin(windowObject, originOf(href))) {
       return false;
     }
-    event.preventDefault();
-    event.stopPropagation();
     const result =
       state.lastResult && state.lastResult.deepLink === href
         ? state.lastResult
         : resultFromHref(windowObject, href);
-    if (result) {
-      state.processedIds.delete(result.requestId);
-      postNavigate(windowObject, state, result);
+    if (!result) {
+      return false;
     }
+    event.preventDefault();
+    event.stopPropagation();
+    state.processedIds.delete(result.requestId);
+    postNavigate(windowObject, state, result);
     return true;
   }
 
@@ -609,6 +665,16 @@
     windowObject.addEventListener(
       'click',
       (event) => handleDeepLinkClick(windowObject, state, event),
+      true,
+    );
+    windowObject.addEventListener(
+      'pointerover',
+      (event) => correctNewChatLink(windowObject, event),
+      true,
+    );
+    windowObject.addEventListener(
+      'focusin',
+      (event) => correctNewChatLink(windowObject, event),
       true,
     );
     announceBridgeReady(windowObject);

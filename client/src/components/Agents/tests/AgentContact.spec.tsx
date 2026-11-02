@@ -36,12 +36,12 @@ describe('AgentContact', () => {
     expect(screen.queryByText('Owner User')).not.toBeInTheDocument();
   });
 
-  it('falls back to owner contact as a plain name without a mailto link', () => {
+  it('does not expose the agent owner as a contact', () => {
     const owner = { name: 'Owner User', email: 'owner@example.com' };
-    render(<AgentContact agent={{ support_contact: undefined, owner_contact: owner }} />);
+    render(<AgentContact compact agent={{ support_contact: undefined, owner_contact: owner }} />);
 
-    expect(screen.getByText('Owner User')).toBeInTheDocument();
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.queryByText('Owner User')).not.toBeInTheDocument();
+    expect(screen.queryByText('Contact:')).not.toBeInTheDocument();
   });
 
   it('renders no-contact text when no contact is available', () => {
