@@ -147,6 +147,7 @@ const MCPAppView = React.memo(function MCPAppView({
   const viewKey = useId();
   const [opened, setOpened] = useState(false);
   const [atCapacity, setAtCapacity] = useState(false);
+  const autoOpenAttempted = useRef(false);
   const openButtonRef = useRef<HTMLButtonElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const focusAfterTransition = useRef<'open' | 'close' | null>(null);
@@ -180,6 +181,20 @@ const MCPAppView = React.memo(function MCPAppView({
     },
     [releaseView, viewKey],
   );
+  useEffect(() => {
+    const isProfilePhoto =
+      app.serverName === 'lessoncaddie-instructor' &&
+      app.toolName === 'get_student' &&
+      app.uri === 'ui://lessoncaddie-instructor/profile-photo/v1.html' &&
+      Boolean(app.resultMeta?.profilePhoto);
+    if (!isProfilePhoto || unavailable || autoOpenAttempted.current) return;
+    autoOpenAttempted.current = true;
+    if (reserveView(viewKey)) {
+      setOpened(true);
+    } else {
+      setAtCapacity(true);
+    }
+  }, [app, unavailable, reserveView, viewKey]);
   const open = () => {
     if (unavailable) return;
     const reserved = reserveView(viewKey);

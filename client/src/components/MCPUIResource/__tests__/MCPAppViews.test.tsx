@@ -105,6 +105,29 @@ describe('MCPAppViews', () => {
     expect(mockUseAppBridge).not.toHaveBeenCalled();
   });
 
+  it('shows a LessonCaddie profile photo App inline when a photo is available', () => {
+    const photoApp = app({
+      uri: 'ui://lessoncaddie-instructor/profile-photo/v1.html',
+      serverName: 'lessoncaddie-instructor',
+      toolName: 'get_student',
+      resultMeta: { profilePhoto: { mimeType: 'image/jpeg', data: 'AQID' } },
+    });
+    const attachments = [
+      attachment({ toolCallId: 'photo', agentId: 'agent', stepId: 'step' }, [photoApp]),
+    ];
+    const view = render(
+      <MCPAppsPolicyProvider startupConfig={enabledConfig} ready userId="user-1">
+        <MCPAppViews attachments={attachments} />
+      </MCPAppsPolicyProvider>,
+    );
+
+    expect(view.container.querySelector('iframe[data-sandbox-url]')).toBeInTheDocument();
+    expect(view.queryByRole('button', { name: /com_ui_mcp_app_open_named/ })).toBeNull();
+    fireEvent.click(view.getByRole('button', { name: /com_ui_mcp_app_close_named/ }));
+    expect(view.container.querySelector('iframe[data-sandbox-url]')).toBeNull();
+    expect(view.getByRole('button', { name: /com_ui_mcp_app_open_named/ })).toBeInTheDocument();
+  });
+
   it('retains every wrapper occurrence and gives each App only its own input and result', () => {
     const alpha = app({
       toolArgs: { owner: 'alpha' },
