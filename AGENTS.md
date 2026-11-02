@@ -39,8 +39,7 @@ formats and examples live in `.github/pull_request_template.md`.
 
 Read the inline review threads themselves — a summary comment or notification list omits findings.
 Audit each one against the current code, fix what is valid, and reject what is obsolete in a reply
-that says why. After each round: focused tests, `npx tsc --noEmit` in every workspace you changed,
-push, then request the next review naming the pull request's exact remote head — a clean review of
+that says why. After each review round, review the diff and push under repository delivery rules. Defer focused tests and `npx tsc --noEmit` unless requested or required for a merge checkpoint. Then request the next review naming the pull request's exact remote head — a clean review of
 an earlier head says nothing about what you just pushed, and CI runs on its own clock. Reply on
 each resolved thread with the resolving commit and evidence. After two actionable rounds, stop
 patching thread by thread and read the subsystem by invariant instead: identity, authorization,
@@ -56,16 +55,17 @@ and checks you could not run.
 
 ## Verification
 
+For SSM Labs work in this fork, read `/home/gspray/node/dev-workflow/POLICY.md` (or the current cloud clone). Development checks are deferred unless Greg requests them; merge and deployment checkpoints remain required. Honor explicit modes, requested scope, accumulated-change testing, and exact-candidate result reuse. Preserve this repository's branch, review, data, and security boundaries.
+
 For startup, auth, config, file, or message-loading changes, avoid serial database
-reads and reuse loaded request data. Run `npm run lighthouse` before completion:
+reads and reuse loaded request data. Run `npm run lighthouse` at an authorized merge/deployment checkpoint when the change requires it:
 the CI lane adds 250 ms per Mongo query and checks the visible conversation's LCP.
 See [budgets, reproduction and failure diagnosis](e2e/lighthouse/README.md).
 
 A green build is not a typecheck: `packages/api`, `packages/client`, `packages/chat` and `packages/data-schemas` build
-with `tsdown`, which emits without checking types. Run `npx tsc --noEmit` in the workspace you
-changed. `packages/client` excludes `*.spec.ts(x)` and `*.test.ts(x)` from typechecking entirely.
+with `tsdown`, which emits without checking types. At an authorized verification or merge/deployment checkpoint, run `npx tsc --noEmit` in the relevant workspace when applicable. `packages/client` excludes `*.spec.ts(x)` and `*.test.ts(x)` from typechecking entirely.
 `npm run sort-imports` with no arguments rewrites every source root — pass the paths you touched.
-Run `npm run static-checks -- --against origin/dev` to reproduce the PR's static checks; use
+When requested or required for a merge, run `npm run static-checks -- --against origin/dev` to reproduce the PR's static checks; use
 `npm run static-checks:full` for the slower gates. Fix all formatting, lint, and TypeScript
 warnings/errors in the code you change.
 
@@ -206,7 +206,7 @@ success, and failure states in focused component tests.
 
 ## Testing
 
-Run focused Jest tests from the owning workspace, not the entire monorepo. Prefer real logic and
+When tests are requested or required at a checkpoint, run focused Jest tests from the owning workspace, not the entire monorepo. Prefer real logic and
 spies over mocked internals; use `mongodb-memory-server` for database queries and the real MCP SDK
 for MCP behavior. Mock only external HTTP APIs or uncontrollable services. For frontend tests use
 the component's colocated `__tests__` and `test/layout-test-utils` where applicable.
