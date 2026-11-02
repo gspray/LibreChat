@@ -18,7 +18,6 @@ services:
       CROSS_ORIGIN_RESOURCE_POLICY: same-site
       CSP_FRAME_ANCESTORS: "'self' https://lessoncaddie.ssmlabs.com http://127.0.0.1:3021"
       MCP_SANDBOX_FRAME_ANCESTORS: "https://chat.ssmlabs.com https://lessoncaddie.ssmlabs.com"
-      LESSONCADDIE_HIDE_MODEL_SELECTOR: "true"
       # inject-index-html keeps api/server/index.js upstream; attach-sso is a no-op until enabled.
       NODE_OPTIONS: --require /app/config/ssmlabs/inject-index-html.js --require /app/config/ssmlabs/attach-lessoncaddie-sso.js
     volumes:
@@ -29,7 +28,6 @@ services:
       - ./api/server/controllers/agents/callbacks.js:/app/api/server/controllers/agents/callbacks.js:ro
       - ./config/provision-instructor-assistant.js:/app/config/provision-instructor-assistant.js:ro
       - ./config/ssmlabs:/app/config/ssmlabs:ro
-      - ./config/ssmlabs/hide-model-selector.browser.js:/app/client/dist/ssmlabs/hide-model-selector.js:ro
       - ./config/ssmlabs/hide-agent-owner-contact.browser.js:/app/client/dist/ssmlabs/hide-agent-owner-contact.js:ro
       - ./config/ssmlabs/lessonCaddieNavigationBridge.browser.js:/app/client/dist/ssmlabs/lesson-caddie-navigation-bridge.js:ro
       - ./config/ssmlabs/embed-passthrough-sw.js:/app/client/dist/sw.js:ro

@@ -38,7 +38,7 @@ interface:
   customWelcome: 'Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?'
   landingHeading: entity
   landingFooter: false
-  # Endpoints/model chip off; modelSpecs still drive softDefault + landing. Chip hide is the ssmlabs overlay, not a ModelSelector.tsx fork.
+  # Hide the model picker; modelSpecs still drive the default agent and landing page.
   modelSelect: false
   parameters: false
   presets: false

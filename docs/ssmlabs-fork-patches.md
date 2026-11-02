@@ -1,8 +1,8 @@
 # SSM Labs LibreChat patches
 
-This fork stays on the published LibreChat image (`registry.librechat.ai/librechat-ai/librechat-dev`). Prefer **isolated overlays** under `config/ssmlabs/` over editing LibreChat source. Recreate the `api` container after overlay or bind-mount changes; a process restart does not remount volumes.
+Development Chat is built from this fork. Client source changes require a new image and a recreated `api` container; a process restart cannot replace the client bundle. Keep overlays under `config/ssmlabs/` for server-side HTML and integration behavior.
 
-Do **not** bind-mount a custom `client/dist`. Branding, nested-route `<base href>`, model-chip hiding, iframe service-worker cleanup, and MCP navigation all run from overlays injected into the image’s `index.html`.
+Do **not** bind-mount a custom `client/dist`. Branding, nested-route `<base href>`, iframe service-worker cleanup, and MCP navigation run from overlays injected into the image’s `index.html`. The model picker follows `interface.modelSelect` in the built client.
 
 Related operator notes: [instructor-assistant.md](instructor-assistant.md). LessonCaddie-side SSO: `lessoncaddie/docs/librechat-sso.md`.
 
@@ -26,7 +26,6 @@ Loaded with `NODE_OPTIONS=--require /app/config/ssmlabs/inject-index-html.js --r
 | Overlay | Why |
 | --- | --- |
 | `inject-index-html.js` | Patches served `index.html`: LessonCaddie title/theme, `<base href="/">` for `/c/...` routes, overlay script tags. Avoids forking `api/server/index.js`. |
-| `hide-model-selector.browser.js` | `interface.modelSelect: false` does not hide the header chip when `modelSpecs` is non-empty. Do not fork `ModelSelector.tsx`. |
 | `lessonCaddieNavigationBridge.browser.js` | Posts `open_app_screen` results to the LessonCaddie parent. Do not fork `client/src` message components. |
 | `embed-passthrough-sw.js` | Replaces Workbox `/sw.js` so a cached `X-Frame-Options: SAMEORIGIN` cannot block the Assistant iframe. |
 | `branding/` | Favicons, `logo.svg`, maskable/512 icons, `manifest.webmanifest`. Do not rewrite `client/public` or `client/vite.config.ts`. |
@@ -47,7 +46,6 @@ These were turned off in product or duplicated by overlays:
 
 - LessonCaddie header / “Back to LessonCaddie” chrome inside chat (App ↔ Assistant switching lives in the LessonCaddie shell).
 - Login auto-redirect overlay (`lessoncaddie-sso.browser.js`). SSO is only the explicit LessonCaddie handoff (`/sso/lessoncaddie/callback`). Keep `/login?local=1` for administrators.
-- React `ModelSelector.tsx` change (chip hide is the overlay).
 - React tool-card / `useHideToolActivity` forks (server redaction + SSE drop).
 - React `lessonCaddieNavigationBridge` / `LessonCaddieNavigationObserver` (DOM overlay).
 - `client/public` icons and `vite.config.ts` PWA manifest (volume branding).
@@ -62,4 +60,4 @@ When pulling a newer LibreChat image:
 2. Confirm overlays still inject (`data-ssmlabs-*` sentinels on `index.html`).
 3. Confirm SSO still mounts before the SPA fallback (`attach-lessoncaddie-sso.js`).
 4. Re-run `node --test config/ssmlabs/*.test.js config/ssmlabs/*.overlay.test.js`.
-5. Do not rebuild the Vite client unless you are leaving the published-image path on purpose.
+5. Rebuild the Chat image after client source changes, then confirm the served bundle comes from that image.

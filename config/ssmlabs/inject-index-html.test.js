@@ -109,7 +109,7 @@ test('client-side login navigation returns through LessonCaddie SSO', () => {
 test('injectIndexHtml does not inject a LessonCaddie back-link overlay', () => {
   const html = injectIndexHtml(SAMPLE);
   assert.doesNotMatch(html, /back-to-lessoncaddie\.js/);
-  assert.match(html, /hide-model-selector\.js/);
+  assert.doesNotMatch(html, /hide-model-selector\.js/);
   assert.match(html, /data-ssmlabs-embed-sw="true"/);
   assert.match(html, /data-ssmlabs-nav-config="true"/);
   assert.match(html, /window\.__LESSONCADDIE_NAV__/);
@@ -160,16 +160,9 @@ test('navigation overlay assets load from the configured Chat subdirectory', () 
     const html = injectIndexHtml(SAMPLE);
     const baseHref = html.match(/<base href="([^"]+)">/)?.[1];
     const navSrc = html.match(/<script src="([^"]+)" data-ssmlabs-nav-bridge/)?.[1];
-    const selectorSrc = html.match(
-      /<script src="([^"]+)" defer data-ssmlabs-hide-model-selector/,
-    )?.[1];
     assert.equal(
       new URL(navSrc, `https://lessoncaddie.ssmlabs.com${baseHref}`).pathname,
       '/chat/ssmlabs/lesson-caddie-navigation-bridge.js',
-    );
-    assert.equal(
-      new URL(selectorSrc, `https://lessoncaddie.ssmlabs.com${baseHref}`).pathname,
-      '/chat/ssmlabs/hide-model-selector.js',
     );
   } finally {
     if (prevDomainClient === undefined) delete process.env.DOMAIN_CLIENT;
