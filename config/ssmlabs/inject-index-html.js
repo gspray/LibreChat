@@ -151,7 +151,7 @@ function buildLoginFallbackScript() {
 }
 
 function buildChatThemeTags() {
-  const version = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '1').trim() || '1';
+  const version = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '2').trim() || '2';
   return {
     style: `<link rel="stylesheet" href="ssmlabs/lesson-caddie-theme.css?v=${escapeHtml(version)}" ${CHAT_THEME_STYLE_SENTINEL} />`,
     script: `<script src="ssmlabs/lesson-caddie-theme.js?v=${escapeHtml(version)}" defer ${CHAT_THEME_SCRIPT_SENTINEL}></script>`,

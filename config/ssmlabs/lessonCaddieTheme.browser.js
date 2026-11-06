@@ -105,6 +105,8 @@
     }
 
     const content = heroRow?.parentElement;
+    addClass(content, 'lc-assistant-landing-content');
+    addClass(content?.parentElement, 'lc-assistant-landing-shell');
     const descriptions = Array.from(content?.querySelectorAll?.('p,div') || []).filter(
       (element) => {
         const text = normalizeText(element.textContent);

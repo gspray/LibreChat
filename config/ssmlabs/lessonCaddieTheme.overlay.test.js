@@ -83,6 +83,7 @@ function buildThemeDocument() {
   const content = new FakeElement(
     'Instructor Assistant Your AI assistant for managing students, lessons, schedules, and practice activities.',
   );
+  const landingShell = new FakeElement();
   const avatar = new FakeElement();
   const avatarContainer = new FakeElement();
   const description = new FakeElement(
@@ -91,6 +92,7 @@ function buildThemeDocument() {
   title.parentElement = titleWrap;
   titleWrap.parentElement = heroRow;
   heroRow.parentElement = content;
+  content.parentElement = landingShell;
   avatar.parentElement = avatarContainer;
   heroRow.query = (selector) =>
     selector === 'img, .avatar-stroke' || selector === '.avatar-stroke' ? avatar : null;
@@ -116,6 +118,7 @@ function buildThemeDocument() {
     body,
     documentElement,
     buttons,
+    landingShell,
     composerSurface,
     composerForm,
     createElement: () => new FakeElement(),
@@ -145,6 +148,7 @@ test('decorate applies landing, starter, icon, and composer theme hooks', () => 
   assert.equal(documentObject.documentElement.dataset.lessonCaddieChatTheme, 'true');
   assert.equal(documentObject.body.dataset.lessonCaddieChatTheme, 'true');
   assert.equal(documentObject.body.classList.contains('lc-chat-landing'), true);
+  assert.equal(documentObject.landingShell.classList.contains('lc-assistant-landing-shell'), true);
   assert.equal(documentObject.buttons[0].classList.contains('lc-conversation-starter'), true);
   assert.equal(documentObject.buttons[0].dataset.lcStarterKind, 'students');
   assert.equal(documentObject.buttons[0].children[0].className, 'lc-starter-icon');
