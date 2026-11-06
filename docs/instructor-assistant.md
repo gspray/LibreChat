@@ -40,7 +40,7 @@ Variables:
 | `APP_TITLE` | `Ask Lesson Caddie Assistant` | Browser/app title (tab default, login logo alt). |
 | `APP_SHORT_NAME` | `Ask Caddie` | Apple web app / PWA short name. |
 | `SSMLABS_BRANDING_ASSET_VERSION` | `1` | Bumps favicon query string when icons change (PWA cache). |
-| `SSMLABS_CHAT_THEME_ASSET_VERSION` | `2` | Bumps the LessonCaddie Chat stylesheet and browser-overlay query strings. |
+| `SSMLABS_CHAT_THEME_ASSET_VERSION` | `3` | Bumps the LessonCaddie Chat stylesheet and browser-overlay query strings. |
 | `LESSONCADDIE_HOME_URL` | `https://lessoncaddie.ssmlabs.com/app` | LessonCaddie origin used by SSO return/allow-list helpers. |
 | `LESSONCADDIE_ALLOWED_ORIGINS` | `https://lessoncaddie.ssmlabs.com` | Comma-separated origins allowed as SSO `returnUrl` values. The home URL origin is always included. |
 

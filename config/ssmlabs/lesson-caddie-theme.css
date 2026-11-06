@@ -21,8 +21,58 @@ body[data-lesson-caddie-chat-theme="true"] {
 }
 
 body[data-lesson-caddie-chat-theme="true"] {
+  --presentation: 3 14 12;
+  --page-canvas: 2 11 9;
+  --text-primary: 246 247 242;
+  --text-secondary: 199 208 203;
+  --text-secondary-alt: 161 181 171;
+  --text-tertiary: 145 166 155;
+  --text-muted: 128 151 140;
+  --link: 139 229 180;
+  --link-hover: 255 232 163;
+  --link-prose: 139 229 180;
+  --surface-primary: 4 20 17;
+  --surface-primary-alt: 3 15 13;
+  --surface-primary-contrast: 7 27 23;
+  --surface-secondary: 10 34 28;
+  --surface-secondary-alt: 12 42 34;
+  --surface-tertiary: 18 59 47;
+  --surface-tertiary-alt: 20 67 53;
+  --surface-dialog: 8 29 24;
+  --surface-overlay: 2 11 9;
+  --surface-hover: 17 57 46;
+  --surface-hover-alt: 20 67 53;
+  --surface-active: 30 94 72;
+  --surface-active-alt: 25 76 60;
+  --surface-pressed: 22 70 55;
+  --surface-chat: 22 45 39;
+  --surface-code: 3 14 12;
+  --surface-code-body: 3 18 15;
+  --surface-code-inline: 18 59 47;
+  --surface-canvas: 4 20 17;
+  --surface-user-message: 20 59 47;
+  --surface-card: 10 34 28;
+  --surface-card-hover: 18 59 47;
+  --surface-nav-hover: 24 70 57;
+  --surface-nav-selected: 33 72 58;
+  --surface-tab-selected: 20 67 53;
+  --surface-menu: 5 22 18;
+  --surface-popover: 10 34 28;
+  --surface-composer: 22 45 39;
+  --surface-composer-hover: 27 62 53;
+  --surface-search: 10 34 28;
+  --surface-sidebar: 16 39 32;
+  --border-light: 24 64 52;
+  --border-medium-alt: 36 84 68;
+  --border-medium: 42 96 77;
+  --border-heavy: 72 132 105;
+  --border-xheavy: 109 174 142;
+  --border-control: 36 84 68;
+  --drawer-edge: 72 132 105;
+  --focus-control: 255 232 163;
   color: var(--lc-chat-text);
   font-family: "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
+  scrollbar-color: rgba(139, 229, 180, 0.34) transparent;
 }
 
 body[data-lesson-caddie-chat-theme="true"] #root {
