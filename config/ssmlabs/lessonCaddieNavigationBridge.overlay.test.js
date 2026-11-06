@@ -4,6 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   extractNavigationFromPayload,
+  extractRecoveryFromPayload,
   handleDeepLinkClick,
   install,
   parseSseChunk,
@@ -31,6 +32,43 @@ test('extracts navigation from a completed MCP SSE payload', () => {
     },
   };
   assert.equal(extractNavigationFromPayload(payload)?.destination, 'start-lesson');
+});
+
+test('extracts safe recovery controls from a failed write payload', () => {
+  const recovery = {
+    type: 'lessoncaddie.recovery',
+    version: 1,
+    toolName: 'create_playbook_system',
+    category: 'permission',
+    message: 'Chat cannot save this change right now.',
+    keptDetails: { title: 'Start line', drills: ['Gate drill'] },
+    retry: { enabled: true, sameArguments: false },
+    review: { enabled: true },
+    fallback: {
+      destination: 'new-playbook-system',
+      params: { title: 'Start line', drills: '["Gate drill"]' },
+    },
+  };
+  const payload = {
+    event: 'on_run_step_completed',
+    data: {
+      result: {
+        tool_call: {
+          output: JSON.stringify({
+            isError: true,
+            structuredContent: { recovery },
+          }),
+        },
+      },
+    },
+  };
+  const extracted = extractRecoveryFromPayload(payload);
+  assert.equal(extracted.category, 'permission');
+  assert.equal(extracted.retry.enabled, true);
+  assert.equal(extracted.retry.sameArguments, false);
+  assert.deepEqual(extracted.keptDetails.drills, ['Gate drill']);
+  assert.equal(extracted.fallback.destination, 'new-playbook-system');
+  assert.equal(extracted.fallback.params.title, 'Start line');
 });
 
 test('extracts navigation JSON that follows an Opened screen sentence', () => {

@@ -16,6 +16,8 @@
 
   const NAVIGATION_TYPE = 'lessoncaddie.navigation';
   const NAVIGATION_VERSION = 1;
+  const RECOVERY_TYPE = 'lessoncaddie.recovery';
+  const RECOVERY_VERSION = 1;
   const ASSISTANT_MESSAGE_SOURCE = 'lessoncaddie-assistant';
   const SHELL_MESSAGE_SOURCE = 'lessoncaddie-shell';
   const TOOL_NAME = 'open_app_screen';
@@ -245,6 +247,103 @@
     return found[0] || null;
   }
 
+  function parseRecoveryResult(raw) {
+    const parsed = parseJson(raw);
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+    let candidate = null;
+    if (parsed.type === RECOVERY_TYPE) candidate = parsed;
+    else if (parsed.recovery?.type === RECOVERY_TYPE) candidate = parsed.recovery;
+    else if (parsed.structuredContent?.recovery?.type === RECOVERY_TYPE) {
+      candidate = parsed.structuredContent.recovery;
+    }
+    if (
+      !candidate ||
+      Number(candidate.version) !== RECOVERY_VERSION ||
+      !['permission', 'validation', 'service'].includes(clean(candidate.category))
+    ) {
+      return null;
+    }
+    const keptDetails = {};
+    const rawDetails =
+      candidate.keptDetails &&
+      typeof candidate.keptDetails === 'object' &&
+      !Array.isArray(candidate.keptDetails)
+        ? candidate.keptDetails
+        : {};
+    for (const [key, value] of Object.entries(rawDetails)) {
+      if (!isSafeId(key)) continue;
+      if (Array.isArray(value)) {
+        const items = value
+          .map(clean)
+          .filter((item) => item && item.length <= 500)
+          .slice(0, 48);
+        if (items.length) keptDetails[key] = items;
+      } else {
+        const text = clean(value);
+        if (text && text.length <= 4000) keptDetails[key] = text;
+      }
+    }
+    let fallback = null;
+    if (candidate.fallback && typeof candidate.fallback === 'object') {
+      const destination = clean(candidate.fallback.destination);
+      const source =
+        candidate.fallback.params &&
+        typeof candidate.fallback.params === 'object' &&
+        !Array.isArray(candidate.fallback.params)
+          ? candidate.fallback.params
+          : {};
+      const params = {};
+      let safe = isSafeId(destination);
+      for (const [key, value] of Object.entries(source)) {
+        const text = clean(value);
+        if (!isSafeId(key) || !text || text.length > 4000) {
+          safe = false;
+          break;
+        }
+        params[key] = text;
+      }
+      if (safe) fallback = { destination, params };
+    }
+    return {
+      type: RECOVERY_TYPE,
+      version: RECOVERY_VERSION,
+      toolName: clean(candidate.toolName),
+      category: clean(candidate.category),
+      message: clean(candidate.message) || 'LessonCaddie could not save this change.',
+      keptDetails,
+      retry: {
+        enabled: candidate.retry?.enabled === true,
+        sameArguments: candidate.retry?.sameArguments === true,
+      },
+      review: { enabled: candidate.review?.enabled === true },
+      fallback,
+    };
+  }
+
+  function walkForRecovery(node, depth, found) {
+    if (!node || depth > 10 || found.length) return;
+    const direct = parseRecoveryResult(node);
+    if (direct) {
+      found.push(direct);
+      return;
+    }
+    if (Array.isArray(node)) {
+      node.forEach((item) => walkForRecovery(item, depth + 1, found));
+      return;
+    }
+    if (typeof node === 'object') {
+      Object.values(node).forEach((value) => walkForRecovery(value, depth + 1, found));
+    }
+  }
+
+  function extractRecoveryFromPayload(payload) {
+    const found = [];
+    walkForRecovery(payload, 0, found);
+    return found[0] || null;
+  }
+
   function logNav(event, fields) {
     try {
       console.info(
@@ -275,6 +374,7 @@
       appNavigationBridge: false,
       processedIds: new Set(),
       lastResult: null,
+      lastRecovery: null,
       fallbackTimers: {},
     };
   }
@@ -473,10 +573,154 @@
     }
   }
 
+  function submitRecoveryPrompt(windowObject, prompt) {
+    const doc = windowObject.document;
+    const composer = doc?.querySelector?.('textarea[aria-label="Message input"]');
+    if (!composer) return false;
+    const proto = windowObject.HTMLTextAreaElement?.prototype;
+    const setter = proto && Object.getOwnPropertyDescriptor(proto, 'value')?.set;
+    if (typeof setter === 'function') setter.call(composer, prompt);
+    else composer.value = prompt;
+    composer.dispatchEvent(new windowObject.Event('input', { bubbles: true }));
+    composer.dispatchEvent(new windowObject.Event('change', { bubbles: true }));
+    windowObject.setTimeout(() => {
+      doc.querySelector?.('button[aria-label="Send message"]:not([disabled])')?.click?.();
+    }, 0);
+    return true;
+  }
+
+  function renderRecoveryControls(windowObject, state, recovery) {
+    const doc = windowObject.document;
+    if (!doc?.body || typeof doc.createElement !== 'function') return false;
+    doc.getElementById?.('lessoncaddie-recovery-card')?.remove?.();
+    const card = doc.createElement('section');
+    card.id = 'lessoncaddie-recovery-card';
+    card.setAttribute('role', 'region');
+    card.setAttribute('aria-label', 'Save recovery');
+    card.style.cssText =
+      'position:fixed;left:50%;bottom:88px;z-index:2147483000;transform:translateX(-50%);' +
+      'width:min(560px,calc(100vw - 24px));box-sizing:border-box;padding:14px;border:1px solid #3f4b55;' +
+      'border-radius:14px;background:#111a21;color:#f5f7f8;box-shadow:0 14px 36px rgba(0,0,0,.45);' +
+      'font:14px/1.4 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;';
+
+    const heading = doc.createElement('strong');
+    heading.textContent = {
+      permission: 'Permission issue',
+      validation: 'Review the details',
+      service: 'LessonCaddie service issue',
+    }[recovery.category];
+    const message = doc.createElement('p');
+    message.textContent = recovery.message;
+    message.style.cssText = 'margin:6px 0 12px;color:#d7dde2;';
+    const actions = doc.createElement('div');
+    actions.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;';
+    const status = doc.createElement('p');
+    status.setAttribute('aria-live', 'polite');
+    status.style.cssText = 'margin:10px 0 0;color:#b8c6cf;';
+    const details = doc.createElement('dl');
+    details.hidden = true;
+    details.style.cssText =
+      'margin:12px 0 0;padding:10px;border-radius:10px;background:#1a252d;max-height:180px;overflow:auto;';
+
+    const detailLabels = {
+      firstName: 'First name',
+      lastName: 'Last name',
+      email: 'Email',
+      phone: 'Phone',
+      nickname: 'Nickname',
+      notes: 'Notes',
+      title: 'Title',
+      tagline: 'Tagline',
+      concepts: 'Concepts',
+      drills: 'Drills',
+      checkpoints: 'Checkpoints',
+      commonMisses: 'Common misses',
+      fixes: 'Fixes',
+      location: 'Location',
+      start: 'Start',
+      durationMinutes: 'Duration',
+      text: 'Draft text',
+    };
+    for (const [key, value] of Object.entries(recovery.keptDetails)) {
+      const term = doc.createElement('dt');
+      term.textContent = detailLabels[key] || key;
+      term.style.cssText = 'font-weight:700;color:#f5f7f8;';
+      const description = doc.createElement('dd');
+      description.textContent = Array.isArray(value) ? value.join(' · ') : value;
+      description.style.cssText = 'margin:0 0 8px;color:#d7dde2;white-space:pre-wrap;';
+      details.append(term, description);
+    }
+
+    const button = (label, handler, primary = false) => {
+      const element = doc.createElement('button');
+      element.type = 'button';
+      element.textContent = label;
+      element.style.cssText =
+        `padding:9px 12px;border-radius:9px;border:1px solid ${primary ? '#55b978' : '#55636d'};` +
+        `background:${primary ? '#318a52' : '#202b33'};color:#fff;font-weight:700;cursor:pointer;`;
+      element.addEventListener('click', handler);
+      actions.appendChild(element);
+      return element;
+    };
+
+    if (recovery.retry.enabled) {
+      const retryPrompt = recovery.retry.sameArguments
+        ? 'Retry the failed save now with the same retained details. Do not ask me to re-enter them.'
+        : 'Review the retained details, correct only what needs attention, and retry the failed save. Do not ask me to re-enter details you already have.';
+      button(
+        'Retry Save',
+        () => {
+          if (submitRecoveryPrompt(windowObject, retryPrompt)) {
+            status.textContent = 'Retry requested with the retained details.';
+          } else {
+            status.textContent =
+              'The Chat composer is unavailable. Review the details or open the editor.';
+          }
+        },
+        true,
+      );
+    }
+    if (recovery.review.enabled && Object.keys(recovery.keptDetails).length) {
+      const reviewButton = button('Review Details', () => {
+        details.hidden = !details.hidden;
+        reviewButton.setAttribute('aria-expanded', String(!details.hidden));
+      });
+      reviewButton.setAttribute('aria-expanded', 'false');
+    }
+    if (recovery.fallback) {
+      button('Open in LessonCaddie', () => {
+        const result = {
+          type: NAVIGATION_TYPE,
+          version: NAVIGATION_VERSION,
+          destination: recovery.fallback.destination,
+          params: recovery.fallback.params,
+          requestId: `recovery-${Date.now()}`,
+        };
+        state.processedIds.delete(result.requestId);
+        if (postNavigate(windowObject, state, result)) {
+          status.textContent = 'Opening the prefilled editor in LessonCaddie.';
+        } else {
+          status.textContent =
+            'Open LessonCaddie from the app to continue with the retained details.';
+        }
+      });
+    }
+    button('Dismiss', () => card.remove());
+
+    card.append(heading, message, actions, details, status);
+    doc.body.appendChild(card);
+    return true;
+  }
+
   function consumePayload(windowObject, state, payload) {
+    const recovery = extractRecoveryFromPayload(payload);
+    if (recovery) {
+      state.lastRecovery = recovery;
+      renderRecoveryControls(windowObject, state, recovery);
+    }
     const result = extractNavigationFromPayload(payload, windowObject);
     if (!result) {
-      return false;
+      return Boolean(recovery);
     }
     state.lastResult = result;
     if (!isFramed(windowObject)) {
@@ -724,6 +968,7 @@
     TOOL_NAME,
     parseNavigationResult,
     extractNavigationFromPayload,
+    extractRecoveryFromPayload,
     resultFromHref,
     parseSseChunk,
     handleDeepLinkClick,
