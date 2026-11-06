@@ -85,19 +85,25 @@ test('extracts navigation JSON that follows an Opened screen sentence', () => {
   assert.equal(extractNavigationFromPayload(payload)?.requestId, 'req-1');
 });
 
-test('extracts start-lesson from an external markdown fallback link', () => {
+test('leaves answer links inert until the user clicks them', () => {
   const payload = {
     content: [
       {
         type: 'text',
-        text: 'Open Start Lesson in LessonCaddie: https://lessoncaddie.ssmlabs.com/app?view=start-lesson',
+        text: [
+          'Students',
+          '[Take me there](https://lessoncaddie.ssmlabs.com/app?panel=directory&lc_nav=1)',
+          'Calendar',
+          '[Take me there](https://lessoncaddie.ssmlabs.com/app?panel=calendar&lc_nav=1)',
+        ].join('\n'),
       },
     ],
   };
-  assert.equal(extractNavigationFromPayload(payload)?.destination, 'start-lesson');
+  assert.equal(extractNavigationFromPayload(payload), null);
   assert.equal(
-    resultFromHref(null, 'https://lessoncaddie.ssmlabs.com/app?view=start-lesson')?.destination,
-    'start-lesson',
+    resultFromHref(null, 'https://lessoncaddie.ssmlabs.com/app?panel=directory&lc_nav=1')
+      ?.destination,
+    'student-list',
   );
 });
 

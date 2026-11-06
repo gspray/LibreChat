@@ -233,12 +233,6 @@
       const parsed = parseNavigationResult(node, windowObject);
       if (parsed) {
         found.push(parsed);
-        return;
-      }
-      const urlMatch = node.match(/https?:\/\/[^\s)]+/);
-      const fromLink = urlMatch ? resultFromHref(windowObject, urlMatch[0]) : null;
-      if (fromLink) {
-        found.push(fromLink);
       }
       return;
     }
