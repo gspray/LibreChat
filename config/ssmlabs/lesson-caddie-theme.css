@@ -1,6 +1,6 @@
 :root {
-  --lc-chat-canvas: #041411;
-  --lc-chat-canvas-deep: #020b09;
+  --lc-chat-canvas: #0c1218;
+  --lc-chat-canvas-deep: #0c1218;
   --lc-chat-surface: rgba(22, 38, 36, 0.94);
   --lc-chat-surface-strong: rgba(30, 49, 47, 0.98);
   --lc-chat-green: #4fd38c;
@@ -21,8 +21,8 @@ body[data-lesson-caddie-chat-theme="true"] {
 }
 
 body[data-lesson-caddie-chat-theme="true"] {
-  --presentation: 3 14 12;
-  --page-canvas: 2 11 9;
+  --presentation: 12 18 24;
+  --page-canvas: 12 18 24;
   --text-primary: 246 247 242;
   --text-secondary: 199 208 203;
   --text-secondary-alt: 161 181 171;
@@ -31,7 +31,7 @@ body[data-lesson-caddie-chat-theme="true"] {
   --link: 139 229 180;
   --link-hover: 255 232 163;
   --link-prose: 139 229 180;
-  --surface-primary: 4 20 17;
+  --surface-primary: 12 18 24;
   --surface-primary-alt: 3 15 13;
   --surface-primary-contrast: 7 27 23;
   --surface-secondary: 10 34 28;
@@ -39,7 +39,7 @@ body[data-lesson-caddie-chat-theme="true"] {
   --surface-tertiary: 18 59 47;
   --surface-tertiary-alt: 20 67 53;
   --surface-dialog: 8 29 24;
-  --surface-overlay: 2 11 9;
+  --surface-overlay: 12 18 24;
   --surface-hover: 17 57 46;
   --surface-hover-alt: 20 67 53;
   --surface-active: 30 94 72;
@@ -49,7 +49,7 @@ body[data-lesson-caddie-chat-theme="true"] {
   --surface-code: 3 14 12;
   --surface-code-body: 3 18 15;
   --surface-code-inline: 18 59 47;
-  --surface-canvas: 4 20 17;
+  --surface-canvas: 12 18 24;
   --surface-user-message: 20 59 47;
   --surface-card: 10 34 28;
   --surface-card-hover: 18 59 47;
@@ -373,6 +373,53 @@ body[data-lesson-caddie-chat-theme="true"] .lc-composer-surface button[type="sub
     grid-column: 1;
     width: 100%;
   }
+}
+
+#lessoncaddie-page-help {
+  position: fixed;
+  z-index: 30;
+  top: 72px;
+  left: 50%;
+  width: min(680px, calc(100% - 28px));
+  max-height: calc(100dvh - 168px);
+  overflow: auto;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: #101820;
+  color: #e8e4dc;
+  font: 15px/1.45 "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
+}
+
+#lessoncaddie-page-help h2 {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+}
+
+#lessoncaddie-page-help ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#lessoncaddie-page-help li {
+  display: grid;
+  gap: 2px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#lessoncaddie-page-help span {
+  color: #9aa8b6;
+}
+
+#lessoncaddie-page-help a {
+  width: fit-content;
+  color: #8be5b4;
+  font-weight: 700;
+  text-decoration: underline;
 }
 
 @media (prefers-reduced-motion: reduce) {

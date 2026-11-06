@@ -564,6 +564,45 @@
     }
   }
 
+  function renderPageHelp(windowObject, help) {
+    const doc = windowObject.document;
+    if (!doc?.body || typeof doc.createElement !== 'function') {
+      return false;
+    }
+    const items = Array.isArray(help?.items) ? help.items.slice(0, 12) : [];
+    const list = doc.createElement('ul');
+    items.forEach((item) => {
+      const href = clean(item?.href);
+      const title = clean(item?.title).slice(0, 80);
+      const summary = clean(item?.summary).slice(0, 180);
+      if (!title || !resultFromHref(windowObject, href)) {
+        return;
+      }
+      const row = doc.createElement('li');
+      const heading = doc.createElement('strong');
+      heading.textContent = title;
+      const description = doc.createElement('span');
+      description.textContent = summary;
+      const link = doc.createElement('a');
+      link.href = href;
+      link.textContent = 'Take me there';
+      row.append(heading, description, link);
+      list.appendChild(row);
+    });
+    if (!list.childElementCount) {
+      return false;
+    }
+    doc.getElementById('lessoncaddie-page-help')?.remove();
+    const card = doc.createElement('section');
+    card.id = 'lessoncaddie-page-help';
+    const pageTitle = clean(help.pageTitle).slice(0, 60);
+    const heading = doc.createElement('h2');
+    heading.textContent = pageTitle ? `What you can do from ${pageTitle}` : 'What you can do';
+    card.append(heading, list);
+    doc.body.appendChild(card);
+    return true;
+  }
+
   function handleShellMessage(windowObject, state, event) {
     if (!event?.data || event.data.source !== SHELL_MESSAGE_SOURCE) {
       return;
@@ -574,6 +613,11 @@
     state.parentOrigin = event.origin;
     if (event.data.capabilities && event.data.capabilities.appNavigationBridge === true) {
       state.appNavigationBridge = true;
+    }
+    if (event.data.type === 'page-help') {
+      state.pageHelp = event.data;
+      renderPageHelp(windowObject, state.pageHelp);
+      return;
     }
     if (event.data.type === 'navigate-ack') {
       const requestId = clean(event.data.requestId);
@@ -1043,6 +1087,7 @@
     extractNavigationFromPayload,
     extractRecoveryFromPayload,
     resultFromHref,
+    renderPageHelp,
     parseSseChunk,
     handleDeepLinkClick,
     hideResolvedDeepLinks,

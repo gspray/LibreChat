@@ -114,7 +114,7 @@ test('injectIndexHtml does not inject a LessonCaddie back-link overlay', () => {
   assert.match(html, /data-ssmlabs-nav-config="true"/);
   assert.match(html, /window\.__LESSONCADDIE_NAV__/);
   assert.match(html, /lesson-caddie-navigation-bridge\.js/);
-  assert.match(html, /lesson-caddie-navigation-bridge\.js\?v=7/);
+  assert.match(html, /lesson-caddie-navigation-bridge\.js\?v=8/);
 });
 
 test('injectIndexHtml loads the owner-contact overlay once', () => {

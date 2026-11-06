@@ -201,6 +201,17 @@
     return;
   }
 
+  documentObject.documentElement.dataset.lessonCaddieChatTheme = 'true';
+  if (documentObject.body) {
+    documentObject.body.dataset.lessonCaddieChatTheme = 'true';
+  }
+  if (globalObject.parent && globalObject.parent !== globalObject) {
+    globalObject.parent.postMessage(
+      { source: 'lessoncaddie-assistant', type: 'theme-ready', version: 1 },
+      '*',
+    );
+  }
+
   let scheduled = false;
   const scheduleDecorate = () => {
     if (scheduled) {

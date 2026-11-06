@@ -10,6 +10,7 @@ const {
   install,
   parseSseChunk,
   resultFromHref,
+  renderPageHelp,
 } = require('./lessonCaddieNavigationBridge.browser.js');
 
 const RESULT = {
@@ -123,6 +124,54 @@ test('a help overview does not navigate until its link is clicked', () => {
     sent.some((message) => message && message.type === 'navigate'),
     false,
   );
+});
+
+test('page help renders a Take me there link for every supplied page', () => {
+  const card = { id: '', append() {} };
+  const list = {
+    childElementCount: 0,
+    appendChild() {
+      this.childElementCount += 1;
+    },
+  };
+  const created = [];
+  const documentObject = {
+    body: {
+      appendChild(node) {
+        created.push(node);
+      },
+    },
+    getElementById() {
+      return null;
+    },
+    createElement(tag) {
+      if (tag === 'ul') return list;
+      if (tag === 'section') return card;
+      return { textContent: '', href: '', append() {} };
+    },
+  };
+  const rendered = renderPageHelp(
+    { document: documentObject },
+    {
+      pageTitle: 'Lessons',
+      items: [
+        {
+          title: 'Lessons',
+          summary: 'Review lessons.',
+          href: 'https://lessoncaddie.ssmlabs.com/app?panel=sessions&lc_nav=1',
+        },
+        {
+          title: 'Students',
+          summary: 'Find students.',
+          href: 'https://lessoncaddie.ssmlabs.com/app?panel=directory&lc_nav=1',
+        },
+        { title: 'External', summary: 'Ignore.', href: 'https://example.com/app' },
+      ],
+    },
+  );
+  assert.equal(rendered, true);
+  assert.equal(list.childElementCount, 2);
+  assert.equal(created[0], card);
 });
 
 test('leaves answer links inert until the user clicks them', () => {
