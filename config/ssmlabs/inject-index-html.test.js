@@ -123,6 +123,24 @@ test('injectIndexHtml loads the owner-contact overlay once', () => {
   assert.equal(injectIndexHtml(html).match(/hide-agent-owner-contact\.js/g)?.length, 1);
 });
 
+test('injectIndexHtml loads the cache-versioned LessonCaddie Chat theme once', () => {
+  const previous = process.env.SSMLABS_CHAT_THEME_ASSET_VERSION;
+  process.env.SSMLABS_CHAT_THEME_ASSET_VERSION = '12';
+  try {
+    const html = injectIndexHtml(SAMPLE);
+    assert.match(html, /lesson-caddie-theme\.css\?v=12/);
+    assert.match(html, /lesson-caddie-theme\.js\?v=12/);
+    assert.match(html, /data-ssmlabs-chat-theme-style="true"/);
+    assert.match(html, /data-ssmlabs-chat-theme-script="true"/);
+    const reinjected = injectIndexHtml(html);
+    assert.equal(reinjected.match(/lesson-caddie-theme\.css/g)?.length, 1);
+    assert.equal(reinjected.match(/lesson-caddie-theme\.js/g)?.length, 1);
+  } finally {
+    if (previous === undefined) delete process.env.SSMLABS_CHAT_THEME_ASSET_VERSION;
+    else process.env.SSMLABS_CHAT_THEME_ASSET_VERSION = previous;
+  }
+});
+
 test('injectBaseHref anchors relative assets at the app root on nested routes', () => {
   const prevDomainClient = process.env.DOMAIN_CLIENT;
   process.env.DOMAIN_CLIENT = 'https://chat.ssmlabs.com';

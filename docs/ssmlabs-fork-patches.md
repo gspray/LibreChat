@@ -26,9 +26,10 @@ Loaded with `NODE_OPTIONS=--require /app/config/ssmlabs/inject-index-html.js --r
 | Overlay | Why |
 | --- | --- |
 | `inject-index-html.js` | Patches served `index.html`: LessonCaddie title/theme, `<base href="/">` for `/c/...` routes, overlay script tags. Avoids forking `api/server/index.js`. |
+| `lessonCaddieTheme.browser.js` + `lesson-caddie-theme.css` | Decorates the Instructor Assistant landing, starter actions, and composer with the LessonCaddie visual treatment without forking React components. |
 | `lessonCaddieNavigationBridge.browser.js` | Posts `open_app_screen` results to the LessonCaddie parent. Do not fork `client/src` message components. |
 | `embed-passthrough-sw.js` | Replaces Workbox `/sw.js` so a cached `X-Frame-Options: SAMEORIGIN` cannot block the Assistant iframe. |
-| `branding/` | Favicons, `logo.svg`, maskable/512 icons, `manifest.webmanifest`. Do not rewrite `client/public` or `client/vite.config.ts`. |
+| `branding/` | Favicons, `logo.svg`, Chat theme artwork, maskable/512 icons, `manifest.webmanifest`. Do not rewrite `client/public` or `client/vite.config.ts`. |
 | `attach-lessoncaddie-sso.js` + `lessonCaddieSso*.js` | Mounts `/sso/lessoncaddie` at `listen` without editing `api/server/index.js`. |
 | `lessonCaddieReturn.js` | Allow-list and `lessonCaddie` config payload for overlays. |
 

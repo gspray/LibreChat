@@ -9,6 +9,7 @@ services:
       APP_TITLE: Ask Lesson Caddie Assistant
       APP_SHORT_NAME: Ask Caddie
       SSMLABS_BRANDING_ASSET_VERSION: "1"
+      SSMLABS_CHAT_THEME_ASSET_VERSION: "1"
       HIDE_TOOL_ACTIVITY: "true"
       INSTRUCTOR_ASSISTANT_MODEL: gpt-4o
       LIBRECHAT_INSTANCE_ENV: ${LIBRECHAT_INSTANCE_ENV:-}
@@ -30,6 +31,8 @@ services:
       - ./config/ssmlabs:/app/config/ssmlabs:ro
       - ./config/ssmlabs/hide-agent-owner-contact.browser.js:/app/client/dist/ssmlabs/hide-agent-owner-contact.js:ro
       - ./config/ssmlabs/lessonCaddieNavigationBridge.browser.js:/app/client/dist/ssmlabs/lesson-caddie-navigation-bridge.js:ro
+      - ./config/ssmlabs/lessonCaddieTheme.browser.js:/app/client/dist/ssmlabs/lesson-caddie-theme.js:ro
+      - ./config/ssmlabs/lesson-caddie-theme.css:/app/client/dist/ssmlabs/lesson-caddie-theme.css:ro
       - ./config/ssmlabs/embed-passthrough-sw.js:/app/client/dist/sw.js:ro
       - ./config/ssmlabs/branding/manifest.webmanifest:/app/client/dist/manifest.webmanifest:ro
       - ./config/ssmlabs/branding/assets/favicon-16x16.png:/app/client/dist/assets/favicon-16x16.png:ro
@@ -41,3 +44,5 @@ services:
       - ./config/ssmlabs/branding/assets/logo.svg:/app/client/dist/assets/logo.svg:ro
       - ./config/ssmlabs/branding/assets/caddie.png:/app/client/dist/assets/caddie.png:ro
       - ./config/ssmlabs/branding/assets/student-caddie.png:/app/client/dist/assets/student-caddie.png:ro
+      - ./config/ssmlabs/branding/assets/instructor-assistant-bg.svg:/app/client/dist/assets/instructor-assistant-bg.svg:ro
+      - ./config/ssmlabs/branding/assets/instructor-assistant-spark.svg:/app/client/dist/assets/instructor-assistant-spark.svg:ro
