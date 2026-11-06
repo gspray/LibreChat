@@ -961,6 +961,24 @@
       onPayload(payload) {
         return consumePayload(windowObject, state, payload);
       },
+      openRecoveryFallback(fallback) {
+        const recovery = parseRecoveryResult({
+          type: RECOVERY_TYPE,
+          version: RECOVERY_VERSION,
+          category: 'service',
+          fallback,
+        });
+        if (!recovery?.fallback) return false;
+        const result = {
+          type: NAVIGATION_TYPE,
+          version: NAVIGATION_VERSION,
+          destination: recovery.fallback.destination,
+          params: recovery.fallback.params,
+          requestId: `recovery-${Date.now()}`,
+        };
+        state.processedIds.delete(result.requestId);
+        return postNavigate(windowObject, state, result);
+      },
     };
   }
 

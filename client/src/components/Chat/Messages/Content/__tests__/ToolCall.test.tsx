@@ -28,6 +28,9 @@ jest.mock('~/hooks', () => ({
       com_ui_via_server: `via ${values?.[0]}`,
       com_ui_tool_failed: 'failed',
       com_ui_tool_name_set_memory: 'Save Memory',
+      com_ui_lc_retry_save: 'Retry Save',
+      com_ui_lc_review_details: 'Review Details',
+      com_ui_lc_open_in_app: 'Open in LessonCaddie',
     };
     return translations[key] || key;
   },
@@ -218,6 +221,55 @@ describe('ToolCall', () => {
     );
 
     expect(screen.queryByTestId('tool-line-icon')).not.toBeInTheDocument();
+  });
+
+  it('keeps failed LessonCaddie writes actionable with retained details', async () => {
+    const openRecoveryFallback = jest.fn(() => true);
+    (window as any).LessonCaddieNavigationOverlay = { openRecoveryFallback };
+    renderWithRecoil(
+      <>
+        <textarea aria-label="Message input" />
+        <button aria-label="Send message" />
+        <ToolCall
+          {...mockProps}
+          name={`create_playbook_system${Constants.mcp_delimiter}lessoncaddie-instructor`}
+          args={{
+            title: 'Recovery Acceptance',
+            tagline: 'Keep this draft',
+            drills: ['Gate drill', 'String line'],
+            confirmed: true,
+            mutationId: 'internal-id',
+          }}
+          output="Permission issue: Chat cannot save this change right now."
+          runStepStatus="failed"
+        />
+      </>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Retry Save' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Review Details' }));
+    expect(screen.getByText('Recovery Acceptance')).toBeInTheDocument();
+    expect(screen.getByText('Gate drill · String line')).toBeInTheDocument();
+    expect(screen.queryByText('internal-id')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open in LessonCaddie' }));
+    expect(openRecoveryFallback).toHaveBeenCalledWith({
+      destination: 'new-playbook-system',
+      params: {
+        title: 'Recovery Acceptance',
+        tagline: 'Keep this draft',
+        drills: '["Gate drill","String line"]',
+      },
+    });
+
+    const send = screen.getByRole('button', { name: 'Send message' });
+    const sendSpy = jest.spyOn(send, 'click');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry Save' }));
+    await waitFor(() => expect(sendSpy).toHaveBeenCalled());
+    expect(screen.getByRole('textbox', { name: 'Message input' })).toHaveValue(
+      'Retry the failed save now with the same retained details. Do not ask me to re-enter them.',
+    );
+    delete (window as any).LessonCaddieNavigationOverlay;
   });
 
   describe('intent label', () => {

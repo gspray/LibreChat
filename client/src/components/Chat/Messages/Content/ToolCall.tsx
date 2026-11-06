@@ -32,6 +32,270 @@ import { ToolAuthWarning } from './auth';
 import { firstErrorLine } from './live';
 import useRowHandoff from './handoff';
 
+type LessonCaddieFailureCategory = 'permission' | 'validation' | 'service';
+type LessonCaddieRecovery = {
+  category: LessonCaddieFailureCategory;
+  keptDetails: Record<string, string | string[] | number>;
+  fallback: { destination: string; params: Record<string, string> } | null;
+};
+
+const LESSONCADDIE_DETAIL_KEYS = [
+  'firstName',
+  'lastName',
+  'email',
+  'phone',
+  'nickname',
+  'notes',
+  'title',
+  'location',
+  'start',
+  'durationMinutes',
+  'text',
+  'tagline',
+  'concepts',
+  'drills',
+  'checkpoints',
+  'commonMisses',
+  'fixes',
+] as const;
+
+const LESSONCADDIE_FALLBACKS: Record<
+  string,
+  { destination: string; required?: string[]; optional?: string[] }
+> = {
+  add_student: {
+    destination: 'new-student',
+    optional: ['firstName', 'lastName', 'email', 'phone', 'nickname', 'notes'],
+  },
+  update_student: { destination: 'student-detail', required: ['contactId'] },
+  archive_student: { destination: 'student-list' },
+  restore_student: { destination: 'student-list' },
+  create_lesson: { destination: 'start-lesson' },
+  move_lesson: { destination: 'lesson-detail', required: ['lessonId'] },
+  update_lesson_details: { destination: 'lesson-detail', required: ['lessonId'] },
+  cancel_lesson: { destination: 'lesson-detail', required: ['lessonId'] },
+  archive_lesson: { destination: 'lesson-list' },
+  generate_lesson_summary: { destination: 'lesson-detail', required: ['lessonId'] },
+  update_lesson_summary_draft: { destination: 'lesson-detail', required: ['lessonId'] },
+  share_lesson_summary: { destination: 'lesson-detail', required: ['lessonId'] },
+  attach_library_media: { destination: 'library' },
+  create_notice: { destination: 'notices' },
+  delete_notice: { destination: 'notices' },
+  reach_out: { destination: 'student-list' },
+  create_playbook_system: {
+    destination: 'new-playbook-system',
+    optional: ['title', 'tagline', 'concepts', 'drills', 'checkpoints', 'commonMisses', 'fixes'],
+  },
+  update_playbook_system: { destination: 'playbook-system', required: ['systemId'] },
+  delete_playbook_system: { destination: 'playbook-systems' },
+  create_playbook_practice: { destination: 'playbook-practices' },
+  update_playbook_practice: { destination: 'playbook-practice', required: ['practiceId'] },
+  delete_playbook_practice: { destination: 'playbook-practices' },
+};
+
+function parseLessonCaddieArgs(raw: string | undefined): Record<string, unknown> {
+  if (!raw) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function lessonCaddieFailureCategory(output: string | null | undefined) {
+  const text = String(output || '');
+  if (text.includes('Permission issue:')) {
+    return 'permission' as const;
+  }
+  if (text.includes('Details need attention:')) {
+    return 'validation' as const;
+  }
+  if (text.includes('LessonCaddie service issue:')) {
+    return 'service' as const;
+  }
+  return null;
+}
+
+function buildLessonCaddieRecovery(
+  functionName: string,
+  args: string | undefined,
+  output: string | null | undefined,
+): LessonCaddieRecovery | null {
+  const category = lessonCaddieFailureCategory(output);
+  if (!category) {
+    return null;
+  }
+  const source = parseLessonCaddieArgs(args);
+  const keptDetails: LessonCaddieRecovery['keptDetails'] = {};
+  for (const key of LESSONCADDIE_DETAIL_KEYS) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim()) {
+      keptDetails[key] = value.trim();
+    } else if (typeof value === 'number' && Number.isFinite(value)) {
+      keptDetails[key] = value;
+    } else if (Array.isArray(value)) {
+      const items = value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .slice(0, 48);
+      if (items.length) {
+        keptDetails[key] = items;
+      }
+    }
+  }
+  const fallbackSpec = LESSONCADDIE_FALLBACKS[functionName];
+  let fallback: LessonCaddieRecovery['fallback'] = null;
+  if (fallbackSpec) {
+    const params: Record<string, string> = {};
+    const keys = [...(fallbackSpec.required ?? []), ...(fallbackSpec.optional ?? [])];
+    for (const key of keys) {
+      const value = source[key];
+      if (Array.isArray(value)) {
+        params[key] = JSON.stringify(value);
+      } else if (typeof value === 'string' && value.trim()) {
+        params[key] = value.trim();
+      }
+    }
+    if ((fallbackSpec.required ?? []).every((key) => Boolean(params[key]))) {
+      fallback = { destination: fallbackSpec.destination, params };
+    }
+  }
+  return { category, keptDetails, fallback };
+}
+
+function submitLessonCaddieRecoveryPrompt(prompt: string) {
+  const composer = document.querySelector<HTMLTextAreaElement>(
+    'textarea[aria-label="Message input"]',
+  );
+  if (!composer) {
+    return false;
+  }
+  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+  if (setter) {
+    setter.call(composer, prompt);
+  } else {
+    composer.value = prompt;
+  }
+  composer.dispatchEvent(new Event('input', { bubbles: true }));
+  composer.dispatchEvent(new Event('change', { bubbles: true }));
+  window.setTimeout(() => {
+    document
+      .querySelector<HTMLButtonElement>('button[aria-label="Send message"]:not([disabled])')
+      ?.click();
+  }, 0);
+  return true;
+}
+
+function LessonCaddieRecoveryControls({ recovery }: { recovery: LessonCaddieRecovery }) {
+  const localize = useLocalize();
+  const [showDetails, setShowDetails] = useState(false);
+  const [status, setStatus] = useState('');
+  const labels: Record<string, string> = {
+    firstName: 'First name',
+    lastName: 'Last name',
+    email: 'Email',
+    phone: 'Phone',
+    nickname: 'Nickname',
+    notes: 'Notes',
+    title: 'Title',
+    location: 'Location',
+    start: 'Start',
+    durationMinutes: 'Duration',
+    text: 'Draft text',
+    tagline: 'Tagline',
+    concepts: 'Concepts',
+    drills: 'Drills',
+    checkpoints: 'Checkpoints',
+    commonMisses: 'Common misses',
+    fixes: 'Fixes',
+  };
+  const detailEntries = Object.entries(recovery.keptDetails);
+  const retryPrompt =
+    recovery.category === 'validation'
+      ? 'Review the retained details, correct only what needs attention, and retry the failed save. Do not ask me to re-enter details you already have.'
+      : 'Retry the failed save now with the same retained details. Do not ask me to re-enter them.';
+
+  const openFallback = () => {
+    const overlay = (
+      window as typeof window & {
+        LessonCaddieNavigationOverlay?: {
+          openRecoveryFallback?: (fallback: LessonCaddieRecovery['fallback']) => boolean;
+        };
+      }
+    ).LessonCaddieNavigationOverlay;
+    if (recovery.fallback && overlay?.openRecoveryFallback?.(recovery.fallback)) {
+      setStatus('Opening the prefilled editor in LessonCaddie.');
+      return;
+    }
+    setStatus('Open LessonCaddie from the app to continue with the retained details.');
+  };
+
+  return (
+    <section
+      aria-label="Save recovery"
+      className="border-border-light bg-surface-secondary mt-2 rounded-xl border p-3"
+    >
+      <p className="text-text-primary text-sm font-medium">
+        {recovery.category === 'permission' && 'Permission issue'}
+        {recovery.category === 'validation' && 'Review the details'}
+        {recovery.category === 'service' && 'LessonCaddie service issue'}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => {
+            if (submitLessonCaddieRecoveryPrompt(retryPrompt)) {
+              setStatus('Retry requested with the retained details.');
+            } else {
+              setStatus('The Chat composer is unavailable. Review the details or open the editor.');
+            }
+          }}
+        >
+          {localize('com_ui_lc_retry_save')}
+        </Button>
+        {detailEntries.length > 0 && (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            aria-expanded={showDetails}
+            onClick={() => setShowDetails((value) => !value)}
+          >
+            {localize('com_ui_lc_review_details')}
+          </Button>
+        )}
+        {recovery.fallback && (
+          <Button type="button" size="sm" variant="outline" onClick={openFallback}>
+            {localize('com_ui_lc_open_in_app')}
+          </Button>
+        )}
+      </div>
+      {showDetails && detailEntries.length > 0 && (
+        <dl className="bg-surface-tertiary mt-3 max-h-44 overflow-auto rounded-lg p-2 text-sm">
+          {detailEntries.map(([key, value]) => (
+            <React.Fragment key={key}>
+              <dt className="text-text-primary font-medium">{labels[key] ?? key}</dt>
+              <dd className="text-text-secondary mb-2 whitespace-pre-wrap">
+                {Array.isArray(value) ? value.join(' · ') : String(value)}
+              </dd>
+            </React.Fragment>
+          ))}
+        </dl>
+      )}
+      {status && (
+        <p className="text-text-secondary mt-2 text-sm" aria-live="polite">
+          {status}
+        </p>
+      )}
+    </section>
+  );
+}
+
 export default function ToolCall({
   initialProgress = 0.1,
   isLast = false,
@@ -227,6 +491,12 @@ export default function ToolCall({
     isSubmitting,
     hasError,
   });
+  const lessonCaddieRecovery = useMemo(() => {
+    if (phase !== 'failed' || !isMCPToolCall || mcpServerName !== 'lessoncaddie-instructor') {
+      return null;
+    }
+    return buildLessonCaddieRecovery(function_name, args, output);
+  }, [phase, isMCPToolCall, mcpServerName, function_name, args, output]);
   const showOAuth = Boolean(auth) && phase === 'running';
 
   const [expandedInfo, setShowInfo] = useToolExpansion(
@@ -490,6 +760,7 @@ export default function ToolCall({
           )}
         </div>
       </div>
+      {lessonCaddieRecovery && <LessonCaddieRecoveryControls recovery={lessonCaddieRecovery} />}
       {showOAuth && (
         <div className="flex w-full flex-col gap-2.5">
           <div className="mt-2 mb-1">
