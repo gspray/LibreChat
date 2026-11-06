@@ -380,6 +380,15 @@
     }
   }
 
+  function isHelpOverview(windowObject) {
+    try {
+      const params = new URL(windowObject.location.href).searchParams;
+      return params.get('lcHelp') === '1' || /^what can i do\b/i.test(params.get('q') || '');
+    } catch {
+      return false;
+    }
+  }
+
   function createState() {
     return {
       parentOrigin: '',
@@ -388,6 +397,7 @@
       lastResult: null,
       lastRecovery: null,
       fallbackTimers: {},
+      helpOverview: false,
     };
   }
 
@@ -738,6 +748,13 @@
       return Boolean(recovery);
     }
     state.lastResult = result;
+    if (state.helpOverview) {
+      logNav('overview_link_deferred', {
+        requestId: result.requestId,
+        destination: result.destination,
+      });
+      return true;
+    }
     if (!isFramed(windowObject)) {
       if (openStudentDetailFallback(windowObject, state, result, 'standalone')) return true;
       logNav('external_client', { requestId: result.requestId, destination: result.destination });
@@ -917,6 +934,29 @@
     }
     windowObject.__lcNavOverlayInstalled = true;
     const state = createState();
+    state.helpOverview = isHelpOverview(windowObject);
+    windowObject.addEventListener(
+      'click',
+      (event) => {
+        if (!state.helpOverview || !event.target?.closest?.('button[aria-label="Send message"]')) {
+          return;
+        }
+        const typed = String(
+          windowObject.document?.querySelector?.('textarea[aria-label="Message input"]')?.value ||
+            '',
+        ).trim();
+        let initial = '';
+        try {
+          initial = new URL(windowObject.location.href).searchParams.get('q') || '';
+        } catch {
+          initial = '';
+        }
+        if (typed && typed !== initial.trim()) {
+          state.helpOverview = false;
+        }
+      },
+      true,
+    );
     installXhrScan(windowObject, state);
     windowObject.addEventListener('message', (event) =>
       handleShellMessage(windowObject, state, event),

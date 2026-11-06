@@ -38,7 +38,7 @@ function buildCapabilityLinkInstructions(homeUrl) {
 When answering what you can do, how you can help, or giving a feature overview:
 - Include a Markdown link labeled exactly “Take me there” for every app feature you mention when it has a matching destination below.
 - Keep the link next to that feature. These links offer navigation; they do not prove the screen opened.
-- Do not call open_app_screen merely to create these overview links.
+- Never call open_app_screen for a capability, help, or “what can I do” answer. The Markdown links are the navigation.
 - Do not invent a destination for capabilities without an app screen, such as weather or local time.
 Use only these reviewed destinations:
 ${links}`;

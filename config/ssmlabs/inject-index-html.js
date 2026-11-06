@@ -18,8 +18,10 @@ const NAV_BRIDGE_SENTINEL = 'data-ssmlabs-nav-bridge="true"';
 const LOGIN_FALLBACK_SENTINEL = 'data-ssmlabs-login-fallback="true"';
 const CHAT_THEME_STYLE_SENTINEL = 'data-ssmlabs-chat-theme-style="true"';
 const CHAT_THEME_SCRIPT_SENTINEL = 'data-ssmlabs-chat-theme-script="true"';
+const CHAT_THEME_BASE_SENTINEL = 'data-ssmlabs-chat-theme-base="true"';
+const CHAT_THEME_BASE_STYLE = `<style ${CHAT_THEME_BASE_SENTINEL}>html,body{background:#020b09;color:#f6f7f2;color-scheme:dark}</style>`;
 const OWNER_CONTACT_SCRIPT = `<script src="ssmlabs/hide-agent-owner-contact.js?v=1" defer ${OWNER_CONTACT_SENTINEL}></script>`;
-const NAV_BRIDGE_SCRIPT = `<script src="ssmlabs/lesson-caddie-navigation-bridge.js?v=6" ${NAV_BRIDGE_SENTINEL}></script>`;
+const NAV_BRIDGE_SCRIPT = `<script src="ssmlabs/lesson-caddie-navigation-bridge.js?v=7" ${NAV_BRIDGE_SENTINEL}></script>`;
 const EMBED_SW_SCRIPT = `<script ${EMBED_SW_SENTINEL}>
 (function clearFramedChatWorker() {
   if (window.parent === window) return;
@@ -158,6 +160,18 @@ function buildChatThemeTags() {
   };
 }
 
+function applyChatThemeRoot(html) {
+  let next = html;
+  if (!next.includes('data-lesson-caddie-chat-theme=')) {
+    next = next.replace(/<html\b([^>]*)>/i, '<html$1 data-lesson-caddie-chat-theme="true">');
+    next = next.replace(/<body\b([^>]*)>/i, '<body$1 data-lesson-caddie-chat-theme="true">');
+  }
+  if (!next.includes(CHAT_THEME_BASE_SENTINEL)) {
+    next = next.replace(/<head\b[^>]*>/i, (match) => `${match}\n${CHAT_THEME_BASE_STYLE}`);
+  }
+  return next;
+}
+
 function injectOverlayScripts(html) {
   let next = html;
   const chatTheme = buildChatThemeTags();
@@ -186,7 +200,7 @@ function injectOverlayScripts(html) {
 }
 
 function injectIndexHtml(html) {
-  return injectOverlayScripts(injectBaseHref(injectBranding(html)));
+  return applyChatThemeRoot(injectOverlayScripts(injectBaseHref(injectBranding(html))));
 }
 
 const originalReadFileSync = fs.readFileSync;

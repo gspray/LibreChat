@@ -114,7 +114,7 @@ test('injectIndexHtml does not inject a LessonCaddie back-link overlay', () => {
   assert.match(html, /data-ssmlabs-nav-config="true"/);
   assert.match(html, /window\.__LESSONCADDIE_NAV__/);
   assert.match(html, /lesson-caddie-navigation-bridge\.js/);
-  assert.match(html, /lesson-caddie-navigation-bridge\.js\?v=6/);
+  assert.match(html, /lesson-caddie-navigation-bridge\.js\?v=7/);
 });
 
 test('injectIndexHtml loads the owner-contact overlay once', () => {
@@ -132,6 +132,9 @@ test('injectIndexHtml loads the cache-versioned LessonCaddie Chat theme once', (
     assert.match(html, /lesson-caddie-theme\.js\?v=12/);
     assert.match(html, /data-ssmlabs-chat-theme-style="true"/);
     assert.match(html, /data-ssmlabs-chat-theme-script="true"/);
+    assert.match(html, /<html[^>]*data-lesson-caddie-chat-theme="true"/);
+    assert.match(html, /<body[^>]*data-lesson-caddie-chat-theme="true"/);
+    assert.match(html, /data-ssmlabs-chat-theme-base="true"/);
     const reinjected = injectIndexHtml(html);
     assert.equal(reinjected.match(/lesson-caddie-theme\.css/g)?.length, 1);
     assert.equal(reinjected.match(/lesson-caddie-theme\.js/g)?.length, 1);

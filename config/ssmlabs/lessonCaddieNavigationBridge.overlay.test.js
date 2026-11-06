@@ -85,6 +85,46 @@ test('extracts navigation JSON that follows an Opened screen sentence', () => {
   assert.equal(extractNavigationFromPayload(payload)?.requestId, 'req-1');
 });
 
+test('a help overview does not navigate until its link is clicked', () => {
+  const sent = [];
+  const browser = {
+    location: {
+      href: 'https://chat.ssmlabs.com/chat/c/new?lcHelp=1&q=What%20can%20I%20do%20from%20the%20Students%20page%3F',
+    },
+    document: {
+      referrer: 'https://lessoncaddie.ssmlabs.com/app',
+      addEventListener() {},
+      querySelector() {
+        return null;
+      },
+    },
+    parent: { postMessage: (message) => sent.push(message) },
+    addEventListener() {},
+    setTimeout() {
+      return 1;
+    },
+  };
+  install(browser);
+  assert.equal(
+    browser.LessonCaddieNavigationOverlay.onPayload({
+      content: [
+        {
+          text: JSON.stringify({
+            ...RESULT,
+            destination: 'student-list',
+            requestId: 'req-help-1',
+          }),
+        },
+      ],
+    }),
+    true,
+  );
+  assert.equal(
+    sent.some((message) => message && message.type === 'navigate'),
+    false,
+  );
+});
+
 test('leaves answer links inert until the user clicks them', () => {
   const payload = {
     content: [

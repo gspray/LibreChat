@@ -13,7 +13,7 @@ test('capability answers use environment-specific Take me there links', () => {
     instructions,
     /\[Take me there\]\(https:\/\/stage\.lessoncaddie\.app\/app\?panel=directory&lc_nav=1\)/,
   );
-  assert.match(instructions, /Do not call open_app_screen merely to create/);
+  assert.match(instructions, /Never call open_app_screen for a capability/);
   assert.match(instructions, /weather or local time/);
 });
 
