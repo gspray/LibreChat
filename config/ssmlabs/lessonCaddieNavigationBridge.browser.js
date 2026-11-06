@@ -425,6 +425,9 @@
   }
 
   function hideResolvedDeepLinks(windowObject, result) {
+    if (result?.destination === 'lesson-detail') {
+      return;
+    }
     const doc = windowObject.document;
     if (!doc || typeof doc.querySelectorAll !== 'function') {
       return;
@@ -990,6 +993,7 @@
     resultFromHref,
     parseSseChunk,
     handleDeepLinkClick,
+    hideResolvedDeepLinks,
     announceBridgeReady,
     install,
   };

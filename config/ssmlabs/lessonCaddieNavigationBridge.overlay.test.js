@@ -6,6 +6,7 @@ const {
   extractNavigationFromPayload,
   extractRecoveryFromPayload,
   handleDeepLinkClick,
+  hideResolvedDeepLinks,
   install,
   parseSseChunk,
   resultFromHref,
@@ -116,6 +117,22 @@ test('forwards New Student details while the fallback link carries no personal d
   assert.equal(extracted.params.email, 'alex.doe@example.com');
   assert.equal(resultFromHref(null, result.deepLink)?.destination, 'new-student');
   assert.equal(result.deepLink.includes('alex.doe'), false);
+});
+
+test('keeps the Open Lesson fallback visible after embedded navigation succeeds', () => {
+  const anchor = {
+    href: 'https://lessoncaddie.ssmlabs.com/app/edit-lesson?lessonId=lesson-1',
+    hidden: false,
+    setAttribute() {},
+  };
+  const windowObject = {
+    document: { querySelectorAll: () => [anchor] },
+  };
+  hideResolvedDeepLinks(windowObject, {
+    destination: 'lesson-detail',
+    deepLink: anchor.href,
+  });
+  assert.equal(anchor.hidden, false);
 });
 
 test('opens a named student page directly from standalone Chat', () => {
