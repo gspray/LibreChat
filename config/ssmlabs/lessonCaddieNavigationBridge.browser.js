@@ -128,8 +128,26 @@
       destination = 'new-student';
     } else if (path === '/app' && url.searchParams.get('panel') === 'sessions') {
       destination = 'lesson-list';
+    } else if (path === '/app' && url.searchParams.get('panel') === 'calendar') {
+      destination = 'calendar';
+    } else if (path === '/app' && url.searchParams.get('panel') === 'library') {
+      destination = 'library';
+    } else if (path === '/app' && url.searchParams.get('panel') === 'today') {
+      destination = 'today';
+    } else if (path === '/app' && url.searchParams.get('panel') === 'practices') {
+      destination = 'practices';
+    } else if (path === '/app' && url.searchParams.get('panel') === 'play') {
+      destination = 'play';
+    } else if (path === '/app' && url.searchParams.get('panel') === 'goals') {
+      destination = 'goals';
     } else if (path === '/app' && url.searchParams.get('panel') === 'playbook') {
       destination = 'practice-plan';
+    } else if (path === '/app/notices' || path === '/notices') {
+      destination = 'notices';
+    } else if (path === '/app/profile/billing' || path === '/profile/billing') {
+      destination = 'billing';
+    } else if (path === '/app/settings/payment-setup' || path === '/settings/payment-setup') {
+      destination = 'payment-setup';
     } else if (path === '/app/edit-lesson' && url.searchParams.get('lessonId')) {
       destination = url.searchParams.get('handoff') === 'edit' ? 'video-editor' : 'lesson-detail';
       params.lessonId = url.searchParams.get('lessonId');

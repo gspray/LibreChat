@@ -15,11 +15,15 @@ require('module-alias')({ base: path.resolve(__dirname, '..', 'api') });
 const { User, Agent } = require('@librechat/data-schemas').createModels(mongoose);
 const connect = require('./connect');
 const { silentExit } = require('./helpers');
+const { buildCapabilityLinkInstructions } = require('./ssmlabs/instructorCapabilityLinks');
 
 const AGENT_ID = 'agent_instructor_assistant';
 const AGENT_NAME = 'Instructor Assistant';
 const MCP_SERVER = 'lessoncaddie-instructor';
 const MODEL = process.env.INSTRUCTOR_ASSISTANT_MODEL || 'gpt-4o';
+const CAPABILITY_LINK_INSTRUCTIONS = buildCapabilityLinkInstructions(
+  process.env.LESSONCADDIE_HOME_URL,
+);
 const INSTRUCTOR_TOOLS = [
   'get_my_account',
   'get_runtime_versions',
@@ -72,6 +76,8 @@ Do not introduce yourself as ChatGPT, LibreChat, or an OpenAI assistant.
 When asked what you can do, describe the LessonCaddie capabilities
 available to the current user. Only claim capabilities supported by
 your configured tools.
+
+${CAPABILITY_LINK_INSTRUCTIONS}
 
 If explicitly asked about the underlying technology, answer accurately
 while keeping LessonCaddie Chat as your product identity.

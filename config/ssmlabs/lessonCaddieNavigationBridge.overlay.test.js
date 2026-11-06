@@ -228,6 +228,22 @@ test('leaves Chat navigation links alone while forwarding LessonCaddie handoff l
   assert.equal(app.event.prevented, true);
   assert.equal(app.event.stopped, true);
   assert.equal(sent[0][0].destination, 'start-lesson');
+
+  const destinations = [
+    ['https://lessoncaddie.ssmlabs.com/app?panel=calendar&lc_nav=1', 'calendar'],
+    ['https://lessoncaddie.ssmlabs.com/app?panel=library&lc_nav=1', 'library'],
+    ['https://lessoncaddie.ssmlabs.com/app/notices', 'notices'],
+    ['https://lessoncaddie.ssmlabs.com/app/profile/billing', 'billing'],
+    ['https://lessoncaddie.ssmlabs.com/app/settings/payment-setup', 'payment-setup'],
+    ['https://lessoncaddie.ssmlabs.com/app?panel=practices&lc_nav=1', 'practices'],
+    ['https://lessoncaddie.ssmlabs.com/app?panel=play&lc_nav=1', 'play'],
+    ['https://lessoncaddie.ssmlabs.com/app?panel=goals&lc_nav=1', 'goals'],
+  ];
+  destinations.forEach(([href, destination]) => {
+    const result = click(href);
+    assert.equal(result.handled, true);
+    assert.equal(sent.at(-1)[0].destination, destination);
+  });
 });
 
 test('New Chat links keep the Chat subdirectory and reach the native click handler', () => {
