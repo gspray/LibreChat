@@ -68,7 +68,6 @@ const LESSONCADDIE_FALLBACKS: Record<
     optional: ['firstName', 'lastName', 'email', 'phone', 'nickname', 'notes'],
   },
   update_student: { destination: 'student-detail', required: ['contactId'] },
-  archive_student: { destination: 'student-list' },
   restore_student: { destination: 'student-list' },
   create_lesson: { destination: 'start-lesson' },
   move_lesson: { destination: 'lesson-detail', required: ['lessonId'] },
