@@ -335,6 +335,29 @@ body[data-lesson-caddie-chat-theme="true"] .lc-composer-surface button[type="sub
   opacity: 0.52;
 }
 
+body[data-lesson-caddie-chat-theme="true"] a.lc-approve-link,
+body[data-lesson-caddie-chat-theme="true"] a[href="#lc-approve"],
+body[data-lesson-caddie-chat-theme="true"] a[href$="#lc-approve"] {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.35rem;
+  padding: 0.4rem 0.95rem;
+  border: 1px solid var(--lc-chat-green);
+  border-radius: 999px;
+  background: linear-gradient(145deg, #3fc47f, #176f52);
+  color: #fff !important;
+  font-weight: 700;
+  text-decoration: none !important;
+  box-shadow: 0 5px 18px rgba(45, 184, 119, 0.32);
+}
+
+body[data-lesson-caddie-chat-theme="true"] a.lc-approve-link:hover,
+body[data-lesson-caddie-chat-theme="true"] a[href="#lc-approve"]:hover,
+body[data-lesson-caddie-chat-theme="true"] a[href$="#lc-approve"]:hover {
+  border-color: var(--lc-chat-green-soft);
+  color: #fff !important;
+}
+
 @media (max-width: 640px) {
   body[data-lesson-caddie-chat-theme="true"].lc-chat-landing::before {
     background-position: 58% top;

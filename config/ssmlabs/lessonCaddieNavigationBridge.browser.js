@@ -841,13 +841,23 @@
     }
   }
 
+  function isApproveLink(anchor) {
+    return /^i approve$/i.test(clean(anchor && anchor.textContent).replace(/\s+/g, ' '));
+  }
+
   function handleDeepLinkClick(windowObject, state, event) {
     correctNewChatLink(windowObject, event);
+    const target = event && event.target;
+    const anchor = target && target.closest ? target.closest('a[href]') : null;
+    if (anchor && isApproveLink(anchor)) {
+      if (event && typeof event.preventDefault === 'function') event.preventDefault();
+      if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+      submitRecoveryPrompt(windowObject, 'I approve');
+      return true;
+    }
     if (state.appNavigationBridge !== true || !isFramed(windowObject)) {
       return false;
     }
-    const target = event && event.target;
-    const anchor = target && target.closest ? target.closest('a[href]') : null;
     const href = anchor && anchor.href;
     if (!href || !isAllowedOrigin(windowObject, originOf(href))) {
       return false;

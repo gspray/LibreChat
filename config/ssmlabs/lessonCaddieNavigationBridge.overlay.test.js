@@ -364,6 +364,52 @@ test('New Chat links keep the Chat subdirectory and reach the native click handl
   assert.equal(event.stopped, undefined);
 });
 
+test('I approve links submit the confirmation prompt', () => {
+  const clicks = [];
+  const composer = {
+    value: '',
+    dispatchEvent() {},
+  };
+  const send = {
+    click() {
+      clicks.push(composer.value);
+    },
+  };
+  const windowObject = {
+    HTMLTextAreaElement: { prototype: {} },
+    Event: function Event() {},
+    document: {
+      querySelector(selector) {
+        if (selector === 'textarea[aria-label="Message input"]') return composer;
+        if (selector === 'button[aria-label="Send message"]:not([disabled])') return send;
+        return null;
+      },
+    },
+    setTimeout(fn) {
+      fn();
+      return 1;
+    },
+  };
+  const event = {
+    target: {
+      closest: () => ({
+        href: 'https://chat.ssmlabs.com/c/x#lc-approve',
+        textContent: 'I approve',
+      }),
+    },
+    preventDefault() {
+      this.prevented = true;
+    },
+    stopPropagation() {
+      this.stopped = true;
+    },
+  };
+  assert.equal(handleDeepLinkClick(windowObject, { appNavigationBridge: false }, event), true);
+  assert.equal(event.prevented, true);
+  assert.equal(event.stopped, true);
+  assert.deepEqual(clicks, ['I approve']);
+});
+
 test('parses SSE data lines into JSON events', () => {
   const found = [];
   const rest = parseSseChunk(`event: message\ndata: ${JSON.stringify({ ok: true })}\n`, (event) =>

@@ -158,6 +158,15 @@
     return false;
   }
 
+  function decorateApproveLinks(documentObject) {
+    const links = Array.from(documentObject.querySelectorAll?.('a') || []);
+    for (const link of links) {
+      if (normalizeText(link.textContent).toLowerCase() === 'i approve') {
+        addClass(link, 'lc-approve-link');
+      }
+    }
+  }
+
   function decorateComposer(documentObject) {
     const surface = documentObject.querySelector?.('[data-testid="composer-surface"]');
     addClass(surface, 'lc-composer-surface');
@@ -182,6 +191,7 @@
     documentObject.body.classList.toggle('lc-chat-landing', startersVisible && heroVisible);
     decorateComposer(documentObject);
     decorateHeader(documentObject);
+    decorateApproveLinks(documentObject);
     return { landing: startersVisible && heroVisible };
   }
 

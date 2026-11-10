@@ -113,6 +113,7 @@ function buildThemeDocument() {
   const composerSurface = new FakeElement();
   const composerForm = new FakeElement();
   composerSurface.closestMatch = (selector) => (selector === 'form' ? composerForm : null);
+  const approveLink = new FakeElement('I approve');
 
   return {
     body,
@@ -121,10 +122,12 @@ function buildThemeDocument() {
     landingShell,
     composerSurface,
     composerForm,
+    approveLink,
     createElement: () => new FakeElement(),
     querySelectorAll(selector) {
       if (selector === 'button') return buttons;
       if (selector === 'h1,h2,h3,[role="heading"],span,div') return [title];
+      if (selector === 'a') return [approveLink];
       return [];
     },
     querySelector(selector) {
@@ -154,6 +157,7 @@ test('decorate applies landing, starter, icon, and composer theme hooks', () => 
   assert.equal(documentObject.buttons[0].children[0].className, 'lc-starter-icon');
   assert.equal(documentObject.composerSurface.classList.contains('lc-composer-surface'), true);
   assert.equal(documentObject.composerForm.classList.contains('lc-composer-form'), true);
+  assert.equal(documentObject.approveLink.classList.contains('lc-approve-link'), true);
 });
 
 test('decorate safely ignores a missing Chat document', () => {
