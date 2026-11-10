@@ -6,6 +6,7 @@ const path = require('path');
 const mongoose = require('mongoose');
 const {
   AccessRoleIds,
+  Constants,
   EModelEndpoint,
   PrincipalType,
   ResourceType,
@@ -24,48 +25,13 @@ const MODEL = process.env.INSTRUCTOR_ASSISTANT_MODEL || 'gpt-4o';
 const CAPABILITY_LINK_INSTRUCTIONS = buildCapabilityLinkInstructions(
   process.env.LESSONCADDIE_HOME_URL,
 );
+/** Bind the instructor MCP server, not a frozen tool-name snapshot.
+ *  `mcp_all` expands to the live catalog on each turn (new tools such as
+ *  get_instructor_counts / get_server_info appear after MCP refresh).
+ *  LessonCaddie still authorizes each call. */
 const INSTRUCTOR_TOOLS = [
-  'get_my_account',
-  'get_runtime_versions',
-  'get_weather_forecast',
-  'search_directory',
-  'get_student',
-  'read_notices',
-  'create_notice',
-  'delete_notice',
-  'reach_out',
-  'add_student',
-  'update_student',
-  'archive_student',
-  'restore_student',
-  'get_lesson',
-  'list_lesson_media',
-  'list_library_shelves',
-  'list_library_items',
-  'play_library_item',
-  'read_playbook_systems',
-  'create_playbook_system',
-  'update_playbook_system',
-  'delete_playbook_system',
-  'read_playbook_practices',
-  'create_playbook_practice',
-  'update_playbook_practice',
-  'delete_playbook_practice',
-  'open_app_screen',
-  'show_lesson_video',
-  'attach_library_media',
-  'create_lesson',
-  'move_lesson',
-  'update_lesson_details',
-  'cancel_lesson',
-  'archive_lesson',
-  'get_instructor_briefing',
-  'search_lessons',
-  'save_lesson_note',
-  'generate_lesson_summary',
-  'get_lesson_summary_status',
-  'update_lesson_summary_draft',
-  'share_lesson_summary',
+  `${Constants.mcp_server}${Constants.mcp_delimiter}${MCP_SERVER}`,
+  `${Constants.mcp_all}${Constants.mcp_delimiter}${MCP_SERVER}`,
 ];
 
 const INSTRUCTIONS = `You are LessonCaddie Chat, the assistant for LessonCaddie.
@@ -106,7 +72,7 @@ General behavior
 7c. When asked to play or replay a Library video or audio item in Chat, call play_library_item for that item on every request, including retries. Reuse its exact itemId from recent tool results or call list_library_items to find it. A previous playback link is not a fresh player. After the tool succeeds, tell the instructor to use the player shown in Chat. Do not claim that playback is limited to a new tab unless this fresh tool call fails.
 7d. When the instructor asks to archive a student, use search_directory to identify the exact student and then archive_student after explicit confirmation. Explain that archiving the student also attempts to archive their active lessons and that both can be restored in the app. If asked to delete or remove a student, offer reversible archiving instead of promising permanent deletion. Use the contactId returned by search_directory, confirmed true only after the instructor confirms the exact student and effect, and a stable mutation ID. Report success only after archive_student succeeds.
 7d-restore. When the instructor asks to restore an archived student, call search_directory with includeArchived true and the student's name, then call restore_student with that exact contactId, confirmed true, and a stable mutation ID. The explicit restore request confirms this reversible action. Restoring the student does not restore archived lessons; say this plainly and do not claim the lessons were restored.
-7e. When the instructor asks for a student's or contact's record details, call get_student with their exact full name or a contactId from search_directory. For “details,” “all details,” “full record,” or equivalent, present every student-record field returned by get_student: name, email, phone, nickname, gender, ability, handicap, side, driver distance, student since, notes, account claim status, plan, and directory kind. Show “Not recorded” for empty fields; translate stored codes into readable labels. Do not include internal IDs or retrieval timestamps, and do not infer missing values or add lesson history unless requested. Use search_lessons for lesson lists and counts, with one or more contactIds from search_directory when filtering by people. Do not treat a failed lesson search as a failed student-record lookup.
+7e. When the instructor asks for a student's or contact's record details, call get_student with their exact full name or a contactId from search_directory. For “details,” “all details,” “full record,” or equivalent, present every student-record field returned by get_student: name, email, phone, nickname, gender, ability, handicap, side, driver distance, student since, notes, account claim status, plan, and directory kind. Show “Not recorded” for empty fields; translate stored codes into readable labels. Do not include internal IDs or retrieval timestamps, and do not infer missing values or add lesson history unless requested. Use get_instructor_counts for roster or lesson totals. Use search_lessons for lesson lists, with one or more contactIds from search_directory when filtering by people. Do not treat a failed lesson search as a failed student-record lookup.
 7f. When the instructor explicitly asks to edit a student or contact record, identify the exact person with search_directory or get_student, then call update_student with only the requested fields and a stable mutationId. The explicit request confirms the edit; do not ask for a second confirmation. Claimed students own their name, email, and phone, so update only instructor-owned fields for them. Use clearFields to erase instructor-owned values; do not claim an update succeeded until the tool returns success.
 7g. For lesson changes, use search_lessons to identify the exact lesson and get_lesson for its current details and expectedUpdatedAt. Use update_lesson_details for title, location, schedule description, repeat setting, and supported lesson thoughts; use move_lesson for date, time, or duration. The explicit edit request confirms the exact change. Do not invent a lesson ID or edit a sent summary.
 7h. To archive one or more lessons, identify each exact lesson with search_lessons and get_lesson. Explain that archiving removes each lesson from active views, then get explicit confirmation of the selected lessons. Call archive_lesson separately for each confirmed lesson with its own lessonId, expectedUpdatedAt, and stable mutationId. Report which succeeded and which failed; do not claim the whole group succeeded after a partial failure.
@@ -123,6 +89,10 @@ Weather and local time
 
 App and Chat versions
 - Call get_runtime_versions when asked for the LessonCaddie app version, Chat version, or both. Report each separately. If Chat is unavailable, say so; do not infer its version from the app.
+- Call get_server_info when asked which instructor MCP tools are available, or for this host's MCP catalog revision.
+
+Counts
+- Call get_instructor_counts once for “how many students,” “how many lessons,” or similar totals. Do not use search_directory, search_lessons, or get_instructor_briefing to answer a count.
 
 Actions
 For operations that modify LessonCaddie data:
@@ -174,7 +144,7 @@ When tools fail, say what the instructor needs to know without disclosing intern
     silentExit(1);
   }
 
-  const tools = INSTRUCTOR_TOOLS.map((name) => `${name}_mcp_${MCP_SERVER}`);
+  const tools = INSTRUCTOR_TOOLS;
   const fields = {
     name: AGENT_NAME,
     description:

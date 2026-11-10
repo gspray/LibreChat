@@ -58,7 +58,7 @@ OpenAI credentials stay in the existing Compose/Doppler env. They are not writte
 | ID | `agent_instructor_assistant` |
 | Model | `gpt-4o` (`openAI`) |
 | MCP | `lessoncaddie-instructor` |
-| Tools | Instructor MCP tools including `open_app_screen` (`{name}_mcp_lessoncaddie-instructor`) |
+| Tools | All tools from `lessoncaddie-instructor` (`sys__server__sys_mcp_lessoncaddie-instructor` + `sys__all__sys_mcp_lessoncaddie-instructor`). Do not freeze a per-tool name list; LessonCaddie authorizes each call. |
 | Sharing | Owner ACL + USER role **viewer**. USER `permissions.AGENTS.CREATE` is managed by the reviewed [role permission snapshot](ssmlabs-role-permissions.md). |
 
 Default selection: model spec `instructor-assistant` with `softDefault: true` and `preset.agent_id: agent_instructor_assistant`. Existing conversations that use another agent are not rewritten.
