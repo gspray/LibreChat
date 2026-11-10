@@ -73,7 +73,6 @@ const LESSONCADDIE_FALLBACKS: Record<
   move_lesson: { destination: 'lesson-detail', required: ['lessonId'] },
   update_lesson_details: { destination: 'lesson-detail', required: ['lessonId'] },
   cancel_lesson: { destination: 'lesson-detail', required: ['lessonId'] },
-  archive_lesson: { destination: 'lesson-list' },
   generate_lesson_summary: { destination: 'lesson-detail', required: ['lessonId'] },
   update_lesson_summary_draft: { destination: 'lesson-detail', required: ['lessonId'] },
   share_lesson_summary: { destination: 'lesson-detail', required: ['lessonId'] },
