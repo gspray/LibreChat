@@ -21,7 +21,7 @@ const CHAT_THEME_SCRIPT_SENTINEL = 'data-ssmlabs-chat-theme-script="true"';
 const CHAT_THEME_BASE_SENTINEL = 'data-ssmlabs-chat-theme-base="true"';
 const CHAT_THEME_BASE_STYLE = `<style ${CHAT_THEME_BASE_SENTINEL}>html,body{background:#0c1218;color:#e8e4dc;color-scheme:dark}</style>`;
 const OWNER_CONTACT_SCRIPT = `<script src="ssmlabs/hide-agent-owner-contact.js?v=1" defer ${OWNER_CONTACT_SENTINEL}></script>`;
-const NAV_BRIDGE_SCRIPT = `<script src="ssmlabs/lesson-caddie-navigation-bridge.js?v=9" ${NAV_BRIDGE_SENTINEL}></script>`;
+const NAV_BRIDGE_SCRIPT = `<script src="ssmlabs/lesson-caddie-navigation-bridge.js?v=10" ${NAV_BRIDGE_SENTINEL}></script>`;
 const EMBED_SW_SCRIPT = `<script ${EMBED_SW_SENTINEL}>
 (function clearFramedChatWorker() {
   if (window.parent === window) return;

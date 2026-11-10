@@ -525,6 +525,59 @@
     }
   }
 
+  const ASSISTANT_FEEDBACK_PUT = /\/api\/messages\/[^/?#]+\/[^/?#]+\/feedback(?:\?|$)/;
+
+  function parseFeedbackPutPath(url) {
+    try {
+      const pathname = new URL(url, 'http://localhost').pathname;
+      const parts = pathname.split('/').filter(Boolean);
+      const feedbackIndex = parts.lastIndexOf('feedback');
+      if (feedbackIndex < 2 || parts[feedbackIndex - 3] !== 'messages') {
+        return null;
+      }
+      return {
+        conversationId: parts[feedbackIndex - 2],
+        messageId: parts[feedbackIndex - 1],
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function postAssistantFeedback(windowObject, state, payload) {
+    ensureEmbeddedBridge(windowObject, state);
+    if (!isFramed(windowObject) || state.appNavigationBridge !== true) {
+      return false;
+    }
+    const origin = resolveParentOrigin(windowObject, state);
+    if (!origin) {
+      return false;
+    }
+    const rating = String(payload?.feedback?.rating || '').trim();
+    if (rating !== 'thumbsUp' && rating !== 'thumbsDown') {
+      return false;
+    }
+    const message = {
+      source: ASSISTANT_MESSAGE_SOURCE,
+      type: 'assistant-feedback',
+      version: 1,
+      requestId: `feedback-${Date.now()}`,
+      rating,
+      feedback: payload.feedback,
+      conversationId: payload.conversationId,
+      messageId: payload.messageId,
+      text: payload.feedback?.text,
+      tag: payload.feedback?.tag,
+    };
+    try {
+      windowObject.parent.postMessage(message, origin);
+      return true;
+    } catch (error) {
+      console.warn('LessonCaddie assistant feedback bridge failed', error);
+      return false;
+    }
+  }
+
   function postNavigate(windowObject, state, result) {
     ensureEmbeddedBridge(windowObject, state);
     if (!isFramed(windowObject) || state.appNavigationBridge !== true) {
@@ -1042,6 +1095,32 @@
           url = input.url;
         }
         const method = (init && init.method) || (input && input.method) || 'GET';
+        const methodUpper = String(method || 'GET').toUpperCase();
+        if (methodUpper === 'PUT' && ASSISTANT_FEEDBACK_PUT.test(String(url || ''))) {
+          return originalFetch.apply(this, arguments).then(async (response) => {
+            try {
+              if (response?.ok) {
+                const ids = parseFeedbackPutPath(String(url || ''));
+                const clone = response.clone();
+                const data = await clone.json().catch(() => null);
+                const feedback = data?.feedback;
+                if (
+                  ids &&
+                  feedback &&
+                  (feedback.rating === 'thumbsUp' || feedback.rating === 'thumbsDown')
+                ) {
+                  postAssistantFeedback(windowObject, state, {
+                    ...ids,
+                    feedback,
+                  });
+                }
+              }
+            } catch {
+              // Overlay must not break Chat feedback.
+            }
+            return response;
+          });
+        }
         return originalFetch.apply(this, arguments).then((response) => {
           try {
             if (
