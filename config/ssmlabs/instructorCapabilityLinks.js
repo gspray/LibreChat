@@ -9,7 +9,7 @@ const DESTINATIONS = Object.freeze([
   ['Calendar', '/app?panel=calendar&lc_nav=1'],
   ['Library', '/app?panel=library&lc_nav=1'],
   ['Playbook and practice activities', '/app?panel=playbook&lc_nav=1'],
-  ['Notices', '/app/notices'],
+  ['Messages', '/app/notices'],
   ['Add a student', '/app?view=new-student'],
   ['Plans and billing', '/app/profile/billing'],
   ['Payment setup', '/app/settings/payment-setup'],
