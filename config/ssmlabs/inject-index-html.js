@@ -224,7 +224,7 @@ function injectOverlayScripts(html) {
   if (!next.includes(LOGIN_FALLBACK_SENTINEL)) {
     next = next.replace('</head>', `${buildLoginFallbackScript()}\n</head>`);
   }
-  const liveTalkVersion = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '31').trim() || '31';
+  const liveTalkVersion = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '32').trim() || '32';
   if (!next.includes(LIVE_TALK_STYLE_SENTINEL)) {
     next = next.replace(
       '</head>',
@@ -234,7 +234,7 @@ function injectOverlayScripts(html) {
   if (!next.includes(LIVE_TALK_CORE_SENTINEL)) {
     next = next.replace(
       '</head>',
-      `<script src="ssmlabs/speak-core.realtime.js?v=${escapeHtml(liveTalkVersion)}" ${LIVE_TALK_CORE_SENTINEL}></script>\n</head>`,
+      `<script src="ssmlabs/speak-core.realtime.js?v=${escapeHtml(liveTalkVersion)}" defer ${LIVE_TALK_CORE_SENTINEL}></script>\n</head>`,
     );
   }
   if (!next.includes(LIVE_TALK_SCRIPT_SENTINEL)) {

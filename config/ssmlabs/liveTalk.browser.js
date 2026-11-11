@@ -565,26 +565,23 @@
     });
     watchThreadChanges();
     if (root.body) {
-      let placeTimer = 0;
       new windowObject.MutationObserver(() => {
         if (!config.enabled) return;
-        const barMissing = !root.body.contains(root.querySelector('.lc-live-talk'));
-        const control = composerButton;
+        if (!root.body.contains(root.querySelector('.lc-live-talk'))) {
+          ensureBar();
+        }
+      }).observe(root.body, { childList: true });
+      windowObject.setInterval(() => {
+        if (!config.enabled) return;
         const mic = findMicButton();
-        const controlMisplaced = Boolean(mic) && (!control || control.nextElementSibling !== mic);
-        if (!barMissing && !controlMisplaced) return;
-        if (placeTimer) return;
-        placeTimer = windowObject.setTimeout(() => {
-          placeTimer = 0;
-          syncBar();
-        }, 50);
-      }).observe(root.body, { childList: true, subtree: true });
+        if (!mic) return;
+        if (composerButton?.isConnected && composerButton.nextElementSibling === mic) return;
+        ensureComposerControl();
+      }, 1000);
     }
   }
 
-  if (root.readyState === 'loading') {
-    root.addEventListener('DOMContentLoaded', () => void start(), { once: true });
-  } else {
-    void start();
-  }
+  void start().catch((error) => {
+    liveTalkError('overlay.start-threw', summarizeError(error));
+  });
 })(window);
