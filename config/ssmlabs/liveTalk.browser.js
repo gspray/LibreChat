@@ -34,15 +34,15 @@
     }
   }
 
-  async function ensureAccessToken() {
-    if (accessToken) return accessToken;
-    const response = await nativeFetch(liveTalkPath('/api/auth/refresh'), {
-      method: 'POST',
-      credentials: 'include',
-      headers: { accept: 'application/json', 'content-type': 'application/json' },
-    });
-    const payload = await response.json().catch(() => ({}));
-    accessToken = clean(payload.token);
+  function isSsoPath() {
+    return String(windowObject.location?.pathname || '').includes('/sso/');
+  }
+
+  async function waitForAccessToken() {
+    patchAuthCapture();
+    for (let attempt = 0; attempt < 40 && !accessToken; attempt += 1) {
+      await new Promise((resolve) => windowObject.setTimeout(resolve, 250));
+    }
     return accessToken;
   }
 
@@ -81,30 +81,20 @@
   }
 
   async function api(path, options) {
-    const token = await ensureAccessToken();
-    const headers = {
-      accept: 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options?.body ? { 'content-type': 'application/json' } : {}),
-      ...(options?.headers || {}),
-    };
-    let response = await nativeFetch(path, {
+    const token = accessToken || (await waitForAccessToken());
+    if (!token) {
+      throw new Error('Live Talk is waiting for Chat sign-in.');
+    }
+    const response = await nativeFetch(path, {
       credentials: 'include',
       ...options,
-      headers,
+      headers: {
+        accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+        ...(options?.body ? { 'content-type': 'application/json' } : {}),
+        ...(options?.headers || {}),
+      },
     });
-    if (response.status === 401) {
-      accessToken = '';
-      const retryToken = await ensureAccessToken();
-      response = await nativeFetch(path, {
-        credentials: 'include',
-        ...options,
-        headers: {
-          ...headers,
-          ...(retryToken ? { Authorization: `Bearer ${retryToken}` } : {}),
-        },
-      });
-    }
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       const error = new Error(payload.message || 'Live Talk request failed.');
@@ -345,14 +335,14 @@
   }
 
   async function start() {
+    if (isSsoPath()) {
+      return;
+    }
     patchAuthCapture();
-    for (let attempt = 0; attempt < 20 && !config.enabled; attempt += 1) {
-      try {
-        config = await api(liveTalkPath('/live-talk/config'));
-      } catch (_) {
-        config = { enabled: false };
-        await new Promise((resolve) => windowObject.setTimeout(resolve, 250));
-      }
+    try {
+      config = await api(liveTalkPath('/live-talk/config'));
+    } catch (_) {
+      config = { enabled: false };
     }
     syncBar();
     watchThreadChanges();
