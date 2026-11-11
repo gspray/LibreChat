@@ -128,42 +128,58 @@ body[data-lesson-caddie-chat-theme="true"]
 }
 
 body[data-lesson-caddie-chat-theme="true"].lc-chat-landing [data-chat-pane] {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
   justify-content: flex-start !important;
-  align-items: stretch !important;
+  align-items: center !important;
+}
+
+body[data-lesson-caddie-chat-theme="true"].lc-chat-landing .lc-composer-band {
+  margin-top: auto !important;
+  flex-shrink: 0;
+  width: 100%;
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
 }
 
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-landing-shell {
   height: auto !important;
   max-height: none !important;
+  flex: 0 1 auto !important;
   justify-content: flex-start !important;
   margin-bottom: 0 !important;
-  padding-top: 0.35rem !important;
-  padding-bottom: 0 !important;
+  overflow: visible !important;
+  padding-top: 1.15rem !important;
+  padding-bottom: 0.25rem !important;
 }
 
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-landing-shell,
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-landing-content {
-  align-items: stretch !important;
-  text-align: left !important;
+  align-items: center !important;
+  text-align: center !important;
 }
 
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-landing-content {
   gap: 0.35rem !important;
   padding-inline: 1.25rem;
   width: 100%;
+  max-width: 44rem;
+  margin-inline: auto;
   box-sizing: border-box;
 }
 
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-hero-row {
   position: relative;
   z-index: 1;
-  align-items: flex-start !important;
-  align-self: stretch;
+  align-items: center !important;
+  align-self: center;
   flex-direction: column !important;
   width: 100%;
   gap: 0.55rem !important;
   margin-top: 0 !important;
-  text-align: left !important;
+  text-align: center !important;
 }
 
 body[data-lesson-caddie-chat-theme="true"] .lc-default-agent-icon {
@@ -172,10 +188,11 @@ body[data-lesson-caddie-chat-theme="true"] .lc-default-agent-icon {
 
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-mark {
   align-self: center;
-  width: clamp(4.4rem, 14vw, 5.8rem);
+  width: clamp(4rem, 13vw, 5.4rem);
   aspect-ratio: 1;
   margin-inline: auto;
-  margin-bottom: 0.4rem;
+  margin-top: 0.15rem;
+  margin-bottom: 0.55rem;
   border-radius: 1.65rem;
   background: url("../assets/instructor-assistant-spark.svg?v=1") center / contain no-repeat;
   filter: drop-shadow(0 0 14px rgba(228, 191, 98, 0.33));
@@ -187,7 +204,7 @@ body[data-lesson-caddie-chat-theme="true"] .lc-assistant-title {
   font-weight: 750 !important;
   letter-spacing: -0.035em;
   line-height: 1.08;
-  text-align: left !important;
+  text-align: center !important;
   text-shadow: 0 4px 24px rgba(0, 0, 0, 0.34);
 }
 
@@ -202,20 +219,20 @@ body[data-lesson-caddie-chat-theme="true"] .lc-assistant-title--accent {
 
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-title-wrap {
   position: relative;
-  align-self: flex-start;
+  align-self: center;
   width: max-content;
   max-width: 100%;
   padding-bottom: 1.75rem !important;
-  text-align: left;
+  text-align: center;
 }
 
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-title-wrap::after {
   position: absolute;
-  left: 0;
+  left: 50%;
   bottom: 0.35rem;
   width: min(19rem, 72vw);
   height: 1px;
-  transform: none;
+  transform: translateX(-50%);
   background:
     linear-gradient(
       90deg,
@@ -232,7 +249,7 @@ body[data-lesson-caddie-chat-theme="true"] .lc-assistant-title-wrap::after {
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-title-wrap::before {
   position: absolute;
   z-index: 1;
-  left: min(9.5rem, 36vw);
+  left: 50%;
   bottom: -0.05rem;
   width: 1rem;
   height: 1rem;
@@ -247,11 +264,11 @@ body[data-lesson-caddie-chat-theme="true"] .lc-assistant-title-wrap::before {
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-description {
   z-index: 1;
   max-width: 34rem !important;
-  margin: 0.65rem 0 0 !important;
+  margin: 0.65rem auto 0 !important;
   color: var(--lc-chat-muted) !important;
   font-size: clamp(0.9rem, 3vw, 1.05rem) !important;
   line-height: 1.55;
-  text-align: left;
+  text-align: center;
   text-wrap: pretty;
 }
 

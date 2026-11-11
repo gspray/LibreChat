@@ -209,7 +209,9 @@
   function decorateComposer(documentObject) {
     const surface = documentObject.querySelector?.('[data-testid="composer-surface"]');
     addClass(surface, 'lc-composer-surface');
-    addClass(surface?.closest?.('form'), 'lc-composer-form');
+    const form = surface?.closest?.('form');
+    addClass(form, 'lc-composer-form');
+    addClass(form?.parentElement, 'lc-composer-band');
   }
 
   function decorateHeader(documentObject) {

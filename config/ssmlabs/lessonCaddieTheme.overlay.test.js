@@ -121,6 +121,8 @@ function buildThemeDocument() {
 
   const composerSurface = new FakeElement();
   const composerForm = new FakeElement();
+  const composerBand = new FakeElement();
+  composerForm.parentElement = composerBand;
   composerSurface.closestMatch = (selector) => (selector === 'form' ? composerForm : null);
   const approveLink = new FakeElement('I approve');
 
@@ -131,6 +133,7 @@ function buildThemeDocument() {
     landingShell,
     composerSurface,
     composerForm,
+    composerBand,
     approveLink,
     createElement: () => new FakeElement(),
     querySelectorAll(selector) {
@@ -166,6 +169,7 @@ test('decorate applies landing, starter, icon, and composer theme hooks', () => 
   assert.equal(documentObject.buttons[0].children[0].className, 'lc-starter-icon');
   assert.equal(documentObject.composerSurface.classList.contains('lc-composer-surface'), true);
   assert.equal(documentObject.composerForm.classList.contains('lc-composer-form'), true);
+  assert.equal(documentObject.composerBand.classList.contains('lc-composer-band'), true);
   assert.equal(documentObject.approveLink.classList.contains('lc-approve-link'), true);
 });
 
