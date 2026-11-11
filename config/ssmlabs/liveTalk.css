@@ -1,0 +1,5 @@
+/* Live Talk chrome lives on the LessonCaddie shell FAB, not inside Chat. */
+.lc-live-talk,
+.lc-live-talk-composer-btn {
+  display: none !important;
+}

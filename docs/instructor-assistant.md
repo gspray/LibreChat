@@ -43,6 +43,7 @@ Variables:
 | `SSMLABS_CHAT_THEME_ASSET_VERSION` | `3` | Bumps the LessonCaddie Chat stylesheet and browser-overlay query strings. |
 | `LESSONCADDIE_HOME_URL` | `https://lessoncaddie.ssmlabs.com/app` | LessonCaddie origin used by SSO return/allow-list helpers. |
 | `LESSONCADDIE_ALLOWED_ORIGINS` | `https://lessoncaddie.ssmlabs.com` | Comma-separated origins allowed as SSO `returnUrl` values. The home URL origin is always included. |
+Live Talk is on for this branch whenever the overlay attach is loaded. There is no disable env flag.
 
 Chat uses LibreChat’s own header. App ↔ Assistant switching lives in the LessonCaddie shell, not inside chat.
 
