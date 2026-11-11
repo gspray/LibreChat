@@ -17,7 +17,7 @@ These files are listed in `config/instructor-assistant.compose-override.yml`. Th
 | `api/server/routes/config.js` | Startup `/api/config` must advertise `lessonCaddie` (pre-login overlay flags) and `hideToolActivity`. |
 | `api/server/routes/messages.js` | History GET must redact tool parts; tool-detail routes must 403 for non-admins. |
 | `api/server/utils/hideToolActivity.js` | New helper used by the message and agent-stream bind-mounts. Not upstream. |
-| `api/server/controllers/agents/callbacks.js` | Live SSE must drop tool telemetry for non-admins while still forwarding `open_app_screen` so the navigation overlay can run. Hidden tool starts also emit a live-only “Looking up {name}…” `on_run_step` / `on_message_delta` pair (not persisted). |
+| `api/server/controllers/agents/callbacks.js` | Live SSE must drop tool telemetry for non-admins while still forwarding `open_app_screen` so the navigation overlay can run. The first tool also emits a live-only “Looking up {name}…” `on_run_step` / `on_message_delta` pair for every user, including admins (not persisted). |
 
 Each of those files has an `SSM Labs fork patch` comment at the call site.
 
