@@ -166,7 +166,9 @@
         /* session may already be gone */
       }
     }
-    setStatus(bar, 'idle', 'Live Talk stopped. You can keep typing in this thread.');
+    if (reason !== 'restart') {
+      setStatus(bar, 'idle', 'Live Talk stopped. You can keep typing in this thread.');
+    }
   }
 
   async function startCall(bar) {
@@ -292,15 +294,23 @@
     }
   }
 
+  function isThreadSwitch(previousId, nextId) {
+    const previous = previousId || '';
+    const next = nextId || '';
+    if (previous === next) return false;
+    if (!previous || previous === 'new') return false;
+    return true;
+  }
+
   function watchThreadChanges() {
     let last = conversationIdFromLocation();
     const check = () => {
       const next = conversationIdFromLocation();
-      if (next !== last) {
-        last = next;
-        if (active) void stopCall(ensureBar(), 'thread_change');
-        syncBar();
-      }
+      if (next === last) return;
+      const switched = isThreadSwitch(last, next);
+      last = next;
+      if (switched && active) void stopCall(ensureBar(), 'thread_change');
+      else syncBar();
     };
     windowObject.addEventListener('popstate', check);
     const originalPush = windowObject.history.pushState;
@@ -318,20 +328,6 @@
     windowObject.addEventListener('beforeunload', () => {
       if (active) void stopCall(ensureBar(), 'unload');
     });
-    root.addEventListener(
-      'keydown',
-      (event) => {
-        if (!active) return;
-        const target = event.target;
-        if (
-          target &&
-          (target.tagName === 'TEXTAREA' || target.getAttribute?.('contenteditable') === 'true')
-        ) {
-          void stopCall(ensureBar(), 'typed');
-        }
-      },
-      true,
-    );
   }
 
   async function start() {
