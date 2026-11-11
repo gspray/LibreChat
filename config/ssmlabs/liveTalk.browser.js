@@ -9,10 +9,18 @@
   const root = windowObject.document;
   const nativeFetch = windowObject.fetch.bind(windowObject);
   const LOG_PREFIX = '[ssmlabs-live-talk]';
+  const ASSISTANT_MESSAGE_SOURCE = 'lessoncaddie-assistant';
+  const SHELL_MESSAGE_SOURCE = 'lessoncaddie-shell';
+  const DEFAULT_PARENT_ORIGINS = [
+    'https://lessoncaddie.ssmlabs.com',
+    'http://127.0.0.1:3021',
+    'http://localhost:3021',
+  ];
   let config = { enabled: false };
   let active = null;
   let accessToken = '';
-  let composerButton = null;
+  let ui = { state: 'idle', text: '' };
+  let pendingShellAction = '';
 
   function clean(value) {
     return String(value || '').trim();
@@ -123,6 +131,35 @@
     return `${chatBasePath()}${path}`;
   }
 
+  function allowedParentOrigins() {
+    const extra = windowObject.__LESSONCADDIE_NAV__?.allowedOrigins;
+    const listed = Array.isArray(extra) ? extra.map(clean).filter(Boolean) : [];
+    return [...new Set([...DEFAULT_PARENT_ORIGINS, ...listed])];
+  }
+
+  function isAllowedParentOrigin(origin) {
+    return allowedParentOrigins().includes(clean(origin));
+  }
+
+  function postStatus() {
+    if (windowObject.parent === windowObject) return;
+    try {
+      windowObject.parent.postMessage(
+        {
+          source: ASSISTANT_MESSAGE_SOURCE,
+          type: 'live-talk-status',
+          version: 1,
+          enabled: Boolean(config.enabled),
+          state: ui.state,
+          text: ui.text,
+        },
+        '*',
+      );
+    } catch (_) {
+      /* parent may be gone */
+    }
+  }
+
   function conversationIdFromLocation() {
     const match = String(windowObject.location?.pathname || '').match(/\/c\/([^/]+)/);
     const id = match ? decodeURIComponent(match[1]) : '';
@@ -136,18 +173,10 @@
     );
   }
 
-  function setStatus(bar, state, text) {
-    bar.dataset.state = state;
-    const status = bar.querySelector('.lc-live-talk-status');
-    if (status) status.textContent = text;
-    const talking = isTalkingState(state);
-    const control = ensureComposerControl();
-    if (!control) return;
-    control.dataset.kind = talking ? 'stop' : 'start';
-    control.disabled = !config.enabled;
-    control.setAttribute('aria-pressed', talking ? 'true' : 'false');
-    control.setAttribute('aria-label', talking ? 'Stop Live Talk' : 'Live Talk');
-    control.title = talking ? 'Stop Live Talk' : 'Live Talk';
+  function setStatus(_bar, state, text) {
+    ui.state = String(state || 'idle');
+    ui.text = String(text || '');
+    postStatus();
   }
 
   async function api(path, options) {
@@ -197,78 +226,8 @@
     return payload;
   }
 
-  async function persist(sessionId, body) {
-    try {
-      await api(liveTalkPath(`/live-talk/session/${sessionId}/transcript`), {
-        method: 'POST',
-        body: JSON.stringify(body),
-      });
-    } catch (error) {
-      liveTalkError('transcript.failed', summarizeError(error, { sessionId, role: body?.role }));
-      setStatus(ensureBar(), 'error', error.message || 'Could not save the voice turn.');
-    }
-  }
-
-  function findMicButton() {
-    const surface = root.querySelector('[data-testid="composer-surface"]');
-    const form = surface?.closest('form') || root.querySelector('[data-chat-pane] form');
-    if (!form) return null;
-    const buttons = Array.from(form.querySelectorAll('button'));
-    return (
-      buttons.find((button) => /micr/i.test(button.getAttribute('aria-label') || '')) ||
-      buttons.find((button) => button.querySelector('svg.lucide-mic'))
-    );
-  }
-
-  function ensureComposerControl() {
-    let button = composerButton;
-    if (!button) {
-      button = root.createElement('button');
-      button.type = 'button';
-      button.className = 'lc-live-talk-composer-btn';
-      button.dataset.kind = 'start';
-      button.setAttribute('aria-label', 'Live Talk');
-      button.title = 'Live Talk';
-      button.innerHTML =
-        '<svg data-icon="start" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-        '<path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>' +
-        '<path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>' +
-        '</svg>' +
-        '<svg data-icon="stop" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
-        '<rect x="6" y="6" width="12" height="12" rx="1"></rect>' +
-        '</svg>';
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        const bar = ensureBar();
-        if (isTalkingState(bar.dataset.state)) {
-          void stopCall(bar, 'stop');
-        } else {
-          void startCall(bar);
-        }
-      });
-      composerButton = button;
-    }
-    const mic = findMicButton();
-    if (mic && mic.parentNode && button.nextElementSibling !== mic) {
-      mic.parentNode.insertBefore(button, mic);
-    }
-    button.hidden = !config.enabled;
-    return button;
-  }
-
   function ensureBar() {
-    let bar = root.querySelector('.lc-live-talk');
-    if (!bar) {
-      bar = root.createElement('div');
-      bar.className = 'lc-live-talk';
-      bar.innerHTML = '<span class="lc-live-talk-status">Live Talk is available.</span>';
-    }
-    const host = root.body;
-    if (host && bar.parentNode !== host) {
-      host.insertBefore(bar, host.firstChild);
-    }
-    return bar;
+    return { dataset: ui };
   }
 
   async function stopCall(bar, reason) {
@@ -310,7 +269,7 @@
       }
     }
     if (reason !== 'restart' && reason !== 'failed') {
-      setStatus(bar, 'idle', 'Live Talk stopped. You can keep typing in this thread.');
+      setStatus(bar, 'idle', 'Live Talk stopped.');
     }
   }
 
@@ -382,8 +341,6 @@
       speakCore: Boolean(SpeakCore),
       sessionApi: Boolean(SpeakCore?.createSpeakRealtimeSession),
       bridgeApi: Boolean(SpeakCore?.createOpenAIRealtimeFunctionCallBridge),
-      micButton: Boolean(findMicButton()),
-      composerMounted: Boolean(composerButton?.isConnected),
       mediaDevices: Boolean(windowObject.navigator?.mediaDevices?.getUserMedia),
     });
     if (
@@ -504,37 +461,8 @@
           event.detail?.message || event.detail?.name || 'Could not connect Live Talk.',
         );
       }
-      if (event.type === SpeakCore.SpeakRealtimeEvent.INPUT_TRANSCRIPT && transcript && sessionId) {
-        void persist(sessionId, {
-          role: 'user',
-          text: transcript,
-          providerItemId: clean(event.detail?.event?.item_id),
-        });
-      }
-      if (
-        (providerEvent === 'response.audio_transcript.done' ||
-          providerEvent === 'response.output_audio_transcript.done') &&
-        transcript &&
-        sessionId
-      ) {
-        void persist(sessionId, {
-          role: 'assistant',
-          text: transcript,
-          providerItemId: clean(event.detail?.event?.item_id || event.detail?.event?.response_id),
-          interrupted: false,
-        });
-      }
-      if (
-        event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_INTERRUPTED &&
-        sessionId &&
-        transcript
-      ) {
-        void persist(sessionId, {
-          role: 'assistant',
-          text: transcript,
-          interrupted: true,
-          providerItemId: `interrupted:${clean(event.detail?.event?.response_id)}`,
-        });
+      if (event.type === SpeakCore.SpeakRealtimeEvent.INPUT_TRANSCRIPT && transcript) {
+        liveTalkLog('transcript.heard', { chars: transcript.length });
       }
     });
     active = {
@@ -569,22 +497,48 @@
 
   function syncBar() {
     const bar = ensureBar();
-    const visible = Boolean(config.enabled);
-    bar.dataset.visible = visible ? 'true' : 'false';
-    ensureComposerControl();
-    if (!visible) {
-      if (active) void stopCall(bar, 'thread_change');
+    if (!config.enabled) {
+      if (active) void stopCall(bar, 'disabled');
+      setStatus(bar, 'idle', '');
       return;
     }
     if (!active) {
       setStatus(bar, 'idle', 'Live Talk is available.');
       return;
     }
-    const currentText = bar.querySelector('.lc-live-talk-status')?.textContent || 'Listening…';
-    setStatus(bar, bar.dataset.state || 'listening', currentText);
+    setStatus(bar, ui.state || 'listening', ui.text || 'Listening…');
+  }
+
+  async function applyShellAction(action) {
+    const bar = ensureBar();
+    if (action === 'stop' || (action === 'toggle' && isTalkingState(ui.state))) {
+      pendingShellAction = '';
+      if (active) await stopCall(bar, 'stop');
+      return;
+    }
+    if (!config.enabled) {
+      pendingShellAction = action;
+      return;
+    }
+    pendingShellAction = '';
+    if (!isTalkingState(ui.state)) {
+      await startCall(bar);
+    }
+  }
+
+  function onShellMessage(event) {
+    if (event.source !== windowObject.parent) return;
+    if (!isAllowedParentOrigin(event.origin)) return;
+    const data = event.data;
+    if (!data || data.source !== SHELL_MESSAGE_SOURCE || data.type !== 'live-talk') return;
+    const action = clean(data.action);
+    if (!['start', 'stop', 'toggle'].includes(action)) return;
+    liveTalkLog('shell.command', { action });
+    void applyShellAction(action);
   }
 
   function watchThreadChanges() {
+    windowObject.addEventListener('message', onShellMessage);
     windowObject.addEventListener('beforeunload', () => {
       if (active) void stopCall(ensureBar(), 'unload');
     });
@@ -604,6 +558,7 @@
       liveTalkWarn('overlay.skip-sso', {});
       return;
     }
+    watchThreadChanges();
     patchAuthCapture();
     try {
       config = await api(liveTalkPath('/live-talk/config'));
@@ -621,26 +576,9 @@
       config = { enabled: false };
     }
     syncBar();
-    liveTalkLog('overlay.chrome', {
-      banner: Boolean(root.querySelector('.lc-live-talk')),
-      composerButton: Boolean(composerButton?.isConnected),
-      micButton: Boolean(findMicButton()),
-    });
-    watchThreadChanges();
-    if (root.body) {
-      new windowObject.MutationObserver(() => {
-        if (!config.enabled) return;
-        if (!root.body.contains(root.querySelector('.lc-live-talk'))) {
-          ensureBar();
-        }
-      }).observe(root.body, { childList: true });
-      windowObject.setInterval(() => {
-        if (!config.enabled) return;
-        const mic = findMicButton();
-        if (!mic) return;
-        if (composerButton?.isConnected && composerButton.nextElementSibling === mic) return;
-        ensureComposerControl();
-      }, 1000);
+    liveTalkLog('overlay.chrome', { host: 'shell-fab' });
+    if (pendingShellAction) {
+      void applyShellAction(pendingShellAction);
     }
   }
 
