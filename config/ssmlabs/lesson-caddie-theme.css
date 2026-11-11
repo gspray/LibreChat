@@ -75,8 +75,23 @@ body[data-lesson-caddie-chat-theme="true"] {
   scrollbar-color: rgba(139, 229, 180, 0.34) transparent;
 }
 
+html[data-lesson-caddie-chat-theme="true"] {
+  height: 100%;
+}
+
+body[data-lesson-caddie-chat-theme="true"] {
+  min-height: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
 body[data-lesson-caddie-chat-theme="true"] #root {
   isolation: isolate;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   background:
     radial-gradient(circle at 50% -20%, rgba(43, 105, 83, 0.2), transparent 38%),
     linear-gradient(180deg, var(--lc-chat-canvas), var(--lc-chat-canvas-deep));
@@ -140,7 +155,7 @@ body[data-lesson-caddie-chat-theme="true"].lc-chat-landing #root {
   min-height: 0;
 }
 
-body[data-lesson-caddie-chat-theme="true"].lc-chat-landing [data-chat-pane],
+body[data-lesson-caddie-chat-theme="true"] [data-chat-pane],
 body[data-lesson-caddie-chat-theme="true"] .lc-chat-pane-landing {
   display: flex !important;
   flex-direction: column !important;
@@ -151,11 +166,23 @@ body[data-lesson-caddie-chat-theme="true"] .lc-chat-pane-landing {
   align-items: center !important;
 }
 
-body[data-lesson-caddie-chat-theme="true"].lc-chat-landing .lc-composer-band {
+body[data-lesson-caddie-chat-theme="true"] .lc-composer-band,
+body[data-lesson-caddie-chat-theme="true"]
+  [data-chat-pane]
+  > div:has([data-testid="composer-surface"]) {
   margin-top: auto !important;
   flex-shrink: 0;
   width: 100%;
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+body[data-lesson-caddie-chat-theme="true"] [data-chat-pane] > div.flex.h-full.transform-gpu {
+  justify-content: flex-start !important;
+  align-items: center !important;
+  padding-top: 1.15rem !important;
+  padding-bottom: 0 !important;
+  text-align: center !important;
+  overflow: visible !important;
 }
 
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-landing-shell {

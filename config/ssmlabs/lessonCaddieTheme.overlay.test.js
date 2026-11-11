@@ -186,13 +186,13 @@ test('decorate marks the chat pane on landing', () => {
   assert.equal(pane.classList.contains('lc-chat-pane-landing'), true);
 });
 
-test('decorate does not apply landing when example starter chips are absent', () => {
+test('decorate still applies landing layout when starter chips are absent', () => {
   const documentObject = buildThemeDocument();
   const originalAll = documentObject.querySelectorAll.bind(documentObject);
   documentObject.querySelectorAll = (selector) =>
     selector === 'button' ? [] : originalAll(selector);
-  assert.deepEqual(theme.decorate(documentObject), { landing: false });
-  assert.equal(documentObject.body.classList.contains('lc-chat-landing'), false);
+  assert.deepEqual(theme.decorate(documentObject), { landing: true });
+  assert.equal(documentObject.body.classList.contains('lc-chat-landing'), true);
 });
 
 test('decorate safely ignores a missing Chat document', () => {

@@ -228,8 +228,8 @@
     documentObject.documentElement.dataset.lessonCaddieChatTheme = 'true';
     documentObject.body.dataset.lessonCaddieChatTheme = 'true';
     const startersVisible = decorateStarters(documentObject);
-    const heroVisible = startersVisible && decorateHero(documentObject);
-    const landingActive = startersVisible && heroVisible;
+    const heroVisible = decorateHero(documentObject);
+    const landingActive = startersVisible || heroVisible;
     documentObject.body.classList.toggle('lc-chat-landing', landingActive);
     if (landingActive) {
       addClass(documentObject.querySelector?.('[data-chat-pane]'), 'lc-chat-pane-landing');
@@ -237,7 +237,7 @@
     decorateComposer(documentObject);
     decorateHeader(documentObject);
     decorateApproveLinks(documentObject);
-    return { landing: startersVisible && heroVisible };
+    return { landing: landingActive };
   }
 
   const api = Object.freeze({
