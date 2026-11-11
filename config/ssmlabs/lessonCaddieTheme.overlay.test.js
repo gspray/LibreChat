@@ -2,8 +2,11 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const theme = require('./lessonCaddieTheme.browser');
+const themeCss = fs.readFileSync(path.join(__dirname, 'lesson-caddie-theme.css'), 'utf8');
 
 class FakeClassList {
   constructor() {
@@ -270,4 +273,10 @@ test('decorate injects I approve on the latest confirmation message', () => {
   assert.equal(body.children[0].textContent, 'I approve');
   assert.equal(body.children[0].href, '#lc-approve');
   assert.equal(body.children[0].classList.contains('lc-approve-link'), true);
+});
+
+test('message avatars use the Caddie mark instead of the default robot glyph', () => {
+  assert.match(themeCss, /body\[data-lesson-caddie-embed="true"\] \.agent-turn \.avatar-stroke/);
+  assert.match(themeCss, /caddie\.png/);
+  assert.match(themeCss, /\.agent-turn \.avatar-stroke svg/);
 });

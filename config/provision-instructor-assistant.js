@@ -20,6 +20,10 @@ const { buildCapabilityLinkInstructions } = require('./ssmlabs/instructorCapabil
 
 const AGENT_ID = 'agent_instructor_assistant';
 const AGENT_NAME = 'Instructor Assistant';
+const AGENT_AVATAR = Object.freeze({
+  filepath: '/assets/caddie.png',
+  source: 'local',
+});
 const MCP_SERVER = 'lessoncaddie-instructor';
 const MODEL = process.env.INSTRUCTOR_ASSISTANT_MODEL || 'gpt-4o';
 const CAPABILITY_LINK_INSTRUCTIONS = buildCapabilityLinkInstructions(
@@ -161,6 +165,7 @@ When tools fail, say what the instructor needs to know without disclosing intern
       'Review a student’s practice plan',
     ],
     category: 'general',
+    avatar: AGENT_AVATAR,
   };
 
   let agent = await Agent.findOne({ $or: [{ id: AGENT_ID }, { name: AGENT_NAME }] });

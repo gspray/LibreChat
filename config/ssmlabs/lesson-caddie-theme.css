@@ -227,6 +227,16 @@ body[data-lesson-caddie-embed="true"] .lc-default-agent-icon {
   display: none !important;
 }
 
+/* Message-row fallback is LibreChat's Feather/Bot glyph. Restore the Caddie mark. */
+body[data-lesson-caddie-embed="true"] .agent-turn .avatar-stroke {
+  background: url("../assets/caddie.png?v=1") center / cover no-repeat !important;
+  overflow: hidden;
+}
+
+body[data-lesson-caddie-embed="true"] .agent-turn .avatar-stroke svg {
+  display: none !important;
+}
+
 body[data-lesson-caddie-embed="true"] .lc-assistant-mark {
   align-self: center;
   width: clamp(4rem, 13vw, 5.4rem);
