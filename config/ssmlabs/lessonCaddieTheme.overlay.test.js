@@ -51,6 +51,12 @@ class FakeElement {
     this.children.unshift(child);
   }
 
+  appendChild(child) {
+    child.parentElement = this;
+    this.children.push(child);
+    return child;
+  }
+
   querySelector(selector) {
     if (selector === '.lc-starter-icon') {
       return this.children.find(
@@ -63,6 +69,9 @@ class FakeElement {
         (child) =>
           child.className === 'lc-assistant-mark' || child.classList.contains('lc-assistant-mark'),
       );
+    }
+    if (selector === 'a[href="#lc-approve"], a[href$="#lc-approve"]') {
+      return this.children.find((child) => child.href === '#lc-approve') || null;
     }
     return this.query?.(selector) || null;
   }
@@ -180,4 +189,42 @@ test('decorate still applies landing when example starter chips are absent', () 
 test('decorate safely ignores a missing Chat document', () => {
   assert.deepEqual(theme.decorate(null), { landing: false });
   assert.deepEqual(theme.decorate({}), { landing: false });
+});
+
+test('looksLikeConfirmationRequest matches write confirmations only', () => {
+  assert.equal(
+    theme.looksLikeConfirmationRequest('Please confirm the lesson tomorrow at 10:00.'),
+    true,
+  );
+  assert.equal(
+    theme.looksLikeConfirmationRequest('Can you confirm the new 60-minute price of $150?'),
+    true,
+  );
+  assert.equal(
+    theme.looksLikeConfirmationRequest(
+      "I'll move Taylor's lesson to Thursday at 2pm. Does this look right?",
+    ),
+    true,
+  );
+  assert.equal(
+    theme.looksLikeConfirmationRequest('Are you sure you want to delete this student?'),
+    true,
+  );
+  assert.equal(theme.looksLikeConfirmationRequest('Which student did you mean?'), false);
+  assert.equal(theme.looksLikeConfirmationRequest('Booked the lesson for Taylor.'), false);
+});
+
+test('decorate injects I approve on the latest confirmation message', () => {
+  const documentObject = buildThemeDocument();
+  const body = new FakeElement('Please confirm the lesson tomorrow at 10:00.');
+  const originalAll = documentObject.querySelectorAll.bind(documentObject);
+  documentObject.querySelectorAll = (selector) => {
+    if (selector === '.agent-turn [data-testid="message-body"]') return [body];
+    if (selector === 'a') return [...originalAll(selector), ...body.children];
+    return originalAll(selector);
+  };
+  theme.decorate(documentObject);
+  assert.equal(body.children[0].textContent, 'I approve');
+  assert.equal(body.children[0].href, '#lc-approve');
+  assert.equal(body.children[0].classList.contains('lc-approve-link'), true);
 });

@@ -147,7 +147,46 @@
     return true;
   }
 
+  function looksLikeConfirmationRequest(value) {
+    const text = normalizeText(value).toLowerCase();
+    if (!text || text.includes('i approve')) {
+      return false;
+    }
+    if (
+      /\b(saved|created|booked|deleted|updated successfully|i('ve| have) (created|booked|saved|deleted|updated|sent))\b/.test(
+        text,
+      )
+    ) {
+      return false;
+    }
+    const confirmCue =
+      /\b(please confirm|can you confirm|could you confirm|confirm (this|these|that|the|it)|to confirm|your confirmation|awaiting confirmation|are you sure|shall i\b|should i\b|want me to\b|ok to\b|okay to\b|go ahead|proceed with|if (this|that) (looks|sounds) (right|correct|good)|does (this|that) look|once you confirm|after you confirm|say yes|reply (with )?yes|may i (create|book|save|delete|update|send|add|change|move)|ready to (save|send|book|create|delete|update))\b/;
+    const writeCue =
+      /\b(create|book|save|delete|update|send|add|change|move|share|charge|message|lesson|student|playbook|price|notice|practice)\b/;
+    return confirmCue.test(text) && writeCue.test(text);
+  }
+
+  function injectApproveControl(documentObject) {
+    const bodies = Array.from(
+      documentObject.querySelectorAll?.('.agent-turn [data-testid="message-body"]') || [],
+    );
+    const last = bodies[bodies.length - 1];
+    if (!last || last.querySelector?.('a[href="#lc-approve"], a[href$="#lc-approve"]')) {
+      return false;
+    }
+    if (!looksLikeConfirmationRequest(last.textContent)) {
+      return false;
+    }
+    const link = documentObject.createElement('a');
+    link.href = '#lc-approve';
+    link.textContent = 'I approve';
+    addClass(link, 'lc-approve-link');
+    last.appendChild(link);
+    return true;
+  }
+
   function decorateApproveLinks(documentObject) {
+    injectApproveControl(documentObject);
     const links = Array.from(documentObject.querySelectorAll?.('a') || []);
     for (const link of links) {
       if (normalizeText(link.textContent).toLowerCase() === 'i approve') {
@@ -188,6 +227,7 @@
     decorate,
     normalizeText,
     starterKind,
+    looksLikeConfirmationRequest,
   });
 
   if (typeof module === 'object' && module.exports) {
