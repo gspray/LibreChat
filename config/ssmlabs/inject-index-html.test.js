@@ -175,6 +175,13 @@ test('injectBaseHref preserves configured subdirectory deployments', () => {
   }
 });
 
+test('Live Talk overlay assets are injected without replacing typed Chat', () => {
+  const html = injectIndexHtml(SAMPLE);
+  assert.match(html, /data-ssmlabs-live-talk-style="true"/);
+  assert.match(html, /ssmlabs\/speak-core\.realtime\.js/);
+  assert.match(html, /ssmlabs\/lesson-caddie-live-talk\.js/);
+});
+
 test('navigation overlay assets load from the configured Chat subdirectory', () => {
   const prevDomainClient = process.env.DOMAIN_CLIENT;
   process.env.DOMAIN_CLIENT = 'https://lessoncaddie.ssmlabs.com/chat';

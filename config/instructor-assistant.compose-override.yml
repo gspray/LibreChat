@@ -19,8 +19,10 @@ services:
       CROSS_ORIGIN_RESOURCE_POLICY: same-site
       CSP_FRAME_ANCESTORS: "'self' https://lessoncaddie.ssmlabs.com http://127.0.0.1:3021"
       MCP_SANDBOX_FRAME_ANCESTORS: "https://chat.ssmlabs.com https://lessoncaddie.ssmlabs.com"
+      LIVE_TALK_TRIAL: ${LIVE_TALK_TRIAL:-false}
+      LIVE_TALK_SPEAK_CORE_SHA: d441d85
       # inject-index-html keeps api/server/index.js upstream; attach-sso is a no-op until enabled.
-      NODE_OPTIONS: --require /app/config/ssmlabs/inject-index-html.js --require /app/config/ssmlabs/attach-lessoncaddie-sso.js
+      NODE_OPTIONS: --require /app/config/ssmlabs/inject-index-html.js --require /app/config/ssmlabs/attach-lessoncaddie-sso.js --require /app/config/ssmlabs/attach-live-talk.js
     volumes:
       - ./librechat.yaml:/app/librechat.yaml:ro
       - ./api/server/routes/config.js:/app/api/server/routes/config.js:ro
@@ -33,6 +35,9 @@ services:
       - ./config/ssmlabs/lessonCaddieNavigationBridge.browser.js:/app/client/dist/ssmlabs/lesson-caddie-navigation-bridge.js:ro
       - ./config/ssmlabs/lessonCaddieTheme.browser.js:/app/client/dist/ssmlabs/lesson-caddie-theme.js:ro
       - ./config/ssmlabs/lessonCaddieConversationStarters.browser.js:/app/client/dist/ssmlabs/lesson-caddie-conversation-starters.js:ro
+      - ./config/ssmlabs/liveTalk.browser.js:/app/client/dist/ssmlabs/lesson-caddie-live-talk.js:ro
+      - ./config/ssmlabs/liveTalk.css:/app/client/dist/ssmlabs/lesson-caddie-live-talk.css:ro
+      - ./config/ssmlabs/speak-core.realtime.js:/app/client/dist/ssmlabs/speak-core.realtime.js:ro
       - ./config/ssmlabs/lesson-caddie-theme.css:/app/client/dist/ssmlabs/lesson-caddie-theme.css:ro
       - ./config/ssmlabs/embed-passthrough-sw.js:/app/client/dist/sw.js:ro
       - ./config/ssmlabs/branding/manifest.webmanifest:/app/client/dist/manifest.webmanifest:ro

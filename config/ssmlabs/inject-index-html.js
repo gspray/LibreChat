@@ -19,6 +19,9 @@ const LOGIN_FALLBACK_SENTINEL = 'data-ssmlabs-login-fallback="true"';
 const CHAT_THEME_STYLE_SENTINEL = 'data-ssmlabs-chat-theme-style="true"';
 const CHAT_THEME_SCRIPT_SENTINEL = 'data-ssmlabs-chat-theme-script="true"';
 const CONVERSATION_STARTERS_SENTINEL = 'data-ssmlabs-conversation-starters="true"';
+const LIVE_TALK_STYLE_SENTINEL = 'data-ssmlabs-live-talk-style="true"';
+const LIVE_TALK_CORE_SENTINEL = 'data-ssmlabs-live-talk-core="true"';
+const LIVE_TALK_SCRIPT_SENTINEL = 'data-ssmlabs-live-talk-script="true"';
 const CHAT_THEME_SEED_SENTINEL = 'data-ssmlabs-chat-theme-seed="true"';
 const LESSON_CADDIE_DEFAULT_APPEARANCE = 'lesson-caddie-default';
 const CHAT_THEME_APPEARANCE_SEED_SCRIPT = `<script ${CHAT_THEME_SEED_SENTINEL}>
@@ -220,6 +223,25 @@ function injectOverlayScripts(html) {
   }
   if (!next.includes(LOGIN_FALLBACK_SENTINEL)) {
     next = next.replace('</head>', `${buildLoginFallbackScript()}\n</head>`);
+  }
+  const liveTalkVersion = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '23').trim() || '23';
+  if (!next.includes(LIVE_TALK_STYLE_SENTINEL)) {
+    next = next.replace(
+      '</head>',
+      `<link rel="stylesheet" href="ssmlabs/lesson-caddie-live-talk.css?v=${escapeHtml(liveTalkVersion)}" ${LIVE_TALK_STYLE_SENTINEL} />\n</head>`,
+    );
+  }
+  if (!next.includes(LIVE_TALK_CORE_SENTINEL)) {
+    next = next.replace(
+      '</head>',
+      `<script src="ssmlabs/speak-core.realtime.js?v=${escapeHtml(liveTalkVersion)}" ${LIVE_TALK_CORE_SENTINEL}></script>\n</head>`,
+    );
+  }
+  if (!next.includes(LIVE_TALK_SCRIPT_SENTINEL)) {
+    next = next.replace(
+      '</head>',
+      `<script src="ssmlabs/lesson-caddie-live-talk.js?v=${escapeHtml(liveTalkVersion)}" defer ${LIVE_TALK_SCRIPT_SENTINEL}></script>\n</head>`,
+    );
   }
   return next;
 }
