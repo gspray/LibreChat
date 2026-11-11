@@ -275,11 +275,31 @@ test('looksLikeConfirmationRequest matches write confirmations only', () => {
   assert.equal(theme.looksLikeConfirmationRequest('Which student did you mean?'), false);
   assert.equal(theme.looksLikeConfirmationRequest('Let me know if you have questions.'), false);
   assert.equal(theme.looksLikeConfirmationRequest('Booked the lesson for Taylor.'), false);
+  assert.equal(
+    theme.looksLikeConfirmationRequest('When you give me that data, you will be asked to approve.'),
+    false,
+  );
+  assert.equal(
+    theme.looksLikeConfirmationRequest(
+      'I can create the lesson once you give me the time. You will be asked to approve.',
+    ),
+    false,
+  );
+  assert.equal(
+    theme.looksLikeConfirmationRequest(
+      'Want me to look up Janet, or should I wait for permission to change the lesson?',
+    ),
+    false,
+  );
+  assert.equal(
+    theme.looksLikeConfirmationRequest('If you would like me to search for that student, say so.'),
+    false,
+  );
 });
 
 test('decorate does not duplicate an existing markdown I approve control', () => {
   const documentObject = buildThemeDocument();
-  const body = new FakeElement('Please confirm the note for Janet.');
+  const body = new FakeElement('Please confirm the lesson for Janet.');
   const existing = new FakeElement('I approve');
   existing.href = 'https://chat.example/c/x#lc-approve';
   existing.setAttribute('href', existing.href);
@@ -311,6 +331,23 @@ test('decorate injects I approve when the assistant asks to proceed', () => {
   theme.decorate(documentObject);
   assert.equal(body.children[0].textContent, 'I approve');
   assert.equal(body.children[0].href, '#lc-approve');
+});
+
+test('decorate hides I approve when the reply only mentions later approval', () => {
+  const documentObject = buildThemeDocument();
+  const body = new FakeElement('When you give me that data, you will be asked to approve.');
+  const existing = new FakeElement('I approve');
+  existing.href = '#lc-approve';
+  existing.setAttribute('href', '#lc-approve');
+  body.appendChild(existing);
+  const originalAll = documentObject.querySelectorAll.bind(documentObject);
+  documentObject.querySelectorAll = (selector) => {
+    if (selector === '.agent-turn [data-testid="message-body"]') return [body];
+    if (selector === 'a[href]' || selector === 'a') return body.children.filter(Boolean);
+    return originalAll(selector);
+  };
+  theme.decorate(documentObject);
+  assert.equal(body.children.length, 0);
 });
 
 test('decorate injects I approve on the latest confirmation message', () => {

@@ -158,28 +158,46 @@
     );
   }
 
-  function looksLikePermissionOrProceedAsk(text) {
-    return /\b(good to proceed|okay to proceed|ok to proceed|to proceed|proceed with|go ahead|shall i\b|should i\b|may i\b|want me to\b|ok to\b|okay to\b|permission to|ready when you|ready to proceed|if you('d| would) like me to|wait for (your )?(ok|okay|approval|confirmation|go-ahead)|let me know if (this|that|that'?s) (is )?(good|ok|okay|correct|right)|if (this|that|that'?s) (looks|sounds|is|are)?\s*(right|correct|good|ok|okay)|if (this|that) works|is (this|that) (ok|okay|alright|good)|does (this|that) (look|sound))\b/.test(
+  function looksLikeDeferredOrMetaApproval(text) {
+    return /\b((when|once|after) you (give|provide|send|share|have|tell|add|enter)|once i (have|get|know|receive)|you('ll| will) be asked|(i('ll| will)|we('ll| will)) (then |later )?(ask|need) you|asked to (approve|confirm)|need (your )?(approval|permission) (when|once|after|before|later)|before i (can|do) |first (i need|tell me|i('ll| will) need)|i still need|missing (the )?(date|time|student|details|data))\b/.test(
       text,
     );
   }
 
+  function looksLikePresentProceedAsk(text) {
+    return /\b((good|okay|ok|ready) to proceed|proceed with (this|that|these|the)|go ahead( and| with this| with that)?|shall i\b|let me know if (this|that|that'?s) (is )?(good|ok|okay|correct|right)|if (this|that|that'?s) (looks|sounds) (right|correct|good|ok|okay)|is (this|that) (ok|okay|alright|good)|does (this|that) (look|sound) (right|correct|ok|okay|good)|wait for (your )?(ok|okay|approval|confirmation|go-ahead)|ready to (save|send|book|create|delete|update))\b/.test(
+      text,
+    );
+  }
+
+  function confirmationSourceText(value) {
+    return normalizeText(value)
+      .replace(/\[i approve\]\(#lc-approve\)/gi, ' ')
+      .replace(/\bi approve\b/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+  }
+
   function looksLikeConfirmationRequest(value) {
-    const text = normalizeText(value).toLowerCase();
-    if (!text || text.includes('i approve')) {
+    const text = confirmationSourceText(value);
+    if (!text) {
       return false;
     }
-    if (looksLikeCompletedWrite(text)) {
+    if (looksLikeCompletedWrite(text) || looksLikeDeferredOrMetaApproval(text)) {
       return false;
     }
-    if (looksLikePermissionOrProceedAsk(text)) {
+    const writeCue =
+      /\b(create|book|save|delete|update|send|add|change|move|share|charge|message|lessons?|students?|playbook|prices?|notice|practice|schedule|scheduled|mock)\b/;
+    if (!writeCue.test(text)) {
+      return false;
+    }
+    if (looksLikePresentProceedAsk(text)) {
       return true;
     }
     const confirmCue =
-      /\b(please confirm|can you confirm|could you confirm|confirm (this|these|that|the|it)|to confirm|your confirmation|awaiting confirmation|are you sure|once you confirm|after you confirm|say yes|reply (with )?yes|ready to (save|send|book|create|delete|update)|may i (create|book|save|delete|update|send|add|change|move|schedule))\b/;
-    const writeCue =
-      /\b(create|book|save|delete|update|send|add|change|move|share|charge|message|lessons?|students?|playbook|prices?|notice|practice|schedule|scheduled|mock)\b/;
-    return confirmCue.test(text) && writeCue.test(text);
+      /\b(please confirm|can you confirm|could you confirm|confirm (this|these|that|the|it)|your confirmation|awaiting confirmation|are you sure|say yes|reply (with )?yes|may i (create|book|save|delete|update|send|add|change|move|schedule))\b/;
+    return confirmCue.test(text);
   }
 
   function isApproveHref(href) {
@@ -248,15 +266,39 @@
     }
   }
 
+  function approveNodesIn(body) {
+    const nodes = [...findApproveLinks(body)];
+    for (const child of Array.from(body?.children || [])) {
+      if (isApproveHref(linkHref(child)) || isApproveLabel(child.textContent)) {
+        nodes.push(child);
+      }
+    }
+    return [...new Set(nodes)];
+  }
+
+  function removeApproveLinks(body) {
+    for (const link of approveNodesIn(body)) {
+      link.remove();
+    }
+  }
+
   function injectApproveControl(documentObject) {
     const bodies = Array.from(
       documentObject.querySelectorAll?.('.agent-turn [data-testid="message-body"]') || [],
     );
     const last = bodies[bodies.length - 1];
-    if (!last || findApproveLinks(last).length > 0) {
+    if (!last) {
       return false;
     }
-    if (!looksLikeConfirmationRequest(last.textContent)) {
+    const existing = approveNodesIn(last);
+    const shouldShow = looksLikeConfirmationRequest(last.textContent);
+    if (!shouldShow) {
+      if (existing.length) {
+        removeApproveLinks(last);
+      }
+      return false;
+    }
+    if (existing.length > 0) {
       return false;
     }
     const link = documentObject.createElement('a');
