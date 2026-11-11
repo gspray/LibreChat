@@ -32,6 +32,7 @@ function createApp(overrides = {}) {
         agent_id: 'agent_instructor_assistant',
         lastMessageId: 'msg-root',
       }),
+      saveConvo: async (_ctx, convo) => convo,
       getAgent: async () => ({ instructions: 'You are Instructor Assistant.' }),
       saveMessage: async (_ctx, message) => message,
       listMcpTools: async () => [
@@ -90,6 +91,33 @@ test('Live Talk bootstraps a session and denies write tools', async () => {
       },
     );
     assert.equal(allowed.status, 200);
+  } finally {
+    resetLiveTalkSessions();
+    server.close();
+  }
+});
+
+test('Live Talk can start from a new Instructor Assistant thread', async () => {
+  const saved = [];
+  const app = createApp({
+    saveConvo: async (_ctx, convo) => {
+      saved.push(convo);
+      return convo;
+    },
+  });
+  const server = await listen(app);
+  try {
+    const created = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ conversationId: 'new', sdp: 'offer' }),
+    });
+    assert.equal(created.status, 201);
+    const session = await created.json();
+    assert.ok(session.conversationId);
+    assert.notEqual(session.conversationId, 'new');
+    assert.equal(saved.length, 1);
+    assert.equal(saved[0].conversationId, session.conversationId);
   } finally {
     resetLiveTalkSessions();
     server.close();

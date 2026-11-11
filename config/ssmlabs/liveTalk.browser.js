@@ -45,7 +45,7 @@
       state === 'connecting' || state === 'listening' || state === 'responding' || state === 'tool';
     if (start) start.hidden = talking;
     if (stop) stop.hidden = !talking;
-    if (start) start.disabled = !config.enabled || !conversationIdFromLocation() || talking;
+    if (start) start.disabled = !config.enabled || talking;
   }
 
   async function api(path, options) {
@@ -80,21 +80,24 @@
 
   function ensureBar() {
     let bar = root.querySelector('.lc-live-talk');
-    if (bar) return bar;
-    bar = root.createElement('div');
-    bar.className = 'lc-live-talk';
-    bar.innerHTML =
-      '<span class="lc-live-talk-status">Live Talk is available on this thread.</span>' +
-      '<button type="button" data-kind="start">Live Talk</button>' +
-      '<button type="button" data-kind="stop" hidden>Stop</button>';
-    const host = root.querySelector('#root') || root.body;
-    host.insertBefore(bar, host.firstChild);
-    bar.querySelector('[data-kind="start"]').addEventListener('click', () => {
-      void startCall(bar);
-    });
-    bar.querySelector('[data-kind="stop"]').addEventListener('click', () => {
-      void stopCall(bar, 'stop');
-    });
+    if (!bar) {
+      bar = root.createElement('div');
+      bar.className = 'lc-live-talk';
+      bar.innerHTML =
+        '<span class="lc-live-talk-status">Live Talk is available.</span>' +
+        '<button type="button" data-kind="start">Live Talk</button>' +
+        '<button type="button" data-kind="stop" hidden>Stop</button>';
+      bar.querySelector('[data-kind="start"]').addEventListener('click', () => {
+        void startCall(bar);
+      });
+      bar.querySelector('[data-kind="stop"]').addEventListener('click', () => {
+        void stopCall(bar, 'stop');
+      });
+    }
+    const host = root.body;
+    if (host && bar.parentNode !== host) {
+      host.insertBefore(bar, host.firstChild);
+    }
     return bar;
   }
 
@@ -137,11 +140,7 @@
       setStatus(bar, 'error', 'Voice engine is not loaded. Reload Chat and try again.');
       return;
     }
-    const conversationId = conversationIdFromLocation();
-    if (!conversationId) {
-      setStatus(bar, 'error', 'Open an existing Instructor Assistant thread first.');
-      return;
-    }
+    const conversationId = conversationIdFromLocation() || 'new';
     await stopCall(bar, 'restart');
     setStatus(bar, 'connecting', 'Connecting…');
     let sessionId = '';
@@ -154,6 +153,11 @@
           body: JSON.stringify({ conversationId, sdp }),
         });
         sessionId = created.sessionId;
+        const createdId = clean(created.conversationId);
+        if (createdId && createdId !== conversationIdFromLocation()) {
+          const next = `${chatBasePath()}/c/${encodeURIComponent(createdId)}${windowObject.location.search || ''}`;
+          windowObject.history.replaceState(windowObject.history.state, '', next);
+        }
         return created.sdp;
       },
     });
@@ -240,15 +244,14 @@
 
   function syncBar() {
     const bar = ensureBar();
-    const conversationId = conversationIdFromLocation();
-    const visible = Boolean(config.enabled && conversationId);
+    const visible = Boolean(config.enabled);
     bar.dataset.visible = visible ? 'true' : 'false';
     if (!visible) {
       if (active) void stopCall(bar, 'thread_change');
       return;
     }
     if (!active) {
-      setStatus(bar, 'idle', 'Live Talk is available on this thread.');
+      setStatus(bar, 'idle', 'Live Talk is available.');
     }
   }
 
@@ -302,6 +305,13 @@
     }
     syncBar();
     watchThreadChanges();
+    if (root.body) {
+      new windowObject.MutationObserver(() => {
+        if (config.enabled && !root.body.contains(root.querySelector('.lc-live-talk'))) {
+          syncBar();
+        }
+      }).observe(root.body, { childList: true });
+    }
   }
 
   if (root.readyState === 'loading') {

@@ -1,7 +1,9 @@
 .lc-live-talk {
-  position: sticky;
+  position: fixed;
   top: 0;
-  z-index: 40;
+  left: 0;
+  right: 0;
+  z-index: 2147483646;
   display: none;
   align-items: center;
   gap: 0.75rem;

@@ -12,7 +12,7 @@ Live Talk is on whenever this overlay is loaded. There is no env flag to disable
 2. Copy overlay keys from `config/instructor-assistant.compose-override.yml` into gitignored `docker-compose.override.yml` if they are missing.
 3. Recreate the `api` container so `NODE_OPTIONS` and overlay bind-mounts load. A process restart is not enough for new mounts.
 4. Test in **LessonCaddie Ask** (`https://lessoncaddie.ssmlabs.com/app` → Ask). Chat is mounted at `/chat`, so Live Talk config is `/chat/live-talk/config`.
-5. Open an **existing** Instructor Assistant thread (URL contains `/c/<id>`, not `/c/new`) and use **Live Talk**. Hard-refresh the app so the Assistant iframe reloads.
+5. Open **Ask**. Live Talk should appear on a new chat and on an existing thread. Hard-refresh the app so the Assistant iframe reloads.
 
 Leaving this branch (or dropping the overlay attach) is the off switch. Existing typed Chat is unchanged.
 

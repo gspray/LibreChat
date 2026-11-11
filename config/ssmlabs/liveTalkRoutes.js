@@ -122,6 +122,7 @@ function createLiveTalkRouter(deps = {}) {
   const router = express.Router();
   const loadConfig = deps.resolveLiveTalkConfig || resolveLiveTalkConfig;
   const getConvo = deps.getConvo;
+  const saveConvo = deps.saveConvo;
   const getAgent = deps.getAgent;
   const saveMessage = deps.saveMessage;
   const listMcpTools = deps.listMcpTools;
@@ -147,14 +148,10 @@ function createLiveTalkRouter(deps = {}) {
       if (!userId) {
         throw publicError(401, 'unauthorized', 'Sign in to use Live Talk.');
       }
-      const conversationId = clean(req.body?.conversationId);
+      const requestedId = clean(req.body?.conversationId);
       const sdp = clean(req.body?.sdp);
-      if (!conversationId || conversationId === 'new' || !sdp) {
-        throw publicError(
-          400,
-          'invalid_session',
-          'Open an existing Instructor Assistant thread before Live Talk.',
-        );
+      if (!sdp) {
+        throw publicError(400, 'invalid_session', 'Live Talk is missing a voice offer.');
       }
       if (countUserSessions(userId) >= config.maxSessionsPerUser) {
         throw publicError(
@@ -163,17 +160,35 @@ function createLiveTalkRouter(deps = {}) {
           'A Live Talk session is already active. Stop it before starting another.',
         );
       }
-      const convo = await getConvo(userId, conversationId);
-      if (!convo) {
-        throw publicError(404, 'conversation_not_found', 'That conversation was not found.');
-      }
-      const agentId = clean(convo.agent_id || convo.agentId);
-      if (agentId && agentId !== config.agentId) {
-        throw publicError(
-          403,
-          'agent_not_allowed',
-          'Live Talk is only available on Instructor Assistant threads.',
-        );
+      let conversationId = requestedId;
+      let convo = null;
+      if (conversationId && conversationId !== 'new') {
+        convo = await getConvo(userId, conversationId);
+        if (!convo) {
+          throw publicError(404, 'conversation_not_found', 'That conversation was not found.');
+        }
+        const agentId = clean(convo.agent_id || convo.agentId);
+        if (agentId && agentId !== config.agentId) {
+          throw publicError(
+            403,
+            'agent_not_allowed',
+            'Live Talk is only available on Instructor Assistant threads.',
+          );
+        }
+      } else {
+        conversationId = crypto.randomUUID();
+        convo = {
+          conversationId,
+          agent_id: config.agentId,
+          endpoint: 'agents',
+          title: 'New chat',
+        };
+        if (saveConvo) {
+          await saveConvo({ userId }, convo, {
+            context: 'ssmlabs-live-talk#session',
+            initialAgentId: config.agentId,
+          });
+        }
       }
       const agent = await getAgent({ id: config.agentId }).catch(() => null);
       const mcpTools = await listMcpTools({ user: req.user, conversationId, config });

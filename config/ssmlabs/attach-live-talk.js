@@ -23,6 +23,7 @@ function createBoundRouter() {
   const { requireJwtAuth } = require('~/server/middleware');
   const {
     getConvo,
+    saveConvo,
     getAgent,
     saveMessage,
     findToken,
@@ -94,6 +95,7 @@ function createBoundRouter() {
   router.use(
     createLiveTalkRouter({
       getConvo,
+      saveConvo,
       getAgent,
       saveMessage,
       listMcpTools,
