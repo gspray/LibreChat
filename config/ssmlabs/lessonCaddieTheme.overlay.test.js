@@ -38,8 +38,6 @@ class FakeElement {
     this.query = null;
     this.queryAll = null;
     this.closestMatch = null;
-    this.hidden = false;
-    this.style = {};
   }
 
   setAttribute(name, value) {
@@ -156,7 +154,7 @@ test('starterKind recognizes every Instructor Assistant quick action', () => {
   assert.equal(theme.starterKind('Unrelated action'), '');
 });
 
-test('decorate applies landing, hides example starter chips, and composer theme hooks', () => {
+test('decorate applies landing, starter, icon, and composer theme hooks', () => {
   const documentObject = buildThemeDocument();
   assert.deepEqual(theme.decorate(documentObject), { landing: true });
   assert.equal(documentObject.documentElement.dataset.lessonCaddieChatTheme, 'true');
@@ -165,25 +163,19 @@ test('decorate applies landing, hides example starter chips, and composer theme 
   assert.equal(documentObject.landingShell.classList.contains('lc-assistant-landing-shell'), true);
   assert.equal(documentObject.buttons[0].classList.contains('lc-conversation-starter'), true);
   assert.equal(documentObject.buttons[0].dataset.lcStarterKind, 'students');
-  assert.equal(documentObject.buttons[0].hidden, true);
-  assert.equal(documentObject.buttons[0].style.display, 'none');
-  assert.equal(
-    documentObject.buttons[0].parentElement.classList.contains('lc-conversation-starters'),
-    true,
-  );
-  assert.equal(documentObject.buttons[0].parentElement.hidden, true);
+  assert.equal(documentObject.buttons[0].children[0].className, 'lc-starter-icon');
   assert.equal(documentObject.composerSurface.classList.contains('lc-composer-surface'), true);
   assert.equal(documentObject.composerForm.classList.contains('lc-composer-form'), true);
   assert.equal(documentObject.approveLink.classList.contains('lc-approve-link'), true);
 });
 
-test('decorate still applies landing when example starter chips are absent', () => {
+test('decorate does not apply landing when example starter chips are absent', () => {
   const documentObject = buildThemeDocument();
   const originalAll = documentObject.querySelectorAll.bind(documentObject);
   documentObject.querySelectorAll = (selector) =>
     selector === 'button' ? [] : originalAll(selector);
-  assert.deepEqual(theme.decorate(documentObject), { landing: true });
-  assert.equal(documentObject.body.classList.contains('lc-chat-landing'), true);
+  assert.deepEqual(theme.decorate(documentObject), { landing: false });
+  assert.equal(documentObject.body.classList.contains('lc-chat-landing'), false);
 });
 
 test('decorate safely ignores a missing Chat document', () => {

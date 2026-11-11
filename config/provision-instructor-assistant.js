@@ -154,7 +154,12 @@ When tools fail, say what the instructor needs to know without disclosing intern
     model: MODEL,
     tools,
     mcpServerNames: [MCP_SERVER],
-    conversation_starters: [],
+    conversation_starters: [
+      'Find one of my students',
+      'Show my recent lessons',
+      'Help me schedule a lesson',
+      'Review a student’s practice plan',
+    ],
     category: 'general',
   };
 

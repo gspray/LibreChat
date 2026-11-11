@@ -58,7 +58,11 @@ modelSpecs:
       softDefault: true
       showOnLanding: true
       hideBadgeRow: true
-      conversation_starters: []
+      conversation_starters:
+        - Find one of my students
+        - Show my recent lessons
+        - Help me schedule a lesson
+        - Review a student’s practice plan
       preset:
         endpoint: agents
         agent_id: agent_instructor_assistant
