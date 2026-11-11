@@ -11,6 +11,7 @@
   let config = { enabled: false };
   let active = null;
   let accessToken = '';
+  let composerButton = null;
 
   function clean(value) {
     return String(value || '').trim();
@@ -67,17 +68,24 @@
     return id;
   }
 
+  function isTalkingState(state) {
+    return (
+      state === 'connecting' || state === 'listening' || state === 'responding' || state === 'tool'
+    );
+  }
+
   function setStatus(bar, state, text) {
     bar.dataset.state = state;
     const status = bar.querySelector('.lc-live-talk-status');
     if (status) status.textContent = text;
-    const start = bar.querySelector('[data-kind="start"]');
-    const stop = bar.querySelector('[data-kind="stop"]');
-    const talking =
-      state === 'connecting' || state === 'listening' || state === 'responding' || state === 'tool';
-    if (start) start.hidden = talking;
-    if (stop) stop.hidden = !talking;
-    if (start) start.disabled = !config.enabled || talking;
+    const talking = isTalkingState(state);
+    const control = ensureComposerControl();
+    if (!control) return;
+    control.dataset.kind = talking ? 'stop' : 'start';
+    control.disabled = !config.enabled;
+    control.setAttribute('aria-pressed', talking ? 'true' : 'false');
+    control.setAttribute('aria-label', talking ? 'Stop Live Talk' : 'Live Talk');
+    control.title = talking ? 'Stop Live Talk' : 'Live Talk';
   }
 
   async function api(path, options) {
@@ -115,21 +123,60 @@
     }
   }
 
+  function findMicButton() {
+    const surface = root.querySelector('[data-testid="composer-surface"]');
+    const form = surface?.closest('form') || root.querySelector('[data-chat-pane] form');
+    if (!form) return null;
+    const buttons = Array.from(form.querySelectorAll('button'));
+    return (
+      buttons.find((button) => /micr/i.test(button.getAttribute('aria-label') || '')) ||
+      buttons.find((button) => button.querySelector('svg.lucide-mic'))
+    );
+  }
+
+  function ensureComposerControl() {
+    let button = composerButton;
+    if (!button) {
+      button = root.createElement('button');
+      button.type = 'button';
+      button.className = 'lc-live-talk-composer-btn';
+      button.dataset.kind = 'start';
+      button.setAttribute('aria-label', 'Live Talk');
+      button.title = 'Live Talk';
+      button.innerHTML =
+        '<svg data-icon="start" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>' +
+        '<path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>' +
+        '</svg>' +
+        '<svg data-icon="stop" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' +
+        '<rect x="6" y="6" width="12" height="12" rx="1"></rect>' +
+        '</svg>';
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const bar = ensureBar();
+        if (isTalkingState(bar.dataset.state)) {
+          void stopCall(bar, 'stop');
+        } else {
+          void startCall(bar);
+        }
+      });
+      composerButton = button;
+    }
+    const mic = findMicButton();
+    if (mic && mic.parentNode && button.nextElementSibling !== mic) {
+      mic.parentNode.insertBefore(button, mic);
+    }
+    button.hidden = !config.enabled;
+    return button;
+  }
+
   function ensureBar() {
     let bar = root.querySelector('.lc-live-talk');
     if (!bar) {
       bar = root.createElement('div');
       bar.className = 'lc-live-talk';
-      bar.innerHTML =
-        '<span class="lc-live-talk-status">Live Talk is available.</span>' +
-        '<button type="button" data-kind="start">Live Talk</button>' +
-        '<button type="button" data-kind="stop" hidden>Stop</button>';
-      bar.querySelector('[data-kind="start"]').addEventListener('click', () => {
-        void startCall(bar);
-      });
-      bar.querySelector('[data-kind="stop"]').addEventListener('click', () => {
-        void stopCall(bar, 'stop');
-      });
+      bar.innerHTML = '<span class="lc-live-talk-status">Live Talk is available.</span>';
     }
     const host = root.body;
     if (host && bar.parentNode !== host) {
@@ -280,13 +327,17 @@
     const bar = ensureBar();
     const visible = Boolean(config.enabled);
     bar.dataset.visible = visible ? 'true' : 'false';
+    ensureComposerControl();
     if (!visible) {
       if (active) void stopCall(bar, 'thread_change');
       return;
     }
     if (!active) {
       setStatus(bar, 'idle', 'Live Talk is available.');
+      return;
     }
+    const currentText = bar.querySelector('.lc-live-talk-status')?.textContent || 'Listening…';
+    setStatus(bar, bar.dataset.state || 'listening', currentText);
   }
 
   function watchThreadChanges() {
@@ -308,11 +359,20 @@
     syncBar();
     watchThreadChanges();
     if (root.body) {
+      let placeTimer = 0;
       new windowObject.MutationObserver(() => {
-        if (config.enabled && !root.body.contains(root.querySelector('.lc-live-talk'))) {
+        if (!config.enabled) return;
+        const barMissing = !root.body.contains(root.querySelector('.lc-live-talk'));
+        const control = composerButton;
+        const mic = findMicButton();
+        const controlMisplaced = Boolean(mic) && (!control || control.nextElementSibling !== mic);
+        if (!barMissing && !controlMisplaced) return;
+        if (placeTimer) return;
+        placeTimer = windowObject.setTimeout(() => {
+          placeTimer = 0;
           syncBar();
-        }
-      }).observe(root.body, { childList: true });
+        }, 50);
+      }).observe(root.body, { childList: true, subtree: true });
     }
   }
 
