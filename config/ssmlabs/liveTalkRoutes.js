@@ -1,12 +1,12 @@
 'use strict';
 
-/** Authenticated Live Talk trial routes. Keys, tools, and limits stay on the server. */
+/** Authenticated Live Talk routes. Keys, tools, and limits stay on the server. */
 const crypto = require('node:crypto');
 const express = require('express');
 const {
   resolveLiveTalkConfig,
   isAllowedLiveTalkTool,
-  voiceTrialInstructions,
+  liveTalkInstructions,
 } = require('./liveTalkConfig');
 
 const sessions = new Map();
@@ -143,9 +143,6 @@ function createLiveTalkRouter(deps = {}) {
   router.post('/session', async (req, res, next) => {
     try {
       const config = loadConfig();
-      if (!config.enabled) {
-        throw publicError(403, 'live_talk_disabled', 'Live Talk is not enabled on this Chat host.');
-      }
       const userId = userIdOf(req);
       if (!userId) {
         throw publicError(401, 'unauthorized', 'Sign in to use Live Talk.');
@@ -187,7 +184,7 @@ function createLiveTalkRouter(deps = {}) {
         session: {
           type: 'realtime',
           model: config.model,
-          instructions: voiceTrialInstructions(agent?.instructions),
+          instructions: liveTalkInstructions(agent?.instructions),
           tools,
           tool_choice: 'auto',
           audio: {
@@ -233,7 +230,7 @@ function createLiveTalkRouter(deps = {}) {
         throw publicError(
           403,
           'tool_denied',
-          'That action is unavailable in the voice trial. Continue in typed Chat.',
+          'That action is not available in Live Talk. Continue in typed Chat.',
         );
       }
       const result = await callMcpTool({

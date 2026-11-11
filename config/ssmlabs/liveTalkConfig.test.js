@@ -5,13 +5,11 @@ const assert = require('node:assert/strict');
 const {
   resolveLiveTalkConfig,
   isAllowedLiveTalkTool,
-  voiceTrialInstructions,
+  liveTalkInstructions,
 } = require('./liveTalkConfig');
 
-test('Live Talk stays disabled unless the trial flag is an explicit true value', () => {
-  assert.equal(resolveLiveTalkConfig({}).enabled, false);
-  assert.equal(resolveLiveTalkConfig({ LIVE_TALK_TRIAL: 'false' }).enabled, false);
-  assert.equal(resolveLiveTalkConfig({ LIVE_TALK_TRIAL: 'true' }).enabled, true);
+test('Live Talk is on for this Chat branch', () => {
+  assert.equal(resolveLiveTalkConfig({}).enabled, true);
 });
 
 test('write tools cannot enter the voice allowlist even if listed as reads', () => {
@@ -24,6 +22,6 @@ test('write tools cannot enter the voice allowlist even if listed as reads', () 
   assert.equal(isAllowedLiveTalkTool('open_app_screen', config), false);
 });
 
-test('voice instructions keep writes out of the trial even if the agent prompt is silent', () => {
-  assert.match(voiceTrialInstructions('Be helpful.'), /unavailable in the voice trial/i);
+test('voice instructions keep writes out of Live Talk even if the agent prompt is silent', () => {
+  assert.match(liveTalkInstructions('Be helpful.'), /not available in Live Talk/i);
 });

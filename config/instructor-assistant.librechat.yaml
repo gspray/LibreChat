@@ -1,5 +1,5 @@
 version: 1.3.18
-# Live Talk trial is env-gated (LIVE_TALK_TRIAL), not a yaml modelSpec.
+# Live Talk is the overlay on this branch, not a yaml modelSpec.
 cache: true
 mcpSettings:
   apps: true

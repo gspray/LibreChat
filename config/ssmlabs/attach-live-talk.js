@@ -6,7 +6,6 @@
  */
 const http = require('http');
 const { createLiveTalkRouter } = require('./liveTalkRoutes');
-const { resolveLiveTalkConfig } = require('./liveTalkConfig');
 
 const originalListen = http.Server.prototype.listen;
 
@@ -127,10 +126,7 @@ function attach(server) {
     stack.push(liveTalkLayer);
   }
   server.__ssmlabsLiveTalkAttached = true;
-  const config = resolveLiveTalkConfig();
-  if (config.enabled) {
-    console.info('[ssmlabs-live-talk] mounted /live-talk');
-  }
+  console.info('[ssmlabs-live-talk] mounted /live-talk');
 }
 
 http.Server.prototype.listen = function listenWithLiveTalk(...args) {

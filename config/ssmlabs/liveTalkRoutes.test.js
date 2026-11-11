@@ -6,8 +6,8 @@ const express = require('express');
 const { resolveLiveTalkConfig } = require('./liveTalkConfig');
 const { createLiveTalkRouter, resetLiveTalkSessions } = require('./liveTalkRoutes');
 
-function enabledConfig() {
-  return resolveLiveTalkConfig({ LIVE_TALK_TRIAL: 'true', OPENAI_API_KEY: 'test-key' });
+function liveTalkConfig() {
+  return resolveLiveTalkConfig({ OPENAI_API_KEY: 'test-key' });
 }
 
 function listen(app) {
@@ -26,7 +26,7 @@ function createApp(overrides = {}) {
   app.use(
     '/live-talk',
     createLiveTalkRouter({
-      resolveLiveTalkConfig: enabledConfig,
+      resolveLiveTalkConfig: liveTalkConfig,
       getConvo: async (userId, conversationId) => ({
         conversationId,
         agent_id: 'agent_instructor_assistant',
@@ -60,26 +60,7 @@ function createApp(overrides = {}) {
   return app;
 }
 
-test('disabled trial rejects session bootstrap', async () => {
-  const app = createApp({
-    resolveLiveTalkConfig: () => resolveLiveTalkConfig({ LIVE_TALK_TRIAL: 'false' }),
-  });
-  const server = await listen(app);
-  try {
-    const response = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ conversationId: 'convo-1', sdp: 'offer' }),
-    });
-    assert.equal(response.status, 403);
-    const body = await response.json();
-    assert.equal(body.error, 'live_talk_disabled');
-  } finally {
-    server.close();
-  }
-});
-
-test('enabled trial bootstraps a session and denies write tools', async () => {
+test('Live Talk bootstraps a session and denies write tools', async () => {
   const app = createApp();
   const server = await listen(app);
   try {

@@ -1,6 +1,6 @@
 'use strict';
 
-/** SSM Labs Live Talk trial — disabled by default. */
+/** SSM Labs Live Talk — on for this Chat branch. */
 const DEFAULT_SERVER = 'lessoncaddie-instructor';
 const DEFAULT_AGENT_ID = 'agent_instructor_assistant';
 const DEFAULT_MODEL = 'gpt-realtime';
@@ -48,10 +48,6 @@ const DEFAULT_WRITE_TOOLS = Object.freeze([
   'set_assistant_conversation_starters',
 ]);
 
-function isEnabledFlag(value) {
-  return /^(1|true|yes|on)$/i.test(String(value || '').trim());
-}
-
 function parseList(value, fallback) {
   if (value == null || String(value).trim() === '') {
     return [...fallback];
@@ -72,7 +68,7 @@ function resolveLiveTalkConfig(env = process.env) {
   const writeTools = new Set(parseList(env.LIVE_TALK_WRITE_TOOLS, DEFAULT_WRITE_TOOLS));
   const allowlist = readTools.filter((name) => !writeTools.has(name));
   return {
-    enabled: isEnabledFlag(env.LIVE_TALK_TRIAL),
+    enabled: true,
     serverName: String(env.LIVE_TALK_MCP_SERVER || DEFAULT_SERVER).trim() || DEFAULT_SERVER,
     agentId: String(env.LIVE_TALK_AGENT_ID || DEFAULT_AGENT_ID).trim() || DEFAULT_AGENT_ID,
     model: String(env.LIVE_TALK_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL,
@@ -97,16 +93,16 @@ function isAllowedLiveTalkTool(name, config = resolveLiveTalkConfig()) {
   return config.allowlist.includes(tool);
 }
 
-function voiceTrialInstructions(agentInstructions) {
+function liveTalkInstructions(agentInstructions) {
   const base = String(agentInstructions || '').trim();
-  const trial = [
-    'You are in the LessonCaddie Live Talk trial.',
+  const extra = [
+    'You are in LessonCaddie Live Talk.',
     'Speak naturally. LessonCaddie facts must come from tools.',
     'Only the provided read-only tools are available.',
-    'If asked to send messages, schedule, change, cancel, or otherwise mutate LessonCaddie data, say that action is unavailable in the voice trial and they can continue in typed Chat.',
+    'If asked to send messages, schedule, change, cancel, or otherwise mutate LessonCaddie data, say that action is not available in Live Talk and they can continue in typed Chat.',
     'Do not claim a write succeeded.',
   ].join(' ');
-  return base ? `${base}\n\n${trial}` : trial;
+  return base ? `${base}\n\n${extra}` : extra;
 }
 
 module.exports = {
@@ -114,5 +110,5 @@ module.exports = {
   DEFAULT_WRITE_TOOLS,
   resolveLiveTalkConfig,
   isAllowedLiveTalkTool,
-  voiceTrialInstructions,
+  liveTalkInstructions,
 };
