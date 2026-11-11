@@ -7,11 +7,43 @@
 
   const SpeakCore = windowObject.SpeakCore;
   const root = windowObject.document;
+  const nativeFetch = windowObject.fetch.bind(windowObject);
   let config = { enabled: false };
   let active = null;
+  let accessToken = '';
 
   function clean(value) {
     return String(value || '').trim();
+  }
+
+  function rememberAuthHeader(value) {
+    const text = String(value || '').trim();
+    const match = text.match(/^Bearer\s+(\S+)/i);
+    if (match) accessToken = match[1];
+  }
+
+  function patchAuthCapture() {
+    const proto = windowObject.XMLHttpRequest?.prototype;
+    if (proto && !proto.__lcLiveTalkAuth) {
+      const original = proto.setRequestHeader;
+      proto.setRequestHeader = function setRequestHeader(name, value) {
+        if (String(name).toLowerCase() === 'authorization') rememberAuthHeader(value);
+        return original.apply(this, arguments);
+      };
+      proto.__lcLiveTalkAuth = true;
+    }
+  }
+
+  async function ensureAccessToken() {
+    if (accessToken) return accessToken;
+    const response = await nativeFetch(liveTalkPath('/api/auth/refresh'), {
+      method: 'POST',
+      credentials: 'include',
+      headers: { accept: 'application/json', 'content-type': 'application/json' },
+    });
+    const payload = await response.json().catch(() => ({}));
+    accessToken = clean(payload.token);
+    return accessToken;
   }
 
   function chatBasePath() {
@@ -49,15 +81,30 @@
   }
 
   async function api(path, options) {
-    const response = await windowObject.fetch(path, {
+    const token = await ensureAccessToken();
+    const headers = {
+      accept: 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options?.body ? { 'content-type': 'application/json' } : {}),
+      ...(options?.headers || {}),
+    };
+    let response = await nativeFetch(path, {
       credentials: 'include',
       ...options,
-      headers: {
-        accept: 'application/json',
-        ...(options?.body ? { 'content-type': 'application/json' } : {}),
-        ...(options?.headers || {}),
-      },
+      headers,
     });
+    if (response.status === 401) {
+      accessToken = '';
+      const retryToken = await ensureAccessToken();
+      response = await nativeFetch(path, {
+        credentials: 'include',
+        ...options,
+        headers: {
+          ...headers,
+          ...(retryToken ? { Authorization: `Bearer ${retryToken}` } : {}),
+        },
+      });
+    }
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
       const error = new Error(payload.message || 'Live Talk request failed.');
@@ -298,10 +345,14 @@
   }
 
   async function start() {
-    try {
-      config = await api(liveTalkPath('/live-talk/config'));
-    } catch (_) {
-      config = { enabled: false };
+    patchAuthCapture();
+    for (let attempt = 0; attempt < 20 && !config.enabled; attempt += 1) {
+      try {
+        config = await api(liveTalkPath('/live-talk/config'));
+      } catch (_) {
+        config = { enabled: false };
+        await new Promise((resolve) => windowObject.setTimeout(resolve, 250));
+      }
     }
     syncBar();
     watchThreadChanges();
