@@ -77,14 +77,33 @@ function requireSession(req) {
   return record;
 }
 
+function clip(value, max = 800) {
+  const text = String(value || '');
+  return text.length > max ? `${text.slice(0, max)}…` : text;
+}
+
+function liveTalkLog(level, stage, data = {}) {
+  const line = `[ssmlabs-live-talk] ${stage}`;
+  if (level === 'error') console.error(line, data);
+  else if (level === 'warn') console.warn(line, data);
+  else console.info(line, data);
+}
+
 async function bootstrapOpenAi({ sdp, session }) {
   const apiKey = resolveLiveTalkConfig().openaiApiKey;
   if (!apiKey) {
+    liveTalkLog('error', 'openai.unconfigured', { hasKey: false });
     throw publicError(503, 'openai_unconfigured', 'Live Talk is missing a server OpenAI key.');
   }
   const form = new FormData();
   form.set('sdp', sdp);
   form.set('session', JSON.stringify(session));
+  liveTalkLog('info', 'openai.bootstrap.start', {
+    model: session?.model || '',
+    voice: session?.audio?.output?.voice || '',
+    toolCount: Array.isArray(session?.tools) ? session.tools.length : 0,
+    sdpChars: String(sdp || '').length,
+  });
   const response = await fetch('https://api.openai.com/v1/realtime/calls', {
     method: 'POST',
     headers: {
@@ -94,12 +113,22 @@ async function bootstrapOpenAi({ sdp, session }) {
   });
   const answer = await response.text();
   if (!response.ok) {
-    throw publicError(
+    const error = publicError(
       502,
       'openai_session_failed',
       'Could not start the voice session. Try again in a moment.',
     );
+    error.debug = {
+      openaiStatus: response.status,
+      openaiBody: clip(answer),
+    };
+    liveTalkLog('error', 'openai.bootstrap.failed', error.debug);
+    throw error;
   }
+  liveTalkLog('info', 'openai.bootstrap.ok', {
+    status: response.status,
+    answerChars: answer.length,
+  });
   return answer;
 }
 
@@ -145,6 +174,11 @@ function createLiveTalkRouter(deps = {}) {
     try {
       const config = loadConfig();
       const userId = userIdOf(req);
+      liveTalkLog('info', 'session.create.request', {
+        userId: userId ? 'set' : '',
+        conversationId: clean(req.body?.conversationId),
+        sdpChars: clean(req.body?.sdp).length,
+      });
       if (!userId) {
         throw publicError(401, 'unauthorized', 'Sign in to use Live Talk.');
       }
@@ -225,6 +259,11 @@ function createLiveTalkRouter(deps = {}) {
       sessions.set(sessionId, record);
       rememberUserSession(userId, 1);
       touchSession(record);
+      liveTalkLog('info', 'session.create.ok', {
+        sessionId,
+        conversationId,
+        toolCount: tools.length,
+      });
       res.status(201).json({
         sessionId,
         sdp: answerSdp,
@@ -320,12 +359,20 @@ function createLiveTalkRouter(deps = {}) {
     }
   });
 
-  router.use((error, _req, res, _next) => {
+  router.use((error, req, res, _next) => {
     const status = Number(error.status) || 500;
+    const debug = {
+      code: error.code || 'live_talk_error',
+      message: error.message || '',
+      path: `${req.method} ${req.originalUrl || req.url || ''}`,
+      ...(error.debug && typeof error.debug === 'object' ? error.debug : {}),
+    };
+    liveTalkLog(status >= 500 ? 'error' : 'warn', 'request.failed', debug);
     res.status(status).json({
       error: error.code || 'live_talk_error',
       message:
         status >= 500 ? 'Live Talk failed. Stop and try again, or continue typing.' : error.message,
+      debug,
     });
   });
 

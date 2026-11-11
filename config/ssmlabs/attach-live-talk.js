@@ -53,10 +53,12 @@ function createBoundRouter() {
         return tools;
       }
     } catch (error) {
-      console.warn(
-        '[ssmlabs-live-talk] MCP tool list failed, using allowlist schemas',
-        error.message,
-      );
+      console.warn('[ssmlabs-live-talk] MCP tool list failed, using allowlist schemas', {
+        message: error.message,
+        name: error.name,
+        status: error.status,
+        stack: error.stack,
+      });
     }
     return config.allowlist.map((name) => ({
       name,
