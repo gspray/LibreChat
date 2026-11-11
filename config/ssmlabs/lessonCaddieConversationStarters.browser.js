@@ -16,6 +16,7 @@
   let cachedPrompts = null;
   let loadPromise = null;
   let editIndex = -1;
+  let renderInFlight = false;
 
   function requestId() {
     return `lc-starters-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -126,24 +127,64 @@
     }
   }
 
+  function setNativeTextareaValue(textarea, text) {
+    if (!textarea) {
+      return;
+    }
+    const prototype =
+      textarea instanceof globalObject.HTMLTextAreaElement
+        ? globalObject.HTMLTextAreaElement.prototype
+        : globalObject.HTMLInputElement.prototype;
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+    if (descriptor?.set) {
+      descriptor.set.call(textarea, text);
+    } else {
+      textarea.value = text;
+    }
+    textarea.dispatchEvent(new globalObject.Event('input', { bubbles: true }));
+    if (typeof globalObject.InputEvent === 'function') {
+      textarea.dispatchEvent(
+        new globalObject.InputEvent('input', {
+          bubbles: true,
+          inputType: 'insertText',
+          data: text,
+        }),
+      );
+    }
+  }
+
   function submitPrompt(documentObject, text) {
     const surface = documentObject.querySelector?.('[data-testid="composer-surface"]');
     const textarea = surface?.querySelector?.('textarea');
-    if (textarea) {
-      textarea.value = text;
-      textarea.dispatchEvent(new Event('input', { bubbles: true }));
-      textarea.focus?.();
+    if (!textarea) {
+      return false;
     }
-    const sendButton = surface?.querySelector?.(
-      'button[type="submit"], button[aria-label*="Send"], button[data-testid*="send"]',
-    );
-    if (sendButton && !sendButton.disabled) {
-      sendButton.click();
-      return;
+    setNativeTextareaValue(textarea, text);
+    textarea.focus?.();
+
+    const submit = () => {
+      const button =
+        surface?.querySelector?.('[data-testid="send-button"]') ||
+        surface?.querySelector?.('button[type="submit"]');
+      if (button && !button.disabled) {
+        button.click();
+        return true;
+      }
+      const form = surface?.closest?.('form');
+      if (form?.requestSubmit) {
+        form.requestSubmit();
+        return true;
+      }
+      return false;
+    };
+
+    if (typeof globalObject.requestAnimationFrame === 'function') {
+      globalObject.requestAnimationFrame(() => {
+        submit();
+      });
+      return true;
     }
-    textarea?.dispatchEvent?.(
-      new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', code: 'Enter' }),
-    );
+    return submit();
   }
 
   function buildChip(documentObject, prompt, index, onChange) {
@@ -158,7 +199,9 @@
     label.className = 'lc-conversation-starter-label';
     label.textContent = prompt;
     send.appendChild(label);
-    send.addEventListener('click', () => {
+    send.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       if (editIndex === index) {
         return;
       }
@@ -231,28 +274,57 @@
     });
   }
 
+  function promptsSignature(prompts) {
+    return prompts.join('\u0001');
+  }
+
+  function shouldIgnoreMutation(record) {
+    const target = record.target;
+    if (!target || typeof target.closest !== 'function') {
+      return false;
+    }
+    return Boolean(target.closest(`[${MANAGED_ATTR}="true"]`));
+  }
+
   async function render(documentObject) {
+    if (editIndex >= 0 || renderInFlight) {
+      return false;
+    }
     const band = findComposerBand(documentObject);
     if (!band) {
       return false;
     }
-    hideNativeStarters(documentObject);
-    const prompts = await loadPrompts();
-    let host = band.querySelector?.(`[${MANAGED_ATTR}="true"]`);
-    if (!host) {
-      host = documentObject.createElement('div');
-      host.className = 'lc-conversation-starters';
-      host.setAttribute(MANAGED_ATTR, 'true');
-      band.insertBefore(host, band.firstChild);
+    renderInFlight = true;
+    try {
+      hideNativeStarters(documentObject);
+      const prompts = await loadPrompts();
+      const signature = promptsSignature(prompts);
+      let host = band.querySelector?.(`[${MANAGED_ATTR}="true"]`);
+      if (
+        host &&
+        host.dataset.lcPromptsSignature === signature &&
+        host.childElementCount === prompts.length
+      ) {
+        return true;
+      }
+      if (!host) {
+        host = documentObject.createElement('div');
+        host.className = 'lc-conversation-starters';
+        host.setAttribute(MANAGED_ATTR, 'true');
+        band.insertBefore(host, band.firstChild);
+      }
+      host.dataset.lcPromptsSignature = signature;
+      host.replaceChildren();
+      const paint = () => {
+        void render(documentObject);
+      };
+      prompts.forEach((prompt, index) => {
+        host.appendChild(buildChip(documentObject, prompt, index, paint));
+      });
+      return true;
+    } finally {
+      renderInFlight = false;
     }
-    host.replaceChildren();
-    const paint = () => {
-      void render(documentObject);
-    };
-    prompts.forEach((prompt, index) => {
-      host.appendChild(buildChip(documentObject, prompt, index, paint));
-    });
-    return true;
   }
 
   function schedule(documentObject) {
@@ -277,7 +349,7 @@
     schedule(documentObject);
   };
   const scheduleDecorate = () => {
-    if (scheduled) {
+    if (scheduled || editIndex >= 0) {
       return;
     }
     scheduled = true;
@@ -293,6 +365,14 @@
   } else {
     scheduleDecorate();
   }
-  const observer = new globalObject.MutationObserver(scheduleDecorate);
+  const observer = new globalObject.MutationObserver((records) => {
+    if (editIndex >= 0) {
+      return;
+    }
+    if (records.every(shouldIgnoreMutation)) {
+      return;
+    }
+    scheduleDecorate();
+  });
   observer.observe(documentObject.documentElement, { childList: true, subtree: true });
 })(typeof window === 'object' ? window : globalThis);
