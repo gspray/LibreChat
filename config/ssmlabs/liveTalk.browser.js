@@ -290,6 +290,15 @@
     } catch (_) {
       /* ignore */
     }
+    liveTalkAudioElements().forEach((audio) => {
+      try {
+        audio.pause?.();
+        audio.srcObject = null;
+        audio.remove();
+      } catch (_) {
+        /* ignore */
+      }
+    });
     if (current?.sessionId) {
       try {
         await api(liveTalkPath(`/live-talk/session/${current.sessionId}/stop`), {
@@ -305,9 +314,33 @@
     }
   }
 
-  function diagnosePlayback() {
-    const audios = Array.from(root.querySelectorAll('audio'));
+  function liveTalkAudioElements() {
+    return Array.from(root.querySelectorAll('audio[data-lc-live-talk="true"]'));
+  }
+
+  function createLiveTalkAudioElement() {
+    const audio = root.createElement('audio');
+    audio.autoplay = true;
+    audio.playsInline = true;
+    audio.setAttribute('playsinline', 'true');
+    audio.setAttribute('data-lc-live-talk', 'true');
+    audio.hidden = true;
+    (root.body || root.documentElement).appendChild(audio);
+    audio.addEventListener('pause', () => {
+      liveTalkWarn('playback.paused', {
+        paused: audio.paused,
+        ended: audio.ended,
+        readyState: audio.readyState,
+        hasSrcObject: Boolean(audio.srcObject),
+      });
+    });
+    return audio;
+  }
+
+  function diagnosePlayback(reason) {
+    const audios = liveTalkAudioElements();
     liveTalkLog('playback.elements', {
+      reason: String(reason || ''),
       count: audios.length,
       items: audios.map((audio) => ({
         autoplay: Boolean(audio.autoplay),
@@ -321,8 +354,9 @@
       const play = audio.play?.();
       if (play && typeof play.then === 'function') {
         play.then(
-          () => liveTalkLog('playback.play-ok', { index }),
-          (error) => liveTalkError('playback.play-blocked', summarizeError(error, { index })),
+          () => liveTalkLog('playback.play-ok', { reason, index }),
+          (error) =>
+            liveTalkError('playback.play-blocked', summarizeError(error, { reason, index })),
         );
       }
     });
@@ -369,7 +403,9 @@
     let sessionId = '';
     const session = SpeakCore.createSpeakRealtimeSession({
       provider: 'openai-realtime',
-      conversationBehavior: { interruption: 'enabled' },
+      holdInput: true,
+      conversationBehavior: { interruption: 'disabled' },
+      createAudioElement: createLiveTalkAudioElement,
       bootstrapCall: async ({ sdp }) => {
         liveTalkLog('bootstrap.offer', {
           conversationId,
@@ -389,7 +425,8 @@
       },
     });
     const bridge = SpeakCore.createOpenAIRealtimeFunctionCallBridge({
-      conversationBehavior: { interruption: 'enabled' },
+      holdInput: true,
+      conversationBehavior: { interruption: 'disabled' },
       invokeTool: async (call) => {
         liveTalkLog('tool.invoke', { name: call.name, callId: call.callId || '', sessionId });
         setStatus(bar, 'tool', `Looking up ${call.name}…`);
@@ -424,10 +461,24 @@
       }
       if (event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CONNECTED) {
         setStatus(bar, 'listening', 'Listening…');
-        diagnosePlayback();
+        diagnosePlayback('connected');
       }
       if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_AUDIO_START) {
-        setStatus(bar, 'responding', 'Responding…');
+        const alreadyResponding = bar.dataset.state === 'responding';
+        if (!alreadyResponding) {
+          setStatus(bar, 'responding', 'Responding…');
+          diagnosePlayback(providerEvent || 'assistant-audio');
+        }
+      }
+      if (
+        event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE ||
+        event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_INTERRUPTED ||
+        providerEvent === 'output_audio_buffer.stopped' ||
+        providerEvent === 'output_audio_buffer.cleared'
+      ) {
+        if (isTalkingState(bar.dataset.state) && bar.dataset.state !== 'tool') {
+          setStatus(bar, 'listening', 'Listening…');
+        }
       }
       if (event.type === SpeakCore.SpeakRealtimeEvent.USER_SPEECH_START) {
         setStatus(bar, 'listening', 'Listening…');
