@@ -106,7 +106,7 @@ function resolveLiveTalkConfig(env = process.env) {
     ),
     allowlist,
     writeTools,
-    speakCoreRevision: String(env.LIVE_TALK_SPEAK_CORE_SHA || 'd441d85').trim(),
+    speakCoreRevision: String(env.LIVE_TALK_SPEAK_CORE_SHA || '36581f2').trim(),
   };
 }
 

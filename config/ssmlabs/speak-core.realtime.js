@@ -1,4 +1,4 @@
-/* Pinned @spray/speak-core 0.2.20 / d441d85 for Live Talk trial. Do not edit by hand. */
+/* Pinned @spray/speak-core 0.2.21 / 36581f2 for Live Talk trial. Do not edit by hand. */
 'use strict';
 var SpeakCore = (() => {
   var __defProp = Object.defineProperty;
@@ -21,7 +21,7 @@ var SpeakCore = (() => {
   };
   var __toCommonJS = (mod) => __copyProps(__defProp({}, '__esModule', { value: true }), mod);
 
-  // ../speak-core/packages/speak-core/src/index.js
+  // src/index.js
   var index_exports = {};
   __export(index_exports, {
     CANONICAL_SPEAK_MIC_AUDIO_CONSTRAINTS: () => CANONICAL_SPEAK_MIC_AUDIO_CONSTRAINTS,
@@ -110,7 +110,7 @@ var SpeakCore = (() => {
     voiceTurnDedupeKey: () => voiceTurnDedupeKey,
   });
 
-  // ../speak-core/packages/speak-core/src/machine/phases.js
+  // src/machine/phases.js
   var SpeakPhase = Object.freeze({
     IDLE: 'idle',
     READY: 'ready',
@@ -168,7 +168,7 @@ var SpeakCore = (() => {
     return SpeakReadyState.IDLE;
   }
 
-  // ../speak-core/packages/speak-core/src/machine/events.js
+  // src/machine/events.js
   var SpeakEvent = Object.freeze({
     START_SESSION: 'START_SESSION',
     START: 'START',
@@ -197,7 +197,7 @@ var SpeakCore = (() => {
     SET_HEAR: 'SET_HEAR',
   });
 
-  // ../speak-core/packages/speak-core/src/machine/state.js
+  // src/machine/state.js
   function createInitialSpeakState(overrides = {}) {
     return {
       phase: SpeakPhase.IDLE,
@@ -216,7 +216,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/machine/reduce.js
+  // src/machine/reduce.js
   function withPhase(state, phase, patch = {}) {
     const next = { ...state, phase, ...patch };
     if (phase !== SpeakPhase.LISTENING && patch.hearingSpeech == null) {
@@ -441,7 +441,7 @@ var SpeakCore = (() => {
     }
   }
 
-  // ../speak-core/packages/speak-core/src/playback/audioPlayer.js
+  // src/playback/audioPlayer.js
   function primeMobileAudioElement(audio) {
     audio.setAttribute('playsinline', '');
     audio.setAttribute('webkit-playsinline', '');
@@ -825,7 +825,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/speech/speechDetector.js
+  // src/speech/speechDetector.js
   var DEFAULTS = {
     speechRms: 0.028,
     silenceRms: 0.018,
@@ -1173,7 +1173,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/policies/listenEnd.js
+  // src/policies/listenEnd.js
   function classifyListenEnd(stats = {}, policy = {}) {
     const reason = String(stats.endReason || '').trim();
     const held = Number(stats.speechHeldMs) || 0;
@@ -1265,7 +1265,7 @@ var SpeakCore = (() => {
     return { verdict: 'unknown', hint: reason || 'no end reason' };
   }
 
-  // ../speak-core/packages/speak-core/src/policies/timeouts.js
+  // src/policies/timeouts.js
   var SpeakTimeouts = Object.freeze({
     SUBMIT_MS: 9e4,
     SPEAK_UNIT_MS: 25e3,
@@ -1421,7 +1421,7 @@ var SpeakCore = (() => {
     return mergeSpeakPolicy(SpeakRecordPolicy, speakRecordPolicyOverridesFromQuery(overrides));
   }
 
-  // ../speak-core/packages/speak-core/src/policies/bargeIn.js
+  // src/policies/bargeIn.js
   var SPEAK_BARGE_IN_RMS = SpeakRecordPolicy.BARGE_IN_RMS;
   var SPEAK_BARGE_IN_ONSET_MS = SpeakRecordPolicy.BARGE_IN_ONSET_MS;
   var SPEAK_BARGE_IN_GRACE_MS = SpeakRecordPolicy.BARGE_IN_GRACE_MS;
@@ -1520,7 +1520,7 @@ var SpeakCore = (() => {
     return { stop };
   }
 
-  // ../speak-core/packages/speak-core/src/playback/cues.js
+  // src/playback/cues.js
   function prefersReducedMotion() {
     try {
       return Boolean(
@@ -1574,7 +1574,7 @@ var SpeakCore = (() => {
     } catch {}
   }
 
-  // ../speak-core/packages/speak-core/src/media/micConstraints.js
+  // src/media/micConstraints.js
   var CANONICAL_SPEAK_MIC_AUDIO_CONSTRAINTS = Object.freeze({
     echoCancellation: true,
     noiseSuppression: true,
@@ -1656,7 +1656,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/media/createSpeakMedia.js
+  // src/media/createSpeakMedia.js
   var SPEAK_MAX_RECORD_MS = SpeakRecordPolicy.MAX_RECORD_MS;
   var SPEAK_NO_SPEECH_HANGUP_MS = SpeakRecordPolicy.NO_SPEECH_HANGUP_MS;
   var SPEAK_SILENCE_AFTER_SPEECH_MS = SpeakRecordPolicy.SILENCE_AFTER_SPEECH_MS;
@@ -2443,7 +2443,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/policies/transcriptQuality.js
+  // src/policies/transcriptQuality.js
   var SPEAK_LISTEN_AGAIN_LINE = "Sorry, I didn't catch that. Try once more.";
   var SPEAK_GOODBYE_LINE = 'Okay, goodbye. Touch Speak to talk.';
   var SPEAK_GARBLED_GIVE_UP_LINE = SPEAK_GOODBYE_LINE;
@@ -2809,7 +2809,7 @@ var SpeakCore = (() => {
     return live.length >= stt.length ? live : stt;
   }
 
-  // ../speak-core/packages/speak-core/src/policies/recoveryPolicy.js
+  // src/policies/recoveryPolicy.js
   var SpeakRecoveryPolicy = Object.freeze({
     weakTranscriptMaxAttempts: 2,
     retryLine: SPEAK_LISTEN_AGAIN_LINE,
@@ -2874,7 +2874,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/diagnostics/types.js
+  // src/diagnostics/types.js
   var SpeakDiagnosticType = Object.freeze({
     TRANSITION: 'transition',
     ERROR: 'error',
@@ -2901,7 +2901,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/controller/duplexTurn.js
+  // src/controller/duplexTurn.js
   function createDuplexTurn() {
     return {
       preserveRecordingAcrossBarge: false,
@@ -2957,7 +2957,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/controller/liveSpeech.js
+  // src/controller/liveSpeech.js
   function createLiveSpeech(ctx) {
     function trackLiveSpeech(handle) {
       if (!handle || typeof handle.stop !== 'function') return handle;
@@ -3053,7 +3053,7 @@ var SpeakCore = (() => {
     return { trackLiveSpeech, abortAllLiveSpeech, beginLiveSpeech };
   }
 
-  // ../speak-core/packages/speak-core/src/controller/recovery.js
+  // src/controller/recovery.js
   function createRecovery(ctx) {
     async function dispatchListenAgain(message, category) {
       ctx.emitDiag({
@@ -3178,7 +3178,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/policies/speakUnits.js
+  // src/policies/speakUnits.js
   function splitSpeakUnits(text) {
     const clean2 = String(text || '')
       .replace(/\s+/g, ' ')
@@ -3206,7 +3206,7 @@ var SpeakCore = (() => {
     return units.length ? units : [clean2];
   }
 
-  // ../speak-core/packages/speak-core/src/controller/util.js
+  // src/controller/util.js
   function isAbortError(err) {
     return err?.name === 'AbortError' || err?.category === 'ended';
   }
@@ -3226,7 +3226,7 @@ var SpeakCore = (() => {
     ]);
   }
 
-  // ../speak-core/packages/speak-core/src/controller/speaking.js
+  // src/controller/speaking.js
   function createSpeaking(ctx) {
     function abortSpeechWarm() {
       try {
@@ -3589,7 +3589,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/controller/listening.js
+  // src/controller/listening.js
   function createListening(ctx) {
     function emitDuplexCutoff(partial = {}) {
       const duplexTurn = ctx.duplex.turn;
@@ -4277,7 +4277,7 @@ var SpeakCore = (() => {
     return { listenAndSubmit, emitDuplexCutoff };
   }
 
-  // ../speak-core/packages/speak-core/src/controller/createSpeakController.js
+  // src/controller/createSpeakController.js
   function createSpeakController(deps) {
     if (typeof deps?.sendTurn !== 'function') {
       throw new Error('createSpeakController requires sendTurn');
@@ -5009,7 +5009,7 @@ var SpeakCore = (() => {
     return api;
   }
 
-  // ../speak-core/packages/speak-core/src/realtime/providers.js
+  // src/realtime/providers.js
   var SpeakRealtimeProvider = Object.freeze({
     FAKE: 'fake',
     LEGACY: 'legacy',
@@ -5035,7 +5035,7 @@ var SpeakCore = (() => {
     return normalizeSpeakRealtimeProvider(provider) !== SpeakRealtimeProvider.LEGACY;
   }
 
-  // ../speak-core/packages/speak-core/src/realtime/events.js
+  // src/realtime/events.js
   var SpeakRealtimeEvent = Object.freeze({
     SESSION_CONNECT_START: 'realtime.session.connect_start',
     SESSION_CONNECTED: 'realtime.session.connected',
@@ -5065,7 +5065,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/realtime/conversationBehavior.js
+  // src/realtime/conversationBehavior.js
   var SpeakConversationTurnTaking = Object.freeze({
     FAST: 'fast',
     BALANCED: 'balanced',
@@ -5144,7 +5144,7 @@ var SpeakCore = (() => {
     return true;
   }
 
-  // ../speak-core/packages/speak-core/src/realtime/fakeRealtimeSession.js
+  // src/realtime/fakeRealtimeSession.js
   function defaultAssistantText(text) {
     return `Realtime heard: ${String(text || '').trim() || 'silence'}`;
   }
@@ -5383,7 +5383,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/realtime/openaiRealtimeWebRtc.js
+  // src/realtime/openaiRealtimeWebRtc.js
   function safeJson(raw) {
     try {
       return JSON.parse(raw);
@@ -5463,7 +5463,13 @@ var SpeakCore = (() => {
         setAssistantOutputActive(true);
         return;
       }
-      if (type === 'output_audio_buffer.stopped' || type === 'output_audio_buffer.cleared') {
+      if (
+        type === 'output_audio_buffer.stopped' ||
+        type === 'output_audio_buffer.cleared' ||
+        type === 'response.done' ||
+        type === 'response.cancelled' ||
+        type === 'response.output_audio.done'
+      ) {
         setAssistantOutputActive(false);
       }
     }
@@ -5672,7 +5678,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/realtime/elevenlabsRealtime.js
+  // src/realtime/elevenlabsRealtime.js
   function normalizeBootstrap(value) {
     if (value == null) return { token: '', providerSessionId: '' };
     if (typeof value === 'string') return { token: value, providerSessionId: '' };
@@ -6101,7 +6107,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/realtime/createRealtimeSession.js
+  // src/realtime/createRealtimeSession.js
   function createSpeakRealtimeSession(options = {}) {
     const provider = normalizeSpeakRealtimeProvider(options.provider);
     if (provider === SpeakRealtimeProvider.FAKE) {
@@ -6121,7 +6127,7 @@ var SpeakCore = (() => {
     );
   }
 
-  // ../speak-core/packages/speak-core/src/realtime/openaiFunctionCallBridge.js
+  // src/realtime/openaiFunctionCallBridge.js
   function clean(value) {
     return String(value || '').trim();
   }
@@ -6447,7 +6453,7 @@ var SpeakCore = (() => {
     });
   }
 
-  // ../speak-core/packages/speak-core/src/media/createFakeSpeakMedia.js
+  // src/media/createFakeSpeakMedia.js
   function deferred() {
     let resolve;
     let reject;
@@ -6748,7 +6754,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/speech/browserSpeech.js
+  // src/speech/browserSpeech.js
   function speechRecognitionCtor() {
     const win = globalThis.window;
     if (!win) return null;
@@ -6813,7 +6819,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/voice/voiceTurn.js
+  // src/voice/voiceTurn.js
   var VoiceTurnStatus = Object.freeze({
     USABLE: 'usable',
     REJECTED: 'rejected',
@@ -6933,7 +6939,7 @@ var SpeakCore = (() => {
     );
   }
 
-  // ../speak-core/packages/speak-core/src/policies/voiceTurnQuality.js
+  // src/policies/voiceTurnQuality.js
   var FILLER_RE = /\b(?:um+|uh+|erm+|ah+|like|you know|i mean|sort of|kind of)\b/gi;
   var SHORT_CONFIRMATION_TOKENS = /* @__PURE__ */ new Set([
     'no',
@@ -7143,7 +7149,7 @@ var SpeakCore = (() => {
     return turn;
   }
 
-  // ../speak-core/packages/speak-core/src/adapters/createFakeTurnAdapters.js
+  // src/adapters/createFakeTurnAdapters.js
   var NUMBER_WORDS = [
     'One',
     'Two',
@@ -7353,7 +7359,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // ../speak-core/packages/speak-core/src/index.js
-  var SPEAK_CORE_VERSION = '0.2.20';
+  // src/index.js
+  var SPEAK_CORE_VERSION = '0.2.21';
   return __toCommonJS(index_exports);
 })();

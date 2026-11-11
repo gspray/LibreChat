@@ -2,13 +2,13 @@
 
 Overlay on this Chat branch. Related umbrella: LessonCaddie [#443](https://github.com/gspray/lessoncaddie/pull/443).
 
-Native OpenAI Realtime speech-to-speech via pinned `@spray/speak-core` `d441d85` (0.2.20 interruption opt-in). LessonCaddie facts use the existing instructor MCP path. Writes are denied on the Chat server.
+Native OpenAI Realtime speech-to-speech via pinned `@spray/speak-core` `36581f2` (0.2.21). LessonCaddie facts use the existing instructor MCP path. Writes are denied on the Chat server.
 
 Live Talk is on whenever this overlay is loaded. There is no env flag to disable it.
 
 ## Development Chat host
 
-1. Confirm `config/ssmlabs/speak-core.realtime.js` exists (built from Speak Core `d441d85`).
+1. Confirm `config/ssmlabs/speak-core.realtime.js` exists (built from Speak Core `36581f2`).
 2. Copy overlay keys from `config/instructor-assistant.compose-override.yml` into gitignored `docker-compose.override.yml` if they are missing.
 3. Recreate the `api` container so `NODE_OPTIONS` and overlay bind-mounts load. A process restart is not enough for new mounts.
 4. Test in **LessonCaddie Ask** (`https://lessoncaddie.ssmlabs.com/app` → Ask). Chat is mounted at `/chat`, so Live Talk config is `/chat/live-talk/config`.

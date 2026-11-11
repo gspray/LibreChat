@@ -440,8 +440,14 @@
         event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE ||
         event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_INTERRUPTED ||
         providerEvent === 'output_audio_buffer.stopped' ||
-        providerEvent === 'output_audio_buffer.cleared'
+        providerEvent === 'output_audio_buffer.cleared' ||
+        providerEvent === 'response.done'
       ) {
+        try {
+          session.setMuted?.(false);
+        } catch (_) {
+          /* keep listening even if mute release throws */
+        }
         if (isTalkingState(bar.dataset.state) && bar.dataset.state !== 'tool') {
           setStatus(bar, 'listening', 'Listening…');
         }
