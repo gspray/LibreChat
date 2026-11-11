@@ -102,7 +102,25 @@
 
   function findComposerBand(documentObject) {
     const surface = documentObject.querySelector?.('[data-testid="composer-surface"]');
-    return surface?.closest?.('form')?.parentElement || null;
+    const fromSurface = surface?.closest?.('form')?.parentElement;
+    if (fromSurface) {
+      return fromSurface;
+    }
+    const form =
+      documentObject.querySelector?.('[data-chat-pane] form') ||
+      documentObject.querySelector?.('form textarea')?.closest?.('form');
+    return form?.parentElement || null;
+  }
+
+  function findComposerForm(band) {
+    if (!band) {
+      return null;
+    }
+    return (
+      band.querySelector?.('form') ||
+      band.querySelector?.('[data-testid="composer-surface"]')?.closest?.('form') ||
+      null
+    );
   }
 
   function hideNativeStarters(documentObject) {
@@ -110,9 +128,21 @@
     if (!band) {
       return;
     }
+    const form = findComposerForm(band);
+    if (form) {
+      let sibling = form.previousElementSibling;
+      while (sibling) {
+        if (sibling.getAttribute(MANAGED_ATTR) !== 'true' && sibling.querySelector?.('button')) {
+          sibling.hidden = true;
+          sibling.setAttribute('aria-hidden', 'true');
+          sibling.dataset.lcNativeStartersHidden = 'true';
+        }
+        sibling = sibling.previousElementSibling;
+      }
+    }
     const candidates = Array.from(band.querySelectorAll?.(':scope > div') || []);
     for (const node of candidates) {
-      if (node.getAttribute(MANAGED_ATTR) === 'true') {
+      if (node.getAttribute(MANAGED_ATTR) === 'true' || node.hidden) {
         continue;
       }
       const buttons = node.querySelectorAll?.('button') || [];
@@ -125,6 +155,15 @@
         node.dataset.lcNativeStartersHidden = 'true';
       }
     }
+  }
+
+  function insertStarterHost(band, host) {
+    const form = findComposerForm(band);
+    if (form?.parentElement === band) {
+      band.insertBefore(host, form);
+      return;
+    }
+    band.insertBefore(host, band.firstChild);
   }
 
   function setNativeTextareaValue(textarea, text) {
@@ -311,7 +350,7 @@
         host = documentObject.createElement('div');
         host.className = 'lc-conversation-starters';
         host.setAttribute(MANAGED_ATTR, 'true');
-        band.insertBefore(host, band.firstChild);
+        insertStarterHost(band, host);
       }
       host.dataset.lcPromptsSignature = signature;
       host.replaceChildren();
