@@ -6,6 +6,8 @@ const {
   shouldDropToolSse,
   redactMessagesForClient,
   eventHasNavigationTool,
+  lookupProgressText,
+  buildLookupProgressEvents,
 } = require('./hideToolActivity');
 
 const NAV_OUTPUT = JSON.stringify({
@@ -83,4 +85,53 @@ test('does not redact stored open_app_screen tool parts', () => {
   );
   assert.equal(messages[0].content[1].tool_call.name, 'action');
   assert.equal(messages[0].content[1].tool_call.output, '');
+});
+
+test('lookup progress waits for complete args then names the person', () => {
+  const pending = {
+    event: 'on_run_step',
+    data: {
+      id: 'tool-step',
+      runId: 'response-1',
+      index: 0,
+      stepDetails: {
+        type: 'tool_calls',
+        tool_calls: [{ id: '1', name: 'get_student', args: '' }],
+      },
+    },
+  };
+  assert.equal(lookupProgressText(pending), '');
+  assert.deepEqual(buildLookupProgressEvents(pending), []);
+
+  const named = {
+    event: 'on_run_step_delta',
+    data: {
+      runId: 'response-1',
+      index: 0,
+      delta: {
+        type: 'tool_calls',
+        tool_calls: [{ id: '1', name: 'get_student', args: '{"name":"janet"}' }],
+      },
+    },
+  };
+  assert.equal(lookupProgressText(named), 'Looking up Janet…');
+  const events = buildLookupProgressEvents(named);
+  assert.equal(events[0].event, 'on_run_step');
+  assert.equal(events[0].data.type, 'message_creation');
+  assert.equal(events[0].data.runId, 'response-1');
+  assert.equal(events[1].event, 'on_message_delta');
+  assert.equal(events[1].data.delta.content[0].text, 'Looking up Janet…');
+});
+
+test('lookup progress uses a generic label when args have no name', () => {
+  const listed = {
+    event: 'on_run_step',
+    data: {
+      stepDetails: {
+        type: 'tool_calls',
+        tool_calls: [{ id: '1', name: 'search_lessons', args: '{}' }],
+      },
+    },
+  };
+  assert.equal(lookupProgressText(listed), 'Looking up lessons…');
 });

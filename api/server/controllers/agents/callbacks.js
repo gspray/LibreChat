@@ -48,6 +48,7 @@ const { saveBase64Image } = require('~/server/services/Files/process');
 const {
   shouldHideToolActivityForUser,
   shouldDropToolSse,
+  buildLookupProgressEvents,
 } = require('~/server/utils/hideToolActivity');
 
 function isHostFileAuthoringArtifact(artifact) {
@@ -273,15 +274,30 @@ function checkIfLastAgent(last_agent_id, langgraph_node) {
  * @param {number} [expectedCreatedAt] - The generation epoch that produced the event
  * @returns {Promise<void>}
  */
-async function emitEvent(res, streamId, eventData, expectedCreatedAt) {
-  if (shouldHideToolActivityForUser(res?.req?.user) && shouldDropToolSse(eventData)) {
-    return;
-  }
+async function sendClientEvent(res, streamId, eventData, expectedCreatedAt) {
   if (streamId) {
     await GenerationJobManager.emitChunk(streamId, eventData, { expectedCreatedAt });
   } else {
     sendEvent(res, eventData);
   }
+}
+
+async function emitEvent(res, streamId, eventData, expectedCreatedAt) {
+  if (shouldHideToolActivityForUser(res?.req?.user) && shouldDropToolSse(eventData)) {
+    if (!res?.__lcLookupProgressSent) {
+      const progressEvents = buildLookupProgressEvents(eventData);
+      if (progressEvents.length) {
+        if (res) {
+          res.__lcLookupProgressSent = true;
+        }
+        for (const progressEvent of progressEvents) {
+          await sendClientEvent(res, streamId, progressEvent, expectedCreatedAt);
+        }
+      }
+    }
+    return;
+  }
+  await sendClientEvent(res, streamId, eventData, expectedCreatedAt);
 }
 
 /**
