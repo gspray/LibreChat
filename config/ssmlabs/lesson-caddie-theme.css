@@ -155,13 +155,16 @@ body[data-lesson-caddie-embed="true"].lc-chat-landing #root {
   min-height: 0;
 }
 
-body[data-lesson-caddie-embed="true"] [data-chat-pane],
-body[data-lesson-caddie-embed="true"] .lc-chat-pane-landing {
+body[data-lesson-caddie-embed="true"] [data-chat-pane] {
   display: flex !important;
   flex-direction: column !important;
   flex: 1 1 auto !important;
   min-height: 0 !important;
   height: 100% !important;
+  align-items: stretch !important;
+}
+
+body[data-lesson-caddie-embed="true"] .lc-chat-pane-landing {
   justify-content: flex-start !important;
   align-items: center !important;
 }
@@ -176,13 +179,41 @@ body[data-lesson-caddie-embed="true"]
   padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
 }
 
-body[data-lesson-caddie-embed="true"] [data-chat-pane] > div.flex.h-full.transform-gpu {
+body[data-lesson-caddie-embed="true"].lc-chat-landing
+  [data-chat-pane]
+  > div.flex.h-full.transform-gpu {
   justify-content: flex-start !important;
   align-items: center !important;
   padding-top: 1.75rem !important;
   padding-bottom: 0 !important;
   text-align: center !important;
   overflow: visible !important;
+}
+
+/* First user/assistant turns must not inherit landing centering for a frame. */
+body[data-lesson-caddie-embed="true"]
+  [data-chat-pane]:has(.user-turn, .agent-turn, [data-testid="message-body"]) {
+  align-items: stretch !important;
+  text-align: start !important;
+}
+
+body[data-lesson-caddie-embed="true"]
+  [data-chat-pane]:has(.user-turn, .agent-turn, [data-testid="message-body"])
+  > div.flex.h-full.transform-gpu {
+  align-items: stretch !important;
+  text-align: start !important;
+  padding-top: 0 !important;
+}
+
+body[data-lesson-caddie-embed="true"]
+  .lc-assistant-landing-shell:has(.user-turn, .agent-turn, [data-testid="message-body"]),
+body[data-lesson-caddie-embed="true"]
+  .lc-assistant-landing-content:has(.user-turn, .agent-turn, [data-testid="message-body"]) {
+  max-width: none !important;
+  width: 100% !important;
+  margin-inline: 0 !important;
+  align-items: stretch !important;
+  text-align: start !important;
 }
 
 body[data-lesson-caddie-embed="true"] .lc-assistant-landing-shell {

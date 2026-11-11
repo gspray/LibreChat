@@ -280,3 +280,22 @@ test('message avatars use the Caddie mark instead of the default robot glyph', (
   assert.match(themeCss, /caddie\.png/);
   assert.match(themeCss, /\.agent-turn \.avatar-stroke svg/);
 });
+
+test('conversation turns are not centered by the empty-chat landing layout', () => {
+  assert.match(
+    themeCss,
+    /\[data-chat-pane\]:has\(\.user-turn, \.agent-turn, \[data-testid="message-body"\]\)/,
+  );
+  assert.match(
+    themeCss,
+    /body\[data-lesson-caddie-embed="true"\] \[data-chat-pane\] \{[\s\S]*?align-items: stretch !important;/,
+  );
+  assert.match(
+    themeCss,
+    /body\[data-lesson-caddie-embed="true"\] \.lc-chat-pane-landing \{[\s\S]*?align-items: center !important;/,
+  );
+  assert.doesNotMatch(
+    themeCss,
+    /body\[data-lesson-caddie-embed="true"\] \[data-chat-pane\],\s*body\[data-lesson-caddie-embed="true"\] \.lc-chat-pane-landing/,
+  );
+});
