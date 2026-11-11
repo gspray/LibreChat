@@ -14,6 +14,20 @@
     return String(value || '').trim();
   }
 
+  function chatBasePath() {
+    try {
+      const href = root.querySelector('base')?.getAttribute('href') || '/';
+      const pathname = new URL(href, windowObject.location.origin).pathname;
+      return pathname.replace(/\/$/, '');
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function liveTalkPath(path) {
+    return `${chatBasePath()}${path}`;
+  }
+
   function conversationIdFromLocation() {
     const match = String(windowObject.location?.pathname || '').match(/\/c\/([^/]+)/);
     const id = match ? decodeURIComponent(match[1]) : '';
@@ -55,7 +69,7 @@
 
   async function persist(sessionId, body) {
     try {
-      await api(`/live-talk/session/${sessionId}/transcript`, {
+      await api(liveTalkPath(`/live-talk/session/${sessionId}/transcript`), {
         method: 'POST',
         body: JSON.stringify(body),
       });
@@ -104,7 +118,7 @@
     }
     if (current?.sessionId) {
       try {
-        await api(`/live-talk/session/${current.sessionId}/stop`, {
+        await api(liveTalkPath(`/live-talk/session/${current.sessionId}/stop`), {
           method: 'POST',
           body: JSON.stringify({ reason }),
         });
@@ -135,7 +149,7 @@
       provider: 'openai-realtime',
       conversationBehavior: { interruption: 'enabled' },
       bootstrapCall: async ({ sdp }) => {
-        const created = await api('/live-talk/session', {
+        const created = await api(liveTalkPath('/live-talk/session'), {
           method: 'POST',
           body: JSON.stringify({ conversationId, sdp }),
         });
@@ -147,7 +161,7 @@
       conversationBehavior: { interruption: 'enabled' },
       invokeTool: async (call) => {
         setStatus(bar, 'tool', `Looking up ${call.name}…`);
-        const payload = await api(`/live-talk/session/${sessionId}/tool`, {
+        const payload = await api(liveTalkPath(`/live-talk/session/${sessionId}/tool`), {
           method: 'POST',
           body: JSON.stringify({
             name: call.name,
@@ -282,7 +296,7 @@
 
   async function start() {
     try {
-      config = await api('/live-talk/config');
+      config = await api(liveTalkPath('/live-talk/config'));
     } catch (_) {
       config = { enabled: false };
     }

@@ -10,7 +10,8 @@ Disabled by default. Native OpenAI Realtime speech-to-speech via pinned `@spray/
 2. Copy overlay keys from `config/instructor-assistant.compose-override.yml` into gitignored `docker-compose.override.yml` if they are missing.
 3. Set `LIVE_TALK_TRIAL=true` in that override (or the shell env Compose reads).
 4. Recreate the `api` container so `NODE_OPTIONS` and overlay bind-mounts load. A process restart is not enough for new mounts.
-5. Open an **existing** Instructor Assistant thread (not `/c/new`) and use **Live Talk**.
+5. Test in **LessonCaddie Ask** (`https://lessoncaddie.ssmlabs.com/app` → Ask), not a bare `:3080` tab. Chat is mounted at `/chat`, so Live Talk config is `/chat/live-talk/config`.
+6. Open an **existing** Instructor Assistant thread (URL contains `/c/<id>`, not `/c/new`) and use **Live Talk**. Hard-refresh the app so the Assistant iframe reloads.
 
 Rollback: set `LIVE_TALK_TRIAL=false` and recreate `api`. Session bootstrap then returns 403. Existing typed Chat is unchanged.
 
