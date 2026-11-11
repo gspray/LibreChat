@@ -166,7 +166,7 @@
         /* session may already be gone */
       }
     }
-    if (reason !== 'restart') {
+    if (reason !== 'restart' && reason !== 'failed') {
       setStatus(bar, 'idle', 'Live Talk stopped. You can keep typing in this thread.');
     }
   }
@@ -192,11 +192,6 @@
           body: JSON.stringify({ conversationId, sdp }),
         });
         sessionId = created.sessionId;
-        const createdId = clean(created.conversationId);
-        if (createdId && createdId !== conversationIdFromLocation()) {
-          const next = `${chatBasePath()}/c/${encodeURIComponent(createdId)}${windowObject.location.search || ''}`;
-          windowObject.history.replaceState(windowObject.history.state, '', next);
-        }
         return created.sdp;
       },
     });
@@ -294,37 +289,7 @@
     }
   }
 
-  function isThreadSwitch(previousId, nextId) {
-    const previous = previousId || '';
-    const next = nextId || '';
-    if (previous === next) return false;
-    if (!previous || previous === 'new') return false;
-    return true;
-  }
-
   function watchThreadChanges() {
-    let last = conversationIdFromLocation();
-    const check = () => {
-      const next = conversationIdFromLocation();
-      if (next === last) return;
-      const switched = isThreadSwitch(last, next);
-      last = next;
-      if (switched && active) void stopCall(ensureBar(), 'thread_change');
-      else syncBar();
-    };
-    windowObject.addEventListener('popstate', check);
-    const originalPush = windowObject.history.pushState;
-    const originalReplace = windowObject.history.replaceState;
-    windowObject.history.pushState = function pushState() {
-      const result = originalPush.apply(this, arguments);
-      check();
-      return result;
-    };
-    windowObject.history.replaceState = function replaceState() {
-      const result = originalReplace.apply(this, arguments);
-      check();
-      return result;
-    };
     windowObject.addEventListener('beforeunload', () => {
       if (active) void stopCall(ensureBar(), 'unload');
     });
