@@ -262,7 +262,18 @@ test('looksLikeConfirmationRequest matches write confirmations only', () => {
     theme.looksLikeConfirmationRequest('Are you sure you want to delete this student?'),
     true,
   );
+  assert.equal(
+    theme.looksLikeConfirmationRequest(
+      "I will schedule 8 mock lessons for Janet Barton in October 2026, every Tuesday and Thursday, starting at 1:00 PM for 60 minutes. Let me know if that's good to proceed!",
+    ),
+    true,
+  );
+  assert.equal(
+    theme.looksLikeConfirmationRequest('Shall I add those eight mock lessons now?'),
+    true,
+  );
   assert.equal(theme.looksLikeConfirmationRequest('Which student did you mean?'), false);
+  assert.equal(theme.looksLikeConfirmationRequest('Let me know if you have questions.'), false);
   assert.equal(theme.looksLikeConfirmationRequest('Booked the lesson for Taylor.'), false);
 });
 
@@ -284,6 +295,22 @@ test('decorate does not duplicate an existing markdown I approve control', () =>
   assert.equal(body.children.length, 1);
   assert.equal(body.children[0], existing);
   assert.equal(existing.classList.contains('lc-approve-link'), true);
+});
+
+test('decorate injects I approve when the assistant asks to proceed', () => {
+  const documentObject = buildThemeDocument();
+  const body = new FakeElement(
+    "I will schedule 8 mock lessons for Janet Barton. Let me know if that's good to proceed!",
+  );
+  const originalAll = documentObject.querySelectorAll.bind(documentObject);
+  documentObject.querySelectorAll = (selector) => {
+    if (selector === '.agent-turn [data-testid="message-body"]') return [body];
+    if (selector === 'a') return [...originalAll(selector), ...body.children];
+    return originalAll(selector);
+  };
+  theme.decorate(documentObject);
+  assert.equal(body.children[0].textContent, 'I approve');
+  assert.equal(body.children[0].href, '#lc-approve');
 });
 
 test('decorate injects I approve on the latest confirmation message', () => {

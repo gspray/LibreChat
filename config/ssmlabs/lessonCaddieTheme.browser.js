@@ -152,22 +152,33 @@
     return false;
   }
 
+  function looksLikeCompletedWrite(text) {
+    return /\b(saved|created|booked|deleted|updated successfully|i('ve| have) (created|booked|saved|deleted|updated|sent))\b/.test(
+      text,
+    );
+  }
+
+  function looksLikePermissionOrProceedAsk(text) {
+    return /\b(good to proceed|okay to proceed|ok to proceed|to proceed|proceed with|go ahead|shall i\b|should i\b|may i\b|want me to\b|ok to\b|okay to\b|permission to|ready when you|ready to proceed|if you('d| would) like me to|wait for (your )?(ok|okay|approval|confirmation|go-ahead)|let me know if (this|that|that'?s) (is )?(good|ok|okay|correct|right)|if (this|that|that'?s) (looks|sounds|is|are)?\s*(right|correct|good|ok|okay)|if (this|that) works|is (this|that) (ok|okay|alright|good)|does (this|that) (look|sound))\b/.test(
+      text,
+    );
+  }
+
   function looksLikeConfirmationRequest(value) {
     const text = normalizeText(value).toLowerCase();
     if (!text || text.includes('i approve')) {
       return false;
     }
-    if (
-      /\b(saved|created|booked|deleted|updated successfully|i('ve| have) (created|booked|saved|deleted|updated|sent))\b/.test(
-        text,
-      )
-    ) {
+    if (looksLikeCompletedWrite(text)) {
       return false;
     }
+    if (looksLikePermissionOrProceedAsk(text)) {
+      return true;
+    }
     const confirmCue =
-      /\b(please confirm|can you confirm|could you confirm|confirm (this|these|that|the|it)|to confirm|your confirmation|awaiting confirmation|are you sure|shall i\b|should i\b|want me to\b|ok to\b|okay to\b|go ahead|proceed with|if (this|that) (looks|sounds) (right|correct|good)|does (this|that) look|once you confirm|after you confirm|say yes|reply (with )?yes|may i (create|book|save|delete|update|send|add|change|move)|ready to (save|send|book|create|delete|update))\b/;
+      /\b(please confirm|can you confirm|could you confirm|confirm (this|these|that|the|it)|to confirm|your confirmation|awaiting confirmation|are you sure|once you confirm|after you confirm|say yes|reply (with )?yes|ready to (save|send|book|create|delete|update)|may i (create|book|save|delete|update|send|add|change|move|schedule))\b/;
     const writeCue =
-      /\b(create|book|save|delete|update|send|add|change|move|share|charge|message|lesson|student|playbook|price|notice|practice)\b/;
+      /\b(create|book|save|delete|update|send|add|change|move|share|charge|message|lessons?|students?|playbook|prices?|notice|practice|schedule|scheduled|mock)\b/;
     return confirmCue.test(text) && writeCue.test(text);
   }
 
