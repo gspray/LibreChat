@@ -203,6 +203,32 @@ test('decorate marks the chat pane on landing', () => {
   assert.equal(pane.classList.contains('lc-chat-pane-landing'), true);
 });
 
+test('decorate waits for the agent title before applying landing layout', () => {
+  const documentObject = buildThemeDocument();
+  const welcome = new FakeElement('Welcome to Ask LessonCaddie Assistant');
+  const originalAll = documentObject.querySelectorAll.bind(documentObject);
+  documentObject.querySelectorAll = (selector) =>
+    selector === 'h1,h2,h3,[role="heading"],span,div' ? [welcome] : originalAll(selector);
+  assert.deepEqual(theme.decorate(documentObject), { landing: false });
+  assert.equal(documentObject.body.classList.contains('lc-chat-landing'), false);
+  assert.equal(documentObject.body.classList.contains('lc-chat-landing-pending'), true);
+});
+
+test('decorate treats Student Caddie as a named landing title', () => {
+  const documentObject = buildThemeDocument();
+  const title = new FakeElement('Student Caddie');
+  const originalAll = documentObject.querySelectorAll.bind(documentObject);
+  documentObject.querySelectorAll = (selector) => {
+    if (selector === 'button') return [];
+    if (selector === 'h1,h2,h3,[role="heading"],span,div') return [title];
+    return originalAll(selector);
+  };
+  assert.deepEqual(theme.decorate(documentObject), { landing: true });
+  assert.equal(title.classList.contains('lc-assistant-title'), false);
+  assert.equal(documentObject.body.classList.contains('lc-chat-landing'), true);
+  assert.equal(documentObject.body.classList.contains('lc-chat-landing-pending'), false);
+});
+
 test('decorate still applies landing layout when starter chips are absent', () => {
   const documentObject = buildThemeDocument();
   const originalAll = documentObject.querySelectorAll.bind(documentObject);
@@ -279,6 +305,13 @@ test('message avatars use the Caddie mark instead of the default robot glyph', (
   assert.match(themeCss, /body\[data-lesson-caddie-embed="true"\] \.agent-turn \.avatar-stroke/);
   assert.match(themeCss, /caddie\.png/);
   assert.match(themeCss, /\.agent-turn \.avatar-stroke svg/);
+});
+
+test('pending landing hides the chat pane until the agent title is ready', () => {
+  assert.match(
+    themeCss,
+    /body\[data-lesson-caddie-embed="true"\]\.lc-chat-landing-pending \[data-chat-pane\]/,
+  );
 });
 
 test('conversation turns are not centered by the empty-chat landing layout', () => {

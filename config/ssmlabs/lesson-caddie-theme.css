@@ -142,6 +142,10 @@ body[data-lesson-caddie-color-theme="default"]
   background-color: var(--lc-chat-sidebar-active) !important;
 }
 
+body[data-lesson-caddie-embed="true"].lc-chat-landing-pending [data-chat-pane] {
+  visibility: hidden;
+}
+
 body[data-lesson-caddie-embed="true"].lc-chat-landing {
   display: flex;
   flex-direction: column;

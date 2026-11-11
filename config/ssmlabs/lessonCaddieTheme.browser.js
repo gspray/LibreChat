@@ -59,6 +59,13 @@
     }
   }
 
+  function findNamedLandingTitle(documentObject) {
+    return (
+      findExactTextElement(documentObject, 'Instructor Assistant') ||
+      findExactTextElement(documentObject, 'Student Caddie')
+    );
+  }
+
   function findHeroRow(title) {
     let current = title?.parentElement || null;
     for (let depth = 0; current && depth < 6; depth += 1) {
@@ -327,10 +334,17 @@
     }
     syncColorThemeAttributes(documentObject);
     const newChat = isNewChatLanding(documentObject);
-    const startersVisible = newChat && decorateStarters(documentObject);
-    const heroVisible = newChat && decorateHero(documentObject);
-    const landingActive = newChat && (startersVisible || heroVisible);
+    if (newChat) {
+      decorateStarters(documentObject);
+    }
+    const namedTitle = newChat ? findNamedLandingTitle(documentObject) : null;
+    if (newChat) {
+      decorateHero(documentObject);
+    }
+    const landingActive = Boolean(newChat && namedTitle);
+    const landingPending = Boolean(newChat && !namedTitle);
     documentObject.body.classList.toggle('lc-chat-landing', landingActive);
+    documentObject.body.classList.toggle('lc-chat-landing-pending', landingPending);
     const pane = documentObject.querySelector?.('[data-chat-pane]');
     if (landingActive) {
       addClass(pane, 'lc-chat-pane-landing');
@@ -340,7 +354,40 @@
     decorateComposer(documentObject);
     decorateHeader(documentObject);
     decorateApproveLinks(documentObject);
+    notifyShellIfReady({
+      landing: landingActive,
+      pending: landingPending,
+      composer: Boolean(documentObject.querySelector?.('[data-testid="composer-surface"]')),
+    });
     return { landing: landingActive };
+  }
+
+  let notifiedReady = false;
+  function notifyShellIfReady(state) {
+    if (notifiedReady) {
+      return;
+    }
+    if (!(globalObject.parent && globalObject.parent !== globalObject)) {
+      return;
+    }
+    const ready = state?.landing === true || (state?.composer && state?.pending !== true);
+    if (!ready) {
+      return;
+    }
+    notifiedReady = true;
+    try {
+      globalObject.parent.postMessage(
+        {
+          source: 'lessoncaddie-assistant',
+          type: 'theme-ready',
+          version: 1,
+          landing: state.landing === true,
+        },
+        '*',
+      );
+    } catch {
+      notifiedReady = false;
+    }
   }
 
   const api = Object.freeze({
@@ -350,6 +397,7 @@
     looksLikeConfirmationRequest,
     findApproveLinks,
     dedupeApproveLinks,
+    findNamedLandingTitle,
   });
 
   if (typeof module === 'object' && module.exports) {
@@ -369,13 +417,6 @@
       'DOMContentLoaded',
       () => syncColorThemeAttributes(documentObject),
       { once: true },
-    );
-  }
-
-  if (globalObject.parent && globalObject.parent !== globalObject) {
-    globalObject.parent.postMessage(
-      { source: 'lessoncaddie-assistant', type: 'theme-ready', version: 1 },
-      '*',
     );
   }
 
