@@ -544,6 +544,27 @@
     }
   }
 
+  function maybeForwardAssistantFeedback(windowObject, state, url, bodyText) {
+    const ids = parseFeedbackPutPath(String(url || ''));
+    if (!ids) {
+      return false;
+    }
+    let data = null;
+    try {
+      data = JSON.parse(String(bodyText || ''));
+    } catch {
+      return false;
+    }
+    const feedback = data?.feedback;
+    if (!feedback || (feedback.rating !== 'thumbsUp' && feedback.rating !== 'thumbsDown')) {
+      return false;
+    }
+    return postAssistantFeedback(windowObject, state, {
+      ...ids,
+      feedback,
+    });
+  }
+
   function postAssistantFeedback(windowObject, state, payload) {
     ensureEmbeddedBridge(windowObject, state);
     if (!isFramed(windowObject) || state.appNavigationBridge !== true) {
@@ -1027,9 +1048,30 @@
           if (this.readyState === Original.LOADING || this.readyState === Original.DONE) {
             scan();
           }
+          if (this.readyState !== Original.DONE) {
+            return;
+          }
+          try {
+            if (
+              String(this.__lcNavMethod || '').toUpperCase() === 'PUT' &&
+              Number(this.status) >= 200 &&
+              Number(this.status) < 300
+            ) {
+              maybeForwardAssistantFeedback(
+                windowObject,
+                state,
+                this.__lcNavUrl,
+                this.responseText,
+              );
+            }
+          } catch {
+            // Overlay must not break Chat feedback.
+          }
         });
         this.addEventListener('load', scan);
       }
+      this.__lcNavMethod = String(arguments[0] || '').toUpperCase();
+      this.__lcNavUrl = String(arguments[1] || '');
       return originalOpen.apply(this, arguments);
     };
     proto.open.__lcNavWrapped = true;
@@ -1100,20 +1142,9 @@
           return originalFetch.apply(this, arguments).then(async (response) => {
             try {
               if (response?.ok) {
-                const ids = parseFeedbackPutPath(String(url || ''));
                 const clone = response.clone();
-                const data = await clone.json().catch(() => null);
-                const feedback = data?.feedback;
-                if (
-                  ids &&
-                  feedback &&
-                  (feedback.rating === 'thumbsUp' || feedback.rating === 'thumbsDown')
-                ) {
-                  postAssistantFeedback(windowObject, state, {
-                    ...ids,
-                    feedback,
-                  });
-                }
+                const bodyText = await clone.text().catch(() => '');
+                maybeForwardAssistantFeedback(windowObject, state, url, bodyText);
               }
             } catch {
               // Overlay must not break Chat feedback.

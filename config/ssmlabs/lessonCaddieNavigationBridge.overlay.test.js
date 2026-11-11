@@ -419,6 +419,112 @@ test('parses SSE data lines into JSON events', () => {
   assert.equal(rest, '');
 });
 
+function createFakeXHRClass() {
+  class FakeXHR {
+    constructor() {
+      this.readyState = 0;
+      this.status = 0;
+      this.responseText = '';
+      this._listeners = {};
+    }
+
+    addEventListener(type, fn) {
+      (this._listeners[type] ||= []).push(fn);
+    }
+
+    open() {
+      this.readyState = 1;
+    }
+
+    complete(status, body) {
+      this.status = status;
+      this.responseText = body;
+      this.readyState = FakeXHR.DONE;
+      for (const fn of this._listeners.readystatechange || []) fn();
+      for (const fn of this._listeners.load || []) fn();
+    }
+  }
+  FakeXHR.LOADING = 3;
+  FakeXHR.DONE = 4;
+  return FakeXHR;
+}
+
+function createFramedChatWindow({ sent, FakeXHR, fetchImpl }) {
+  return {
+    location: { href: 'https://chat.ssmlabs.com/c/abc' },
+    document: {
+      referrer: 'https://lessoncaddie.ssmlabs.com/app',
+      addEventListener() {},
+      querySelector() {
+        return null;
+      },
+    },
+    parent: {
+      postMessage(message) {
+        sent.push(message);
+      },
+    },
+    addEventListener() {},
+    setTimeout() {
+      return 1;
+    },
+    XMLHttpRequest: FakeXHR,
+    fetch: fetchImpl,
+  };
+}
+
+test('forwards thumbs-down XHR feedback to the LessonCaddie parent', () => {
+  const sent = [];
+  const FakeXHR = createFakeXHRClass();
+  const browser = createFramedChatWindow({ sent, FakeXHR });
+  install(browser);
+  const xhr = new FakeXHR();
+  xhr.open('PUT', '/api/messages/conversation-1/message-1/feedback');
+  xhr.complete(
+    200,
+    JSON.stringify({
+      messageId: 'message-1',
+      conversationId: 'conversation-1',
+      feedback: { rating: 'thumbsDown', tag: 'inaccurate', text: 'Wrong student' },
+    }),
+  );
+  const message = sent.find((entry) => entry && entry.type === 'assistant-feedback');
+  assert.ok(message);
+  assert.equal(message.rating, 'thumbsDown');
+  assert.equal(message.conversationId, 'conversation-1');
+  assert.equal(message.messageId, 'message-1');
+  assert.equal(message.feedback.tag, 'inaccurate');
+  assert.equal(message.text, 'Wrong student');
+});
+
+test('forwards thumbs-down fetch feedback to the LessonCaddie parent', async () => {
+  const sent = [];
+  const FakeXHR = createFakeXHRClass();
+  const body = JSON.stringify({
+    messageId: 'message-2',
+    conversationId: 'conversation-2',
+    feedback: { rating: 'thumbsDown', tag: 'not_helpful' },
+  });
+  const browser = createFramedChatWindow({
+    sent,
+    FakeXHR,
+    fetchImpl: async () => ({
+      ok: true,
+      clone() {
+        return this;
+      },
+      text: async () => body,
+    }),
+  });
+  install(browser);
+  await browser.fetch('/api/messages/conversation-2/message-2/feedback', { method: 'PUT' });
+  const message = sent.find((entry) => entry && entry.type === 'assistant-feedback');
+  assert.ok(message);
+  assert.equal(message.rating, 'thumbsDown');
+  assert.equal(message.conversationId, 'conversation-2');
+  assert.equal(message.messageId, 'message-2');
+});
+
 test('reassembles navigation JSON across XHR progress chunks', () => {
   const found = [];
   const payload = {
