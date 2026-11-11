@@ -2,7 +2,7 @@
 
 /**
  * SSM Labs overlay — docs/ssmlabs-fork-patches.md
- * Mounts /api/live-talk at listen time so api/server/index.js stays upstream.
+ * Mounts /live-talk at listen time so api/server/index.js stays upstream.
  */
 const http = require('http');
 const { createLiveTalkRouter } = require('./liveTalkRoutes');
@@ -112,7 +112,7 @@ function attach(server) {
   if (!app) {
     return;
   }
-  app.use('/api/live-talk', createBoundRouter());
+  app.use('/live-talk', createBoundRouter());
   const stack = app.router?.stack;
   const liveTalkLayer = stack?.pop();
   const fallbackIndex = stack?.findIndex((layer) =>
@@ -129,7 +129,7 @@ function attach(server) {
   server.__ssmlabsLiveTalkAttached = true;
   const config = resolveLiveTalkConfig();
   if (config.enabled) {
-    console.info('[ssmlabs-live-talk] mounted /api/live-talk');
+    console.info('[ssmlabs-live-talk] mounted /live-talk');
   }
 }
 

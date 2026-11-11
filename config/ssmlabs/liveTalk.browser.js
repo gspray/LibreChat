@@ -55,7 +55,7 @@
 
   async function persist(sessionId, body) {
     try {
-      await api(`/api/live-talk/session/${sessionId}/transcript`, {
+      await api(`/live-talk/session/${sessionId}/transcript`, {
         method: 'POST',
         body: JSON.stringify(body),
       });
@@ -104,7 +104,7 @@
     }
     if (current?.sessionId) {
       try {
-        await api(`/api/live-talk/session/${current.sessionId}/stop`, {
+        await api(`/live-talk/session/${current.sessionId}/stop`, {
           method: 'POST',
           body: JSON.stringify({ reason }),
         });
@@ -135,7 +135,7 @@
       provider: 'openai-realtime',
       conversationBehavior: { interruption: 'enabled' },
       bootstrapCall: async ({ sdp }) => {
-        const created = await api('/api/live-talk/session', {
+        const created = await api('/live-talk/session', {
           method: 'POST',
           body: JSON.stringify({ conversationId, sdp }),
         });
@@ -147,7 +147,7 @@
       conversationBehavior: { interruption: 'enabled' },
       invokeTool: async (call) => {
         setStatus(bar, 'tool', `Looking up ${call.name}…`);
-        const payload = await api(`/api/live-talk/session/${sessionId}/tool`, {
+        const payload = await api(`/live-talk/session/${sessionId}/tool`, {
           method: 'POST',
           body: JSON.stringify({
             name: call.name,
@@ -282,7 +282,7 @@
 
   async function start() {
     try {
-      config = await api('/api/live-talk/config');
+      config = await api('/live-talk/config');
     } catch (_) {
       config = { enabled: false };
     }

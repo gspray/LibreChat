@@ -24,7 +24,7 @@ function createApp(overrides = {}) {
     next();
   });
   app.use(
-    '/api/live-talk',
+    '/live-talk',
     createLiveTalkRouter({
       resolveLiveTalkConfig: enabledConfig,
       getConvo: async (userId, conversationId) => ({
@@ -66,14 +66,11 @@ test('disabled trial rejects session bootstrap', async () => {
   });
   const server = await listen(app);
   try {
-    const response = await fetch(
-      `http://127.0.0.1:${server.address().port}/api/live-talk/session`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ conversationId: 'convo-1', sdp: 'offer' }),
-      },
-    );
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ conversationId: 'convo-1', sdp: 'offer' }),
+    });
     assert.equal(response.status, 403);
     const body = await response.json();
     assert.equal(body.error, 'live_talk_disabled');
@@ -86,7 +83,7 @@ test('enabled trial bootstraps a session and denies write tools', async () => {
   const app = createApp();
   const server = await listen(app);
   try {
-    const created = await fetch(`http://127.0.0.1:${server.address().port}/api/live-talk/session`, {
+    const created = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ conversationId: 'convo-1', sdp: 'offer' }),
@@ -95,7 +92,7 @@ test('enabled trial bootstraps a session and denies write tools', async () => {
     const session = await created.json();
     assert.equal(session.sdp, 'answer-sdp');
     const denied = await fetch(
-      `http://127.0.0.1:${server.address().port}/api/live-talk/session/${session.sessionId}/tool`,
+      `http://127.0.0.1:${server.address().port}/live-talk/session/${session.sessionId}/tool`,
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -104,7 +101,7 @@ test('enabled trial bootstraps a session and denies write tools', async () => {
     );
     assert.equal(denied.status, 403);
     const allowed = await fetch(
-      `http://127.0.0.1:${server.address().port}/api/live-talk/session/${session.sessionId}/tool`,
+      `http://127.0.0.1:${server.address().port}/live-talk/session/${session.sessionId}/tool`,
       {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -122,14 +119,14 @@ test('a second instructor cannot use another instructor session', async () => {
   const app = createApp();
   const server = await listen(app);
   try {
-    const created = await fetch(`http://127.0.0.1:${server.address().port}/api/live-talk/session`, {
+    const created = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ conversationId: 'convo-1', sdp: 'offer' }),
     });
     const session = await created.json();
     const other = await fetch(
-      `http://127.0.0.1:${server.address().port}/api/live-talk/session/${session.sessionId}/tool`,
+      `http://127.0.0.1:${server.address().port}/live-talk/session/${session.sessionId}/tool`,
       {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-user': 'instructor-2' },

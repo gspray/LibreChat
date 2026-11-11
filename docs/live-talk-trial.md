@@ -16,7 +16,7 @@ Rollback: set `LIVE_TALK_TRIAL=false` and recreate `api`. Session bootstrap then
 
 ## Manual checklist
 
-- Flag off: no usable Live Talk start; POST `/api/live-talk/session` rejected.
+- Flag off: no usable Live Talk start; POST `/live-talk/session` rejected.
 - Native mic in / spoken reply out; interrupt during playback.
 - Ask a directory or lesson question; the spoken answer uses a read tool.
 - Ask to schedule or message; the tool is denied and nothing is written.

@@ -33,7 +33,7 @@ Loaded with `NODE_OPTIONS=--require /app/config/ssmlabs/inject-index-html.js --r
 | `embed-passthrough-sw.js` | Replaces Workbox `/sw.js` so a cached `X-Frame-Options: SAMEORIGIN` cannot block the Assistant iframe. |
 | `branding/` | Favicons, `logo.svg`, Chat theme artwork, maskable/512 icons, `manifest.webmanifest`. Do not rewrite `client/public` or `client/vite.config.ts`. |
 | `attach-lessoncaddie-sso.js` + `lessonCaddieSso*.js` | Mounts `/sso/lessoncaddie` at `listen` without editing `api/server/index.js`. |
-| `attach-live-talk.js` + `liveTalk*.js` | Disabled-by-default Instructor Live Talk: `/api/live-talk`, Speak Core overlay, read-only MCP allowlist. |
+| `attach-live-talk.js` + `liveTalk*.js` | Disabled-by-default Instructor Live Talk: `/live-talk`, Speak Core overlay, read-only MCP allowlist. |
 | `lessonCaddieReturn.js` | Allow-list and `lessonCaddie` config payload for overlays. |
 
 ## Config and provision (not LibreChat UI source)

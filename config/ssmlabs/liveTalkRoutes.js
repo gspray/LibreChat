@@ -281,7 +281,7 @@ function createLiveTalkRouter(deps = {}) {
           model: loadConfig().model,
           error: false,
         },
-        { context: 'POST /api/live-talk/session/:id/transcript' },
+        { context: 'POST /live-talk/session/:id/transcript' },
       );
       record.parentMessageId = saved?.messageId || messageId;
       res.status(201).json({ ok: true, messageId: record.parentMessageId });
