@@ -127,7 +127,21 @@ body[data-lesson-caddie-chat-theme="true"]
   background-color: var(--lc-chat-sidebar-active) !important;
 }
 
-body[data-lesson-caddie-chat-theme="true"].lc-chat-landing [data-chat-pane] {
+body[data-lesson-caddie-chat-theme="true"].lc-chat-landing {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+body[data-lesson-caddie-chat-theme="true"].lc-chat-landing #root {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+body[data-lesson-caddie-chat-theme="true"].lc-chat-landing [data-chat-pane],
+body[data-lesson-caddie-chat-theme="true"] .lc-chat-pane-landing {
   display: flex !important;
   flex-direction: column !important;
   flex: 1 1 auto !important;
@@ -152,7 +166,7 @@ body[data-lesson-caddie-chat-theme="true"] .lc-assistant-landing-shell {
   margin-bottom: 0 !important;
   overflow: visible !important;
   padding-top: 1.15rem !important;
-  padding-bottom: 0.25rem !important;
+  padding-bottom: 0 !important;
 }
 
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-landing-shell,

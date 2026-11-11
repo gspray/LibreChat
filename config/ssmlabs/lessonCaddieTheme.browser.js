@@ -229,7 +229,11 @@
     documentObject.body.dataset.lessonCaddieChatTheme = 'true';
     const startersVisible = decorateStarters(documentObject);
     const heroVisible = startersVisible && decorateHero(documentObject);
-    documentObject.body.classList.toggle('lc-chat-landing', startersVisible && heroVisible);
+    const landingActive = startersVisible && heroVisible;
+    documentObject.body.classList.toggle('lc-chat-landing', landingActive);
+    if (landingActive) {
+      addClass(documentObject.querySelector?.('[data-chat-pane]'), 'lc-chat-pane-landing');
+    }
     decorateComposer(documentObject);
     decorateHeader(documentObject);
     decorateApproveLinks(documentObject);

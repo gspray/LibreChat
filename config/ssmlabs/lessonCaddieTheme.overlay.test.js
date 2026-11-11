@@ -173,6 +173,19 @@ test('decorate applies landing, starter, icon, and composer theme hooks', () => 
   assert.equal(documentObject.approveLink.classList.contains('lc-approve-link'), true);
 });
 
+test('decorate marks the chat pane on landing', () => {
+  const documentObject = buildThemeDocument();
+  const pane = new FakeElement();
+  const originalQuery = documentObject.querySelector.bind(documentObject);
+  documentObject.querySelector = (selector) => {
+    if (selector === '[data-chat-pane]') return pane;
+    if (selector === '[data-testid="composer-surface"]') return documentObject.composerSurface;
+    return originalQuery(selector);
+  };
+  assert.deepEqual(theme.decorate(documentObject), { landing: true });
+  assert.equal(pane.classList.contains('lc-chat-pane-landing'), true);
+});
+
 test('decorate does not apply landing when example starter chips are absent', () => {
   const documentObject = buildThemeDocument();
   const originalAll = documentObject.querySelectorAll.bind(documentObject);
