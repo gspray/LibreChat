@@ -164,12 +164,78 @@
     return confirmCue.test(text) && writeCue.test(text);
   }
 
+  function isApproveHref(href) {
+    const value = String(href || '')
+      .trim()
+      .toLowerCase();
+    return value === '#lc-approve' || value.endsWith('#lc-approve');
+  }
+
+  function isApproveLabel(text) {
+    return normalizeText(text).toLowerCase() === 'i approve';
+  }
+
+  function linkHref(link) {
+    if (link && typeof link.getAttribute === 'function') {
+      const fromAttr = link.getAttribute('href');
+      if (fromAttr) {
+        return fromAttr;
+      }
+    }
+    return link?.href || '';
+  }
+
+  function findApproveLinks(root) {
+    const seen = new Set();
+    const matches = [];
+    for (const selector of ['a[href]', 'a']) {
+      for (const link of Array.from(root?.querySelectorAll?.(selector) || [])) {
+        if (seen.has(link)) {
+          continue;
+        }
+        seen.add(link);
+        if (isApproveHref(linkHref(link)) || isApproveLabel(link.textContent)) {
+          matches.push(link);
+        }
+      }
+    }
+    return matches;
+  }
+
+  function dedupeApproveLinks(body) {
+    const links = findApproveLinks(body);
+    if (links.length <= 1) {
+      return;
+    }
+    const keep =
+      links.find((link) => link.dataset.lcInjectedApprove !== 'true') || links[links.length - 1];
+    for (const link of links) {
+      if (link !== keep) {
+        link.remove();
+      }
+    }
+  }
+
+  function removePlainApproveDuplicates(body) {
+    if (!findApproveLinks(body).length) {
+      return;
+    }
+    for (const block of Array.from(body.querySelectorAll?.('p, div, li, span') || [])) {
+      if (block.querySelector?.('a[href]')) {
+        continue;
+      }
+      if (isApproveLabel(block.textContent) && normalizeText(block.textContent).length <= 12) {
+        block.remove();
+      }
+    }
+  }
+
   function injectApproveControl(documentObject) {
     const bodies = Array.from(
       documentObject.querySelectorAll?.('.agent-turn [data-testid="message-body"]') || [],
     );
     const last = bodies[bodies.length - 1];
-    if (!last || last.querySelector?.('a[href="#lc-approve"], a[href$="#lc-approve"]')) {
+    if (!last || findApproveLinks(last).length > 0) {
       return false;
     }
     if (!looksLikeConfirmationRequest(last.textContent)) {
@@ -178,18 +244,24 @@
     const link = documentObject.createElement('a');
     link.href = '#lc-approve';
     link.textContent = 'I approve';
+    link.dataset.lcInjectedApprove = 'true';
     addClass(link, 'lc-approve-link');
     last.appendChild(link);
     return true;
   }
 
   function decorateApproveLinks(documentObject) {
+    const bodies = Array.from(
+      documentObject.querySelectorAll?.('.agent-turn [data-testid="message-body"]') || [],
+    );
+    const last = bodies[bodies.length - 1];
+    if (last) {
+      dedupeApproveLinks(last);
+      removePlainApproveDuplicates(last);
+    }
     injectApproveControl(documentObject);
-    const links = Array.from(documentObject.querySelectorAll?.('a') || []);
-    for (const link of links) {
-      if (normalizeText(link.textContent).toLowerCase() === 'i approve') {
-        addClass(link, 'lc-approve-link');
-      }
+    for (const link of findApproveLinks(documentObject)) {
+      addClass(link, 'lc-approve-link');
     }
   }
 
@@ -276,6 +348,8 @@
     normalizeText,
     starterKind,
     looksLikeConfirmationRequest,
+    findApproveLinks,
+    dedupeApproveLinks,
   });
 
   if (typeof module === 'object' && module.exports) {

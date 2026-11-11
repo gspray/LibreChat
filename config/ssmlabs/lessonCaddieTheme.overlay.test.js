@@ -44,6 +44,19 @@ class FakeElement {
     this.attributes[name] = value;
   }
 
+  getAttribute(name) {
+    return Object.prototype.hasOwnProperty.call(this.attributes, name)
+      ? this.attributes[name]
+      : null;
+  }
+
+  remove() {
+    if (this.parentElement && Array.isArray(this.parentElement.children)) {
+      this.parentElement.children = this.parentElement.children.filter((child) => child !== this);
+    }
+    this.parentElement = null;
+  }
+
   prepend(child) {
     child.parentElement = this;
     this.children.unshift(child);
@@ -125,6 +138,8 @@ function buildThemeDocument() {
   composerForm.parentElement = composerBand;
   composerSurface.closestMatch = (selector) => (selector === 'form' ? composerForm : null);
   const approveLink = new FakeElement('I approve');
+  approveLink.href = '#lc-approve';
+  approveLink.setAttribute('href', '#lc-approve');
 
   return {
     body,
@@ -139,7 +154,7 @@ function buildThemeDocument() {
     querySelectorAll(selector) {
       if (selector === 'button') return buttons;
       if (selector === 'h1,h2,h3,[role="heading"],span,div') return [title];
-      if (selector === 'a') return [approveLink];
+      if (selector === 'a' || selector === 'a[href]') return [approveLink];
       return [];
     },
     querySelector(selector) {
@@ -220,6 +235,26 @@ test('looksLikeConfirmationRequest matches write confirmations only', () => {
   );
   assert.equal(theme.looksLikeConfirmationRequest('Which student did you mean?'), false);
   assert.equal(theme.looksLikeConfirmationRequest('Booked the lesson for Taylor.'), false);
+});
+
+test('decorate does not duplicate an existing markdown I approve control', () => {
+  const documentObject = buildThemeDocument();
+  const body = new FakeElement('Please confirm the note for Janet.');
+  const existing = new FakeElement('I approve');
+  existing.href = 'https://chat.example/c/x#lc-approve';
+  existing.setAttribute('href', existing.href);
+  body.appendChild(existing);
+  const originalAll = documentObject.querySelectorAll.bind(documentObject);
+  documentObject.querySelectorAll = (selector) => {
+    if (selector === '.agent-turn [data-testid="message-body"]') return [body];
+    if (selector === 'a[href]') return [existing];
+    if (selector === 'a') return [existing];
+    return originalAll(selector);
+  };
+  theme.decorate(documentObject);
+  assert.equal(body.children.length, 1);
+  assert.equal(body.children[0], existing);
+  assert.equal(existing.classList.contains('lc-approve-link'), true);
 });
 
 test('decorate injects I approve on the latest confirmation message', () => {
