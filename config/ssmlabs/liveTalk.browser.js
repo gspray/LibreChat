@@ -43,12 +43,15 @@
   }
 
   function summarizeError(error, extra) {
+    const debug = error?.debug && typeof error.debug === 'object' ? error.debug : null;
     return {
       name: error?.name || '',
       message: error?.message || String(error || ''),
       code: error?.code || '',
       status: error?.status || '',
-      debug: error?.debug || null,
+      openaiStatus: debug?.openaiStatus || '',
+      openaiBody: debug?.openaiBody || '',
+      debug,
       ...(extra || {}),
     };
   }

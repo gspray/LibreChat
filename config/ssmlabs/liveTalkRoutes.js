@@ -16,6 +16,24 @@ function clean(value) {
   return String(value || '').trim();
 }
 
+function normalizeSdp(value) {
+  const text = String(value || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/^\s+/, '')
+    .replace(/\s+$/, '');
+  if (!text) return '';
+  return `${text}\n`;
+}
+
+function openaiErrorMessage(body) {
+  try {
+    const parsed = JSON.parse(body);
+    return clean(parsed?.error?.message);
+  } catch {
+    return '';
+  }
+}
+
 function userIdOf(req) {
   return clean(req.user?.id || req.user?._id);
 }
@@ -95,14 +113,17 @@ async function bootstrapOpenAi({ sdp, session }) {
     liveTalkLog('error', 'openai.unconfigured', { hasKey: false });
     throw publicError(503, 'openai_unconfigured', 'Live Talk is missing a server OpenAI key.');
   }
+  const offer = normalizeSdp(sdp);
   const form = new FormData();
-  form.set('sdp', sdp);
+  form.set('sdp', offer);
   form.set('session', JSON.stringify(session));
   liveTalkLog('info', 'openai.bootstrap.start', {
     model: session?.model || '',
     voice: session?.audio?.output?.voice || '',
     toolCount: Array.isArray(session?.tools) ? session.tools.length : 0,
-    sdpChars: String(sdp || '').length,
+    sdpChars: offer.length,
+    sdpEndsWithNewline: offer.endsWith('\n'),
+    sdpTail: clip(offer.slice(-24), 24),
   });
   const response = await fetch('https://api.openai.com/v1/realtime/calls', {
     method: 'POST',
@@ -113,10 +134,12 @@ async function bootstrapOpenAi({ sdp, session }) {
   });
   const answer = await response.text();
   if (!response.ok) {
+    const openaiMessage = openaiErrorMessage(answer);
+    const clientStatus = response.status >= 400 && response.status < 500 ? 400 : 502;
     const error = publicError(
-      502,
+      clientStatus,
       'openai_session_failed',
-      'Could not start the voice session. Try again in a moment.',
+      openaiMessage || 'Could not start the voice session. Try again in a moment.',
     );
     error.debug = {
       openaiStatus: response.status,
@@ -174,16 +197,17 @@ function createLiveTalkRouter(deps = {}) {
     try {
       const config = loadConfig();
       const userId = userIdOf(req);
+      const sdp = normalizeSdp(req.body?.sdp);
       liveTalkLog('info', 'session.create.request', {
         userId: userId ? 'set' : '',
         conversationId: clean(req.body?.conversationId),
-        sdpChars: clean(req.body?.sdp).length,
+        sdpChars: sdp.length,
+        sdpEndsWithNewline: sdp.endsWith('\n'),
       });
       if (!userId) {
         throw publicError(401, 'unauthorized', 'Sign in to use Live Talk.');
       }
       const requestedId = clean(req.body?.conversationId);
-      const sdp = clean(req.body?.sdp);
       if (!sdp) {
         throw publicError(400, 'invalid_session', 'Live Talk is missing a voice offer.');
       }
