@@ -438,7 +438,16 @@
             callId: call.callId,
           }),
         });
-        return payload.result;
+        const result = payload.result;
+        if (call.name === 'open_app_screen') {
+          const overlay = windowObject.LessonCaddieNavigationOverlay;
+          const opened = overlay?.onPayload?.(result);
+          liveTalkLog('tool.navigate', {
+            opened: Boolean(opened),
+            destination: result?.destination || result?.structuredContent?.destination || '',
+          });
+        }
+        return result;
       },
     });
     bridge.attach(session);

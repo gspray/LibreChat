@@ -287,6 +287,7 @@ function createLiveTalkRouter(deps = {}) {
         sessionId,
         conversationId,
         toolCount: tools.length,
+        tools: tools.map((tool) => tool.name),
       });
       res.status(201).json({
         sessionId,
@@ -304,7 +305,16 @@ function createLiveTalkRouter(deps = {}) {
       const config = loadConfig();
       const record = requireSession(req);
       const name = clean(req.body?.name);
+      liveTalkLog('info', 'tool.call', {
+        sessionId: record.id,
+        name,
+        argumentKeys:
+          req.body?.arguments && typeof req.body.arguments === 'object'
+            ? Object.keys(req.body.arguments)
+            : [],
+      });
       if (!isAllowedLiveTalkTool(name, config)) {
+        liveTalkLog('warn', 'tool.denied', { name, allowlist: config.allowlist });
         throw publicError(
           403,
           'tool_denied',
@@ -318,6 +328,10 @@ function createLiveTalkRouter(deps = {}) {
         toolArguments:
           req.body?.arguments && typeof req.body.arguments === 'object' ? req.body.arguments : {},
         conversationId: record.conversationId,
+      });
+      liveTalkLog('info', 'tool.ok', {
+        name,
+        resultType: result && typeof result === 'object' ? result.type || 'object' : typeof result,
       });
       res.json({ ok: true, result });
     } catch (error) {

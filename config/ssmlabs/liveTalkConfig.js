@@ -11,12 +11,36 @@ const DEFAULT_MAX_SESSIONS_PER_USER = 1;
 
 const DEFAULT_READ_TOOLS = Object.freeze([
   'get_my_account',
+  'resolve_relative_date',
   'search_directory',
   'get_student',
   'search_lessons',
   'get_lesson',
   'get_instructor_briefing',
+  'summarize_roster_health',
+  'summarize_upcoming_schedule',
+  'get_business_overview',
+  'get_weather_forecast',
+  'open_app_screen',
 ]);
+
+const VOICE_TOOL_HINTS = Object.freeze({
+  get_my_account: 'Read the instructor account, timezone, and local calendar clock.',
+  resolve_relative_date:
+    'Convert today, tomorrow, or a weekday into YYYY-MM-DD in the instructor timezone.',
+  search_directory:
+    'Search or list students. Omit query to list the roster. Use the returned total for “how many students.”',
+  get_student: 'Read one student by name or contactId.',
+  search_lessons: 'Search lessons and use total for lesson counts.',
+  get_lesson: 'Read one authorized lesson by lessonId.',
+  get_instructor_briefing: 'Read upcoming and recent lessons for a spoken briefing.',
+  summarize_roster_health: 'Summarize roster follow-up counts without listing every student.',
+  summarize_upcoming_schedule: 'Summarize booked teaching load for the next 28 days.',
+  get_business_overview: 'Read My Business headline metrics.',
+  get_weather_forecast: 'Read weather for the instructor ZIP or a named location.',
+  open_app_screen:
+    'Open an app screen only when asked to open, go to, or show that page. Calendar → destination calendar. Stay in voice for lookups.',
+});
 
 const DEFAULT_WRITE_TOOLS = Object.freeze([
   'add_student',
@@ -98,17 +122,25 @@ function liveTalkInstructions(agentInstructions) {
   const extra = [
     'You are in LessonCaddie Live Talk.',
     'Speak naturally. LessonCaddie facts must come from tools.',
-    'Only the provided read-only tools are available.',
+    'For how many students or roster size, call search_directory with no query and speak the returned total.',
+    'When the user asks to open, go to, or show a page, call open_app_screen. Calendar is destination calendar. Today is today. Students list is student-list.',
+    'Only the provided read and navigation tools are available.',
     'If asked to send messages, schedule, change, cancel, or otherwise mutate LessonCaddie data, say that action is not available in Live Talk and they can continue in typed Chat.',
     'Do not claim a write succeeded.',
   ].join(' ');
   return base ? `${base}\n\n${extra}` : extra;
 }
 
+function voiceToolHint(name) {
+  return VOICE_TOOL_HINTS[String(name || '').trim()] || `LessonCaddie tool ${name}`;
+}
+
 module.exports = {
   DEFAULT_READ_TOOLS,
   DEFAULT_WRITE_TOOLS,
+  VOICE_TOOL_HINTS,
   resolveLiveTalkConfig,
   isAllowedLiveTalkTool,
   liveTalkInstructions,
+  voiceToolHint,
 };

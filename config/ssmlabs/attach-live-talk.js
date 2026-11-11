@@ -6,6 +6,7 @@
  */
 const http = require('http');
 const { createLiveTalkRouter } = require('./liveTalkRoutes');
+const { voiceToolHint } = require('./liveTalkConfig');
 
 const originalListen = http.Server.prototype.listen;
 
@@ -50,6 +51,7 @@ function createBoundRouter() {
       const listed = await connection.listTools?.();
       const tools = listed?.tools || listed || [];
       if (Array.isArray(tools) && tools.length) {
+        console.info('[ssmlabs-live-talk] MCP tool list ok', { count: tools.length });
         return tools;
       }
     } catch (error) {
@@ -62,7 +64,7 @@ function createBoundRouter() {
     }
     return config.allowlist.map((name) => ({
       name,
-      description: `Read-only LessonCaddie tool ${name}`,
+      description: voiceToolHint(name),
       inputSchema: { type: 'object', additionalProperties: true },
     }));
   }
@@ -81,15 +83,30 @@ function createBoundRouter() {
       tokenMethods,
       requestBody: { conversationId },
     });
-    const text = Array.isArray(result) ? result[0] : result;
-    if (typeof text === 'string') {
+    return unwrapMcpResult(result);
+  }
+
+  function unwrapMcpResult(result) {
+    if (result == null) return null;
+    if (typeof result === 'string') {
       try {
-        return JSON.parse(text);
+        return unwrapMcpResult(JSON.parse(result));
       } catch {
-        return { text };
+        return { text: result };
       }
     }
-    return text ?? null;
+    if (Array.isArray(result)) {
+      return unwrapMcpResult(result[0]);
+    }
+    if (typeof result !== 'object') return result;
+    if (result.structuredContent && typeof result.structuredContent === 'object') {
+      return result.structuredContent;
+    }
+    if (Array.isArray(result.content)) {
+      const first = result.content.find((part) => part && part.text != null) || result.content[0];
+      return unwrapMcpResult(first && first.text != null ? first.text : first);
+    }
+    return result;
   }
 
   const router = require('express').Router();

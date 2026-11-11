@@ -22,6 +22,15 @@ test('write tools cannot enter the voice allowlist even if listed as reads', () 
   assert.equal(isAllowedLiveTalkTool('open_app_screen', config), false);
 });
 
+test('Live Talk includes roster reads and app navigation by default', () => {
+  const config = resolveLiveTalkConfig({});
+  assert.equal(isAllowedLiveTalkTool('search_directory', config), true);
+  assert.equal(isAllowedLiveTalkTool('open_app_screen', config), true);
+  assert.equal(isAllowedLiveTalkTool('create_lesson', config), false);
+});
+
 test('voice instructions keep writes out of Live Talk even if the agent prompt is silent', () => {
   assert.match(liveTalkInstructions('Be helpful.'), /not available in Live Talk/i);
+  assert.match(liveTalkInstructions('Be helpful.'), /search_directory/i);
+  assert.match(liveTalkInstructions('Be helpful.'), /open_app_screen/i);
 });
