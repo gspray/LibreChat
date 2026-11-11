@@ -9,17 +9,6 @@
     "review a student's practice plan": 'practice',
   });
 
-  const ICONS = Object.freeze({
-    students:
-      '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-    lessons:
-      '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/><path d="M8 15h3M8 18h6"/></svg>',
-    schedule:
-      '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="15" height="16" rx="2"/><path d="M14 3v4M7 3v4M3 11h15M18 14v6M15 17h6"/></svg>',
-    practice:
-      '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h6M9 3v4M7 5H5a2 2 0 0 0-2 2v13h12"/><path d="m16 18 2 2 4-5"/><path d="M7 11h5M7 15h3"/></svg>',
-  });
-
   function normalizeText(value) {
     return String(value || '')
       .replace(/\s+/g, ' ')
@@ -124,20 +113,14 @@
     return true;
   }
 
-  function decorateStarter(documentObject, button, kind) {
-    addClass(button, 'lc-conversation-starter');
-    button.dataset.lcStarterKind = kind;
-    if (button.querySelector?.('.lc-starter-icon')) {
-      return;
-    }
-    const icon = documentObject.createElement('span');
-    icon.className = 'lc-starter-icon';
-    icon.setAttribute('aria-hidden', 'true');
-    icon.innerHTML = ICONS[kind];
-    button.prepend(icon);
-  }
-
   function decorateStarters(documentObject) {
+    const managed = documentObject.querySelector?.(
+      '.lc-conversation-starters[data-lc-managed="true"]',
+    );
+    if (managed) {
+      addClass(managed, 'lc-conversation-starters');
+      return managed.querySelectorAll('.lc-conversation-starter-chip').length >= 1;
+    }
     const buttons = Array.from(documentObject.querySelectorAll?.('button') || []);
     const starters = [];
     for (const button of buttons) {
@@ -145,7 +128,8 @@
       if (!kind) {
         continue;
       }
-      decorateStarter(documentObject, button, kind);
+      addClass(button, 'lc-conversation-starter');
+      button.dataset.lcStarterKind = kind;
       starters.push(button);
     }
     if (starters.length >= 2) {

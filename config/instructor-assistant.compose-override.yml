@@ -9,7 +9,7 @@ services:
       APP_TITLE: Ask Lesson Caddie Assistant
       APP_SHORT_NAME: Ask Caddie
       SSMLABS_BRANDING_ASSET_VERSION: "1"
-      SSMLABS_CHAT_THEME_ASSET_VERSION: "13"
+      SSMLABS_CHAT_THEME_ASSET_VERSION: "14"
       HIDE_TOOL_ACTIVITY: "true"
       INSTRUCTOR_ASSISTANT_MODEL: gpt-4o
       LIBRECHAT_INSTANCE_ENV: ${LIBRECHAT_INSTANCE_ENV:-}
@@ -32,6 +32,7 @@ services:
       - ./config/ssmlabs/hide-agent-owner-contact.browser.js:/app/client/dist/ssmlabs/hide-agent-owner-contact.js:ro
       - ./config/ssmlabs/lessonCaddieNavigationBridge.browser.js:/app/client/dist/ssmlabs/lesson-caddie-navigation-bridge.js:ro
       - ./config/ssmlabs/lessonCaddieTheme.browser.js:/app/client/dist/ssmlabs/lesson-caddie-theme.js:ro
+      - ./config/ssmlabs/lessonCaddieConversationStarters.browser.js:/app/client/dist/ssmlabs/lesson-caddie-conversation-starters.js:ro
       - ./config/ssmlabs/lesson-caddie-theme.css:/app/client/dist/ssmlabs/lesson-caddie-theme.css:ro
       - ./config/ssmlabs/embed-passthrough-sw.js:/app/client/dist/sw.js:ro
       - ./config/ssmlabs/branding/manifest.webmanifest:/app/client/dist/manifest.webmanifest:ro

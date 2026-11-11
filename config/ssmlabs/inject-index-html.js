@@ -18,6 +18,7 @@ const NAV_BRIDGE_SENTINEL = 'data-ssmlabs-nav-bridge="true"';
 const LOGIN_FALLBACK_SENTINEL = 'data-ssmlabs-login-fallback="true"';
 const CHAT_THEME_STYLE_SENTINEL = 'data-ssmlabs-chat-theme-style="true"';
 const CHAT_THEME_SCRIPT_SENTINEL = 'data-ssmlabs-chat-theme-script="true"';
+const CONVERSATION_STARTERS_SENTINEL = 'data-ssmlabs-conversation-starters="true"';
 const CHAT_THEME_BASE_SENTINEL = 'data-ssmlabs-chat-theme-base="true"';
 const CHAT_THEME_BASE_STYLE = `<style ${CHAT_THEME_BASE_SENTINEL}>html,body{background:#0c1218;color:#e8e4dc;color-scheme:dark}</style>`;
 const OWNER_CONTACT_SCRIPT = `<script src="ssmlabs/hide-agent-owner-contact.js?v=1" defer ${OWNER_CONTACT_SENTINEL}></script>`;
@@ -180,6 +181,13 @@ function injectOverlayScripts(html) {
   }
   if (!next.includes(CHAT_THEME_SCRIPT_SENTINEL)) {
     next = next.replace('</head>', `${chatTheme.script}\n</head>`);
+  }
+  if (!next.includes(CONVERSATION_STARTERS_SENTINEL)) {
+    const startersVersion = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '10').trim() || '10';
+    next = next.replace(
+      '</head>',
+      `<script src="ssmlabs/lesson-caddie-conversation-starters.js?v=${escapeHtml(startersVersion)}" defer ${CONVERSATION_STARTERS_SENTINEL}></script>\n</head>`,
+    );
   }
   if (!next.includes(OWNER_CONTACT_SENTINEL)) {
     next = next.replace('</head>', `${OWNER_CONTACT_SCRIPT}\n</head>`);
