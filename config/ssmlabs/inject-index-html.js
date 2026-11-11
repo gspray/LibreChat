@@ -153,7 +153,7 @@ function buildLoginFallbackScript() {
 }
 
 function buildChatThemeTags() {
-  const version = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '4').trim() || '4';
+  const version = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '5').trim() || '5';
   return {
     style: `<link rel="stylesheet" href="ssmlabs/lesson-caddie-theme.css?v=${escapeHtml(version)}" ${CHAT_THEME_STYLE_SENTINEL} />`,
     script: `<script src="ssmlabs/lesson-caddie-theme.js?v=${escapeHtml(version)}" defer ${CHAT_THEME_SCRIPT_SENTINEL}></script>`,

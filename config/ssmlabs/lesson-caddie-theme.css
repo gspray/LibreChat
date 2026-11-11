@@ -134,16 +134,28 @@ body[data-lesson-caddie-chat-theme="true"] .lc-assistant-landing-shell {
   padding-bottom: 0 !important;
 }
 
+body[data-lesson-caddie-chat-theme="true"] .lc-assistant-landing-shell,
+body[data-lesson-caddie-chat-theme="true"] .lc-assistant-landing-content {
+  align-items: flex-start !important;
+  text-align: left !important;
+}
+
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-landing-content {
   gap: 0.35rem !important;
+  padding-inline: 1.25rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-hero-row {
   position: relative;
   z-index: 1;
+  align-items: flex-start !important;
+  align-self: flex-start;
   flex-direction: column !important;
   gap: 0.55rem !important;
   margin-top: 0 !important;
+  text-align: left !important;
 }
 
 body[data-lesson-caddie-chat-theme="true"] .lc-default-agent-icon {
@@ -165,6 +177,7 @@ body[data-lesson-caddie-chat-theme="true"] .lc-assistant-title {
   font-weight: 750 !important;
   letter-spacing: -0.035em;
   line-height: 1.08;
+  text-align: left !important;
   text-shadow: 0 4px 24px rgba(0, 0, 0, 0.34);
 }
 
@@ -179,16 +192,20 @@ body[data-lesson-caddie-chat-theme="true"] .lc-assistant-title--accent {
 
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-title-wrap {
   position: relative;
+  align-self: flex-start;
+  width: max-content;
+  max-width: 100%;
   padding-bottom: 1.75rem !important;
+  text-align: left;
 }
 
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-title-wrap::after {
   position: absolute;
-  left: 50%;
+  left: 0;
   bottom: 0.35rem;
   width: min(19rem, 72vw);
   height: 1px;
-  transform: translateX(-50%);
+  transform: none;
   background:
     linear-gradient(
       90deg,
@@ -205,7 +222,7 @@ body[data-lesson-caddie-chat-theme="true"] .lc-assistant-title-wrap::after {
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-title-wrap::before {
   position: absolute;
   z-index: 1;
-  left: 50%;
+  left: min(9.5rem, 36vw);
   bottom: -0.05rem;
   width: 1rem;
   height: 1rem;
@@ -220,11 +237,12 @@ body[data-lesson-caddie-chat-theme="true"] .lc-assistant-title-wrap::before {
 body[data-lesson-caddie-chat-theme="true"] .lc-assistant-description {
   z-index: 1;
   max-width: 34rem !important;
-  margin: 0.65rem 1rem 0 !important;
+  margin: 0.65rem 0 0 !important;
   color: var(--lc-chat-muted) !important;
   font-size: clamp(0.9rem, 3vw, 1.05rem) !important;
   line-height: 1.55;
-  text-wrap: balance;
+  text-align: left;
+  text-wrap: pretty;
 }
 
 body[data-lesson-caddie-chat-theme="true"] .lc-conversation-starters {
