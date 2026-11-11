@@ -179,7 +179,7 @@ body[data-lesson-caddie-chat-theme="true"]
 body[data-lesson-caddie-chat-theme="true"] [data-chat-pane] > div.flex.h-full.transform-gpu {
   justify-content: flex-start !important;
   align-items: center !important;
-  padding-top: 1.15rem !important;
+  padding-top: 1.75rem !important;
   padding-bottom: 0 !important;
   text-align: center !important;
   overflow: visible !important;
@@ -192,7 +192,7 @@ body[data-lesson-caddie-chat-theme="true"] .lc-assistant-landing-shell {
   justify-content: flex-start !important;
   margin-bottom: 0 !important;
   overflow: visible !important;
-  padding-top: 1.15rem !important;
+  padding-top: 1.75rem !important;
   padding-bottom: 0 !important;
 }
 
@@ -219,7 +219,7 @@ body[data-lesson-caddie-chat-theme="true"] .lc-assistant-hero-row {
   flex-direction: column !important;
   width: 100%;
   gap: 0.55rem !important;
-  margin-top: 0 !important;
+  margin-top: 0.35rem !important;
   text-align: center !important;
 }
 
@@ -232,7 +232,7 @@ body[data-lesson-caddie-chat-theme="true"] .lc-assistant-mark {
   width: clamp(4rem, 13vw, 5.4rem);
   aspect-ratio: 1;
   margin-inline: auto;
-  margin-top: 0.15rem;
+  margin-top: 0.55rem;
   margin-bottom: 0.55rem;
   border-radius: 1.65rem;
   background: url("../assets/instructor-assistant-spark.svg?v=1") center / contain no-repeat;
