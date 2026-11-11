@@ -313,7 +313,7 @@ body[data-lesson-caddie-color-theme="default"] .lc-assistant-description {
   text-wrap: pretty;
 }
 
-body[data-lesson-caddie-color-theme="default"] .lc-conversation-starters {
+body[data-lesson-caddie-embed="true"] .lc-conversation-starters {
   position: relative;
   z-index: 1;
   display: grid !important;
@@ -324,7 +324,7 @@ body[data-lesson-caddie-color-theme="default"] .lc-conversation-starters {
   padding: 0 !important;
 }
 
-body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter {
+body[data-lesson-caddie-embed="true"] .lc-conversation-starter {
   min-height: 3rem;
   max-width: none !important;
   border: 1px solid var(--lc-chat-border);
@@ -338,13 +338,13 @@ body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter {
   backdrop-filter: blur(9px);
 }
 
-body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter:nth-child(n + 3) {
+body[data-lesson-caddie-embed="true"] .lc-conversation-starter:nth-child(n + 3) {
   grid-column: 1 / -1;
   justify-self: center;
   width: min(100%, 24rem);
 }
 
-body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter[data-lc-starter-kind="schedule"] {
+body[data-lesson-caddie-embed="true"] .lc-conversation-starter[data-lc-starter-kind="schedule"] {
   border-color: rgba(228, 191, 98, 0.76);
   box-shadow:
     inset 0 0 0 1px rgba(255, 235, 171, 0.08),
@@ -352,13 +352,13 @@ body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter[data-lc-
     0 8px 24px rgba(0, 0, 0, 0.25);
 }
 
-body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter:hover {
+body[data-lesson-caddie-embed="true"] .lc-conversation-starter:hover {
   border-color: var(--lc-chat-green-soft);
   background: rgba(11, 49, 39, 0.9) !important;
   color: #fff !important;
 }
 
-body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter:focus-visible {
+body[data-lesson-caddie-embed="true"] .lc-conversation-starter:focus-visible {
   outline: 2px solid var(--lc-chat-gold-soft);
   outline-offset: 3px;
 }
@@ -367,7 +367,7 @@ body[data-lesson-caddie-color-theme="default"] .lc-starter-icon {
   display: none !important;
 }
 
-body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter-chip {
+body[data-lesson-caddie-embed="true"] .lc-conversation-starter-chip {
   position: relative;
   display: flex;
   align-items: stretch;
@@ -375,7 +375,7 @@ body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter-chip {
   overflow: hidden;
 }
 
-body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter-send {
+body[data-lesson-caddie-embed="true"] .lc-conversation-starter-send {
   flex: 1 1 auto;
   min-width: 0;
   border: 0;
@@ -389,14 +389,14 @@ body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter-send {
   pointer-events: auto;
 }
 
-body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter-label {
+body[data-lesson-caddie-embed="true"] .lc-conversation-starter-label {
   display: block;
   line-clamp: 2;
   overflow: hidden;
   text-wrap: balance;
 }
 
-body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter-edit {
+body[data-lesson-caddie-embed="true"] .lc-conversation-starter-edit {
   position: absolute;
   top: 50%;
   right: 0.45rem;
@@ -416,17 +416,17 @@ body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter-edit {
   cursor: pointer;
 }
 
-body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter-edit:hover {
+body[data-lesson-caddie-embed="true"] .lc-conversation-starter-edit:hover {
   color: var(--lc-chat-gold-soft);
   background: rgba(228, 191, 98, 0.12);
 }
 
-body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter-edit svg {
+body[data-lesson-caddie-embed="true"] .lc-conversation-starter-edit svg {
   width: 0.95rem;
   height: 0.95rem;
 }
 
-body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter-input {
+body[data-lesson-caddie-embed="true"] .lc-conversation-starter-input {
   width: 100%;
   border: 0;
   background: transparent;
@@ -504,12 +504,12 @@ body[data-lesson-caddie-color-theme="default"] a[href$="#lc-approve"]:hover {
     background-size: auto 72vh;
   }
 
-  body[data-lesson-caddie-color-theme="default"] .lc-conversation-starters {
+  body[data-lesson-caddie-embed="true"] .lc-conversation-starters {
     width: calc(100% - 1.5rem);
     gap: 0.65rem !important;
   }
 
-  body[data-lesson-caddie-color-theme="default"] .lc-conversation-starter {
+  body[data-lesson-caddie-embed="true"] .lc-conversation-starter {
     min-height: 2.75rem;
     padding: 0.65rem 0.8rem !important;
     font-size: 0.83rem !important;
