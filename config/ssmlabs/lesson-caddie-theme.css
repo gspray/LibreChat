@@ -245,10 +245,15 @@ body[data-lesson-caddie-chat-theme="true"] .lc-assistant-description {
   text-wrap: pretty;
 }
 
+body[data-lesson-caddie-chat-theme="true"] .lc-conversation-starters,
+body[data-lesson-caddie-chat-theme="true"] .lc-conversation-starter {
+  display: none !important;
+}
+
 body[data-lesson-caddie-chat-theme="true"] .lc-conversation-starters {
   position: relative;
   z-index: 1;
-  display: grid !important;
+  display: none !important;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   width: min(44rem, calc(100% - 2rem));
   margin: 1.35rem auto 1.5rem !important;

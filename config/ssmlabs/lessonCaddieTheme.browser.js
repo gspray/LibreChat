@@ -9,17 +9,6 @@
     "review a student's practice plan": 'practice',
   });
 
-  const ICONS = Object.freeze({
-    students:
-      '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-    lessons:
-      '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/><path d="M8 15h3M8 18h6"/></svg>',
-    schedule:
-      '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="15" height="16" rx="2"/><path d="M14 3v4M7 3v4M3 11h15M18 14v6M15 17h6"/></svg>',
-    practice:
-      '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5h6M9 3v4M7 5H5a2 2 0 0 0-2 2v13h12"/><path d="m16 18 2 2 4-5"/><path d="M7 11h5M7 15h3"/></svg>',
-  });
-
   function normalizeText(value) {
     return String(value || '')
       .replace(/\s+/g, ' ')
@@ -124,20 +113,17 @@
     return true;
   }
 
-  function decorateStarter(documentObject, button, kind) {
-    addClass(button, 'lc-conversation-starter');
-    button.dataset.lcStarterKind = kind;
-    if (button.querySelector?.('.lc-starter-icon')) {
+  function hideNode(node) {
+    if (!node) {
       return;
     }
-    const icon = documentObject.createElement('span');
-    icon.className = 'lc-starter-icon';
-    icon.setAttribute('aria-hidden', 'true');
-    icon.innerHTML = ICONS[kind];
-    button.prepend(icon);
+    node.hidden = true;
+    if (node.style) {
+      node.style.display = 'none';
+    }
   }
 
-  function decorateStarters(documentObject) {
+  function hideStarters(documentObject) {
     const buttons = Array.from(documentObject.querySelectorAll?.('button') || []);
     const starters = [];
     for (const button of buttons) {
@@ -145,17 +131,20 @@
       if (!kind) {
         continue;
       }
-      decorateStarter(documentObject, button, kind);
+      addClass(button, 'lc-conversation-starter');
+      button.dataset.lcStarterKind = kind;
+      hideNode(button);
       starters.push(button);
     }
-    if (starters.length >= 2) {
-      const parent = starters[0].parentElement;
-      if (parent && starters.every((button) => button.parentElement === parent)) {
-        addClass(parent, 'lc-conversation-starters');
-      }
-      return true;
+    if (!starters.length) {
+      return false;
     }
-    return false;
+    const parent = starters[0].parentElement;
+    if (parent && starters.every((button) => button.parentElement === parent)) {
+      addClass(parent, 'lc-conversation-starters');
+      hideNode(parent);
+    }
+    return true;
   }
 
   function decorateApproveLinks(documentObject) {
@@ -186,13 +175,13 @@
     }
     documentObject.documentElement.dataset.lessonCaddieChatTheme = 'true';
     documentObject.body.dataset.lessonCaddieChatTheme = 'true';
-    const startersVisible = decorateStarters(documentObject);
-    const heroVisible = startersVisible && decorateHero(documentObject);
-    documentObject.body.classList.toggle('lc-chat-landing', startersVisible && heroVisible);
+    hideStarters(documentObject);
+    const heroVisible = decorateHero(documentObject);
+    documentObject.body.classList.toggle('lc-chat-landing', heroVisible);
     decorateComposer(documentObject);
     decorateHeader(documentObject);
     decorateApproveLinks(documentObject);
-    return { landing: startersVisible && heroVisible };
+    return { landing: heroVisible };
   }
 
   const api = Object.freeze({
