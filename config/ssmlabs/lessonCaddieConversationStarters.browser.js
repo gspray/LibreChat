@@ -325,12 +325,33 @@
     return Boolean(target.closest(`[${MANAGED_ATTR}="true"]`));
   }
 
+  function isNewChatLanding(documentObject) {
+    const pane = documentObject.querySelector?.('[data-chat-pane]') || documentObject.body;
+    if (!pane) {
+      return true;
+    }
+    return !pane.querySelector?.(
+      '[data-testid="message-body"], .user-turn, .agent-turn, [data-system-turn="true"]',
+    );
+  }
+
+  function removeManagedStarters(band) {
+    const host = band?.querySelector?.(`[${MANAGED_ATTR}="true"]`);
+    if (host) {
+      host.remove();
+    }
+  }
+
   async function render(documentObject) {
     if (editIndex >= 0 || renderInFlight) {
       return false;
     }
     const band = findComposerBand(documentObject);
     if (!band) {
+      return false;
+    }
+    if (!isNewChatLanding(documentObject)) {
+      removeManagedStarters(band);
       return false;
     }
     renderInFlight = true;
@@ -370,7 +391,7 @@
     void render(documentObject);
   }
 
-  const api = Object.freeze({ render, loadPrompts, savePrompts });
+  const api = Object.freeze({ render, loadPrompts, savePrompts, isNewChatLanding });
 
   if (typeof module === 'object' && module.exports) {
     module.exports = api;

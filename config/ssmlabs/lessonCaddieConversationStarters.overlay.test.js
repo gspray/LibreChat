@@ -25,3 +25,10 @@ test('conversation starters overlay hides native band siblings and inserts above
   assert.match(startersSrc, /insertStarterHost/);
   assert.match(startersSrc, /band\.insertBefore\(host, form\)/);
 });
+
+test('conversation starters render only on new chats with no messages', () => {
+  assert.match(startersSrc, /function isNewChatLanding/);
+  assert.match(startersSrc, /removeManagedStarters/);
+  assert.match(startersSrc, /data-testid="message-body"/);
+  assert.match(startersSrc, /!isNewChatLanding\(documentObject\)/);
+});

@@ -238,17 +238,32 @@
     }
   }
 
+  function isNewChatLanding(documentObject) {
+    const checker = globalObject.LessonCaddieConversationStarters?.isNewChatLanding;
+    if (typeof checker === 'function') {
+      return checker(documentObject);
+    }
+    const pane = documentObject.querySelector?.('[data-chat-pane]') || documentObject.body;
+    return !pane?.querySelector?.(
+      '[data-testid="message-body"], .user-turn, .agent-turn, [data-system-turn="true"]',
+    );
+  }
+
   function decorate(documentObject) {
     if (!documentObject?.documentElement || !documentObject?.body) {
       return { landing: false };
     }
     syncColorThemeAttributes(documentObject);
-    const startersVisible = decorateStarters(documentObject);
-    const heroVisible = decorateHero(documentObject);
-    const landingActive = startersVisible || heroVisible;
+    const newChat = isNewChatLanding(documentObject);
+    const startersVisible = newChat && decorateStarters(documentObject);
+    const heroVisible = newChat && decorateHero(documentObject);
+    const landingActive = newChat && (startersVisible || heroVisible);
     documentObject.body.classList.toggle('lc-chat-landing', landingActive);
+    const pane = documentObject.querySelector?.('[data-chat-pane]');
     if (landingActive) {
-      addClass(documentObject.querySelector?.('[data-chat-pane]'), 'lc-chat-pane-landing');
+      addClass(pane, 'lc-chat-pane-landing');
+    } else {
+      pane?.classList?.remove?.('lc-chat-pane-landing');
     }
     decorateComposer(documentObject);
     decorateHeader(documentObject);
