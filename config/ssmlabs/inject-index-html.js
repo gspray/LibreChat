@@ -19,8 +19,19 @@ const LOGIN_FALLBACK_SENTINEL = 'data-ssmlabs-login-fallback="true"';
 const CHAT_THEME_STYLE_SENTINEL = 'data-ssmlabs-chat-theme-style="true"';
 const CHAT_THEME_SCRIPT_SENTINEL = 'data-ssmlabs-chat-theme-script="true"';
 const CONVERSATION_STARTERS_SENTINEL = 'data-ssmlabs-conversation-starters="true"';
-const CHAT_THEME_BASE_SENTINEL = 'data-ssmlabs-chat-theme-base="true"';
-const CHAT_THEME_BASE_STYLE = `<style ${CHAT_THEME_BASE_SENTINEL}>html,body{background:#0c1218;color:#e8e4dc;color-scheme:dark}</style>`;
+const CHAT_THEME_SEED_SENTINEL = 'data-ssmlabs-chat-theme-seed="true"';
+const LESSON_CADDIE_DEFAULT_APPEARANCE = 'lesson-caddie-default';
+const CHAT_THEME_APPEARANCE_SEED_SCRIPT = `<script ${CHAT_THEME_SEED_SENTINEL}>
+(function seedLessonCaddieDefaultAppearance() {
+  try {
+    if (localStorage.getItem('color-theme')) {
+      return;
+    }
+    localStorage.setItem('color-theme', ${JSON.stringify(LESSON_CADDIE_DEFAULT_APPEARANCE)});
+  } catch (_) {}
+})();
+</script>`;
+const CHAT_THEME_EMBED_SENTINEL = 'data-ssmlabs-chat-theme-embed="true"';
 const OWNER_CONTACT_SCRIPT = `<script src="ssmlabs/hide-agent-owner-contact.js?v=1" defer ${OWNER_CONTACT_SENTINEL}></script>`;
 const NAV_BRIDGE_SCRIPT = `<script src="ssmlabs/lesson-caddie-navigation-bridge.js?v=10" ${NAV_BRIDGE_SENTINEL}></script>`;
 const EMBED_SW_SCRIPT = `<script ${EMBED_SW_SENTINEL}>
@@ -161,14 +172,20 @@ function buildChatThemeTags() {
   };
 }
 
-function applyChatThemeRoot(html) {
+function applyLessonCaddieEmbedRoot(html) {
   let next = html;
-  if (!next.includes('data-lesson-caddie-chat-theme=')) {
-    next = next.replace(/<html\b([^>]*)>/i, '<html$1 data-lesson-caddie-chat-theme="true">');
-    next = next.replace(/<body\b([^>]*)>/i, '<body$1 data-lesson-caddie-chat-theme="true">');
+  if (!next.includes('data-lesson-caddie-embed=')) {
+    next = next.replace(/<html\b([^>]*)>/i, '<html$1 data-lesson-caddie-embed="true">');
+    next = next.replace(/<body\b([^>]*)>/i, '<body$1 data-lesson-caddie-embed="true">');
   }
-  if (!next.includes(CHAT_THEME_BASE_SENTINEL)) {
-    next = next.replace(/<head\b[^>]*>/i, (match) => `${match}\n${CHAT_THEME_BASE_STYLE}`);
+  if (!next.includes(CHAT_THEME_SEED_SENTINEL)) {
+    next = next.replace(
+      /<head\b[^>]*>/i,
+      (match) => `${match}\n${CHAT_THEME_APPEARANCE_SEED_SCRIPT}`,
+    );
+  }
+  if (!next.includes(CHAT_THEME_EMBED_SENTINEL)) {
+    next = next.replace('</head>', `    <!-- ${CHAT_THEME_EMBED_SENTINEL} -->\n</head>`);
   }
   return next;
 }
@@ -208,7 +225,7 @@ function injectOverlayScripts(html) {
 }
 
 function injectIndexHtml(html) {
-  return applyChatThemeRoot(injectOverlayScripts(injectBaseHref(injectBranding(html))));
+  return applyLessonCaddieEmbedRoot(injectOverlayScripts(injectBaseHref(injectBranding(html))));
 }
 
 const originalReadFileSync = fs.readFileSync;

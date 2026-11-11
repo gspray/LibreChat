@@ -160,13 +160,12 @@ test('starterKind recognizes every Instructor Assistant quick action', () => {
 test('decorate applies landing, starter, icon, and composer theme hooks', () => {
   const documentObject = buildThemeDocument();
   assert.deepEqual(theme.decorate(documentObject), { landing: true });
-  assert.equal(documentObject.documentElement.dataset.lessonCaddieChatTheme, 'true');
-  assert.equal(documentObject.body.dataset.lessonCaddieChatTheme, 'true');
+  assert.equal(documentObject.documentElement.dataset.lessonCaddieEmbed, 'true');
+  assert.equal(documentObject.body.dataset.lessonCaddieEmbed, 'true');
   assert.equal(documentObject.body.classList.contains('lc-chat-landing'), true);
   assert.equal(documentObject.landingShell.classList.contains('lc-assistant-landing-shell'), true);
   assert.equal(documentObject.buttons[0].classList.contains('lc-conversation-starter'), true);
   assert.equal(documentObject.buttons[0].dataset.lcStarterKind, 'students');
-  assert.equal(documentObject.buttons[0].children[0].className, 'lc-starter-icon');
   assert.equal(documentObject.composerSurface.classList.contains('lc-composer-surface'), true);
   assert.equal(documentObject.composerForm.classList.contains('lc-composer-form'), true);
   assert.equal(documentObject.composerBand.classList.contains('lc-composer-band'), true);

@@ -12,6 +12,8 @@ These files are listed in `config/instructor-assistant.compose-override.yml`. Th
 
 | File | Why it cannot be an overlay |
 | --- | --- |
+| `packages/client/src/theme/context/ThemeProvider.tsx` | Settings → Theme must include selectable **Default** (`lesson-caddie-default`); overlay CSS tokens gate on `data-lesson-caddie-color-theme`. |
+| `client/src/components/Appearance/Selectors.tsx` | Theme dropdown option list (adds **Default** above system/light/dark). |
 | `api/server/routes/config.js` | Startup `/api/config` must advertise `lessonCaddie` (pre-login overlay flags) and `hideToolActivity`. |
 | `api/server/routes/messages.js` | History GET must redact tool parts; tool-detail routes must 403 for non-admins. |
 | `api/server/utils/hideToolActivity.js` | New helper used by the message and agent-stream bind-mounts. Not upstream. |
@@ -26,7 +28,7 @@ Loaded with `NODE_OPTIONS=--require /app/config/ssmlabs/inject-index-html.js --r
 | Overlay | Why |
 | --- | --- |
 | `inject-index-html.js` | Patches served `index.html`: LessonCaddie title/theme, `<base href="/">` for `/c/...` routes, overlay script tags. Avoids forking `api/server/index.js`. |
-| `lessonCaddieTheme.browser.js` + `lesson-caddie-theme.css` | Decorates the Instructor Assistant landing, starter actions, and composer with the LessonCaddie visual treatment without forking React components. |
+| `lessonCaddieTheme.browser.js` + `lesson-caddie-theme.css` | Landing layout and branded UI; color tokens apply only when appearance is **Default** (`lesson-caddie-default`). Embed flag `data-lesson-caddie-embed` keeps layout hooks without overriding LibreChat light/dark. |
 | `lessonCaddieNavigationBridge.browser.js` | Posts `open_app_screen` results to the LessonCaddie parent. Do not fork `client/src` message components. |
 | `embed-passthrough-sw.js` | Replaces Workbox `/sw.js` so a cached `X-Frame-Options: SAMEORIGIN` cannot block the Assistant iframe. |
 | `branding/` | Favicons, `logo.svg`, Chat theme artwork, maskable/512 icons, `manifest.webmanifest`. Do not rewrite `client/public` or `client/vite.config.ts`. |

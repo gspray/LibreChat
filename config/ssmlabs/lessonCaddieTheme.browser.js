@@ -1,6 +1,9 @@
 'use strict';
 
 (function attachLessonCaddieChatTheme(globalObject) {
+  const LESSON_CADDIE_DEFAULT_APPEARANCE = 'lesson-caddie-default';
+  const THEME_STORAGE_KEY = 'color-theme';
+
   const STARTERS = Object.freeze({
     'find one of my students': 'students',
     'show my recent lessons': 'lessons',
@@ -205,12 +208,41 @@
     addClass(sidebarButton?.closest?.('div[class*="absolute"][class*="top-0"]'), 'lc-chat-header');
   }
 
+  function readAppearanceMode() {
+    try {
+      return globalObject.localStorage?.getItem(THEME_STORAGE_KEY) || '';
+    } catch {
+      return '';
+    }
+  }
+
+  function syncColorThemeAttributes(documentObject) {
+    const root = documentObject?.documentElement;
+    const body = documentObject?.body;
+    if (!root || !body) {
+      return;
+    }
+    const lessonCaddieDefault = readAppearanceMode() === LESSON_CADDIE_DEFAULT_APPEARANCE;
+    root.dataset.lessonCaddieEmbed = 'true';
+    body.dataset.lessonCaddieEmbed = 'true';
+    if (typeof root.toggleAttribute === 'function') {
+      root.toggleAttribute('data-lesson-caddie-color-theme', lessonCaddieDefault);
+      body.toggleAttribute('data-lesson-caddie-color-theme', lessonCaddieDefault);
+    }
+    if (lessonCaddieDefault) {
+      root.dataset.lessonCaddieColorTheme = 'default';
+      body.dataset.lessonCaddieColorTheme = 'default';
+    } else {
+      delete root.dataset.lessonCaddieColorTheme;
+      delete body.dataset.lessonCaddieColorTheme;
+    }
+  }
+
   function decorate(documentObject) {
     if (!documentObject?.documentElement || !documentObject?.body) {
       return { landing: false };
     }
-    documentObject.documentElement.dataset.lessonCaddieChatTheme = 'true';
-    documentObject.body.dataset.lessonCaddieChatTheme = 'true';
+    syncColorThemeAttributes(documentObject);
     const startersVisible = decorateStarters(documentObject);
     const heroVisible = decorateHero(documentObject);
     const landingActive = startersVisible || heroVisible;
@@ -241,10 +273,16 @@
     return;
   }
 
-  documentObject.documentElement.dataset.lessonCaddieChatTheme = 'true';
   if (documentObject.body) {
-    documentObject.body.dataset.lessonCaddieChatTheme = 'true';
+    syncColorThemeAttributes(documentObject);
+  } else {
+    documentObject.addEventListener(
+      'DOMContentLoaded',
+      () => syncColorThemeAttributes(documentObject),
+      { once: true },
+    );
   }
+
   if (globalObject.parent && globalObject.parent !== globalObject) {
     globalObject.parent.postMessage(
       { source: 'lessoncaddie-assistant', type: 'theme-ready', version: 1 },
@@ -275,7 +313,17 @@
     scheduleDecorate();
   }
 
-  const observer = new globalObject.MutationObserver(scheduleDecorate);
+  globalObject.addEventListener?.('storage', (event) => {
+    if (event.key === THEME_STORAGE_KEY) {
+      syncColorThemeAttributes(documentObject);
+      scheduleDecorate();
+    }
+  });
+
+  const observer = new globalObject.MutationObserver(() => {
+    syncColorThemeAttributes(documentObject);
+    scheduleDecorate();
+  });
   observer.observe(documentObject.documentElement, {
     childList: true,
     subtree: true,

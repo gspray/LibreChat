@@ -22,6 +22,8 @@ export const ThemeSelector = ({
   const localize = useLocalize();
 
   const themeOptions = [
+    // SSM Labs fork patch — Lesson Caddie palette; product label "Default".
+    { value: 'lesson-caddie-default', label: 'Default' },
     { value: 'system', label: localize('com_nav_theme_system') },
     { value: 'dark', label: localize('com_nav_theme_dark') },
     { value: 'light', label: localize('com_nav_theme_light') },
