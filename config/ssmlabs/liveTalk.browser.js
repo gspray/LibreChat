@@ -27,6 +27,8 @@
   let liveTalkSpec = '';
   let greetingPending = false;
   let startInFlight = false;
+  let awaitingAssistant = false;
+  let pendingKickTimer = 0;
   let readyTimer = 0;
   let liveVoiceSettings = {
     waitForYou: 'patient',
@@ -411,6 +413,8 @@
       }
     }
     greetingPending = false;
+    awaitingAssistant = false;
+    clearPendingKick();
     windowObject.clearTimeout(readyTimer);
     readyTimer = 0;
     if (reason !== 'restart' && reason !== 'failed') {
@@ -430,9 +434,9 @@
         interrupt_response,
       };
     }
-    let eagerness = 'low';
+    let eagerness = 'medium';
     if (voice.waitForYou === 'fast') eagerness = 'high';
-    else if (voice.waitForYou === 'balanced') eagerness = 'medium';
+    else if (voice.waitForYou === 'patient') eagerness = 'medium';
     return {
       type: 'semantic_vad',
       eagerness,
@@ -463,9 +467,37 @@
     }
   }
 
+  function clearPendingKick() {
+    windowObject.clearTimeout(pendingKickTimer);
+    pendingKickTimer = 0;
+  }
+
+  function kickTurn(session, reason) {
+    if (!session?.sendEvent) return;
+    if (awaitingAssistant) return;
+    if (ui.state === 'responding' || ui.state === 'tool') return;
+    awaitingAssistant = true;
+    liveTalkLog('turn.kick', { reason: String(reason || '') });
+    try {
+      session.sendEvent({ type: 'response.create' });
+    } catch (error) {
+      awaitingAssistant = false;
+      liveTalkWarn('turn.kick-failed', summarizeError(error));
+    }
+  }
+
+  function armSpeechEndKick(session) {
+    clearPendingKick();
+    pendingKickTimer = windowObject.setTimeout(() => {
+      pendingKickTimer = 0;
+      kickTurn(session, 'speech-end');
+    }, 400);
+  }
+
   function finishGreeting(reason) {
     if (!greetingPending) return;
     greetingPending = false;
+    awaitingAssistant = false;
     windowObject.clearTimeout(readyTimer);
     readyTimer = 0;
     enableTurnResponses(active?.session);
@@ -689,14 +721,16 @@
         holdInput: voice.muteMicWhileSheTalks,
         conversationBehavior: { interruption: voice.allowInterrupt ? 'enabled' : 'disabled' },
         invokeTool: async (call) => {
+          const startedAt = Date.now();
           liveTalkLog('tool.invoke', { name: call.name, callId: call.callId || '', sessionId });
-          if (greetingPending || ui.state === 'connecting' || ui.state === 'greeting') {
+          if (ui.state === 'connecting') {
             liveTalkLog('tool.ignored-while-starting', { name: call.name });
             return {
               ok: false,
-              error: 'Live Talk is still starting. Do not call tools until the user speaks.',
+              error: 'Live Talk is still connecting. Retry the tool after the greeting.',
             };
           }
+          if (greetingPending) finishGreeting('tool-call');
           setStatus(bar, 'tool', `Looking up ${call.name}…`);
           const payload = await api(liveTalkPath(`/live-talk/session/${sessionId}/tool`), {
             method: 'POST',
@@ -707,6 +741,10 @@
             }),
           });
           const result = payload.result;
+          liveTalkLog('tool.returned', {
+            name: call.name,
+            ms: Date.now() - startedAt,
+          });
           postAppDataChanged(call.name, result);
           if (call.name === 'open_app_screen') {
             const overlay = windowObject.LessonCaddieNavigationOverlay;
@@ -749,6 +787,13 @@
         if (event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CONNECTED) {
           setStatus(bar, 'connecting', 'Connecting…');
         }
+        if (
+          event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_START ||
+          providerEvent === 'response.created'
+        ) {
+          awaitingAssistant = true;
+          clearPendingKick();
+        }
         if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_AUDIO_START) {
           try {
             session.setMuted?.(true);
@@ -770,6 +815,7 @@
           event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE ||
           providerEvent === 'response.done'
         ) {
+          awaitingAssistant = false;
           if (greetingPending) {
             finishGreeting(providerEvent || event.type);
           } else {
@@ -802,8 +848,16 @@
           liveTalkWarn('greeting.provider-error', summarizeEvent(event));
         }
         if (event.type === SpeakCore.SpeakRealtimeEvent.USER_SPEECH_START) {
-          if (greetingPending) return;
+          if (greetingPending) finishGreeting('user-speech');
+          awaitingAssistant = false;
           setStatus(bar, 'listening', 'Listening…');
+        }
+        if (event.type === SpeakCore.SpeakRealtimeEvent.USER_SPEECH_END) {
+          if (greetingPending) finishGreeting('user-speech-end');
+          liveTalkLog('turn.speech-end', { awaitingAssistant, state: ui.state });
+          if (!awaitingAssistant && ui.state !== 'responding' && ui.state !== 'tool') {
+            armSpeechEndKick(session);
+          }
         }
         if (event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED) {
           const failed = summarizeError(

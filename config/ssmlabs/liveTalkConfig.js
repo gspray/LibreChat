@@ -28,7 +28,7 @@ const DEFAULT_MAX_SESSION_MS = 15 * 60 * 1000;
 const DEFAULT_IDLE_MS = 2 * 60 * 1000;
 const DEFAULT_MAX_SESSIONS_PER_USER = 1;
 const DEFAULT_VAD_TYPE = 'semantic_vad';
-const DEFAULT_VAD_EAGERNESS = 'low';
+const DEFAULT_VAD_EAGERNESS = 'medium';
 const DEFAULT_VAD_THRESHOLD = 0.75;
 const DEFAULT_VAD_PREFIX_PADDING_MS = 300;
 const DEFAULT_VAD_SILENCE_MS = 900;
@@ -120,7 +120,12 @@ function resolveLiveTalkConfig(env = process.env) {
 const WAIT_FOR_YOU = ['patient', 'balanced', 'fast'];
 const VOICES = ['marin', 'cedar', 'shimmer', 'verse', 'alloy'];
 const WAIT_PRESETS = {
-  patient: { vadEagerness: 'low', vadThreshold: 0.75, vadSilenceMs: 900, vadPrefixPaddingMs: 300 },
+  patient: {
+    vadEagerness: 'medium',
+    vadThreshold: 0.75,
+    vadSilenceMs: 700,
+    vadPrefixPaddingMs: 300,
+  },
   balanced: {
     vadEagerness: 'medium',
     vadThreshold: 0.55,

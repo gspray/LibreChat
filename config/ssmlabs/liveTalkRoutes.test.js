@@ -54,7 +54,7 @@ function createApp(overrides = {}) {
           true,
         );
         assert.equal(session.audio?.input?.turn_detection?.type, 'semantic_vad');
-        assert.equal(session.audio?.input?.turn_detection?.eagerness, 'low');
+        assert.equal(session.audio?.input?.turn_detection?.eagerness, 'medium');
         assert.equal(session.audio?.input?.turn_detection?.create_response, false);
         assert.equal(session.audio?.input?.turn_detection?.interrupt_response, false);
         return 'answer-sdp';
