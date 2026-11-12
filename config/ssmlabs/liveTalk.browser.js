@@ -515,6 +515,14 @@
       })),
     });
     audios.forEach((audio, index) => {
+      if (!audio.paused) {
+        liveTalkLog('playback.already-playing', {
+          reason,
+          index,
+          readyState: audio.readyState,
+        });
+        return;
+      }
       const play = audio.play?.();
       if (play && typeof play.then === 'function') {
         play.then(
@@ -524,6 +532,32 @@
         );
       }
     });
+  }
+
+  async function waitForRemotePlayback(session, timeoutMs = 2500) {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (active?.session !== session) return false;
+      const audios = liveTalkAudioElements().filter((audio) => audio.srcObject);
+      for (const audio of audios) {
+        if (audio.paused) {
+          try {
+            await audio.play();
+          } catch (_) {
+            /* autoplay may still attach */
+          }
+        }
+        if (!audio.paused) {
+          liveTalkLog('playback.remote-ready', { readyState: audio.readyState });
+          return true;
+        }
+      }
+      await sleep(50);
+    }
+    liveTalkWarn('playback.remote-wait-timeout', {
+      count: liveTalkAudioElements().length,
+    });
+    return false;
   }
 
   function watchPeer(session) {
@@ -752,6 +786,7 @@
       liveTalkLog('session.started', session.snapshot?.() || { sessionId });
       watchPeer(session);
       if (active?.session === session) {
+        await waitForRemotePlayback(session);
         await speakGreeting(session);
       }
     } catch (error) {
