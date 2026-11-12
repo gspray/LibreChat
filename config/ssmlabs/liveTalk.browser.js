@@ -687,6 +687,18 @@
       const conversationId = conversationIdFromLocation() || 'new';
       const spec = resolveLiveTalkSpec();
       liveTalkLog('start.conversation', { conversationId, spec });
+      if (spec) {
+        try {
+          const nextConfig = await api(
+            `${liveTalkPath('/live-talk/config')}?spec=${encodeURIComponent(spec)}`,
+          );
+          if (nextConfig && typeof nextConfig === 'object') {
+            config = nextConfig;
+          }
+        } catch (error) {
+          liveTalkWarn('config.spec-refresh-failed', summarizeError(error, { spec }));
+        }
+      }
       await stopCall(bar, 'restart');
       setStatus(bar, 'connecting', 'Connecting…');
       let sessionId = '';
@@ -964,7 +976,12 @@
     if (event.source !== windowObject.parent) return;
     if (!isAllowedParentOrigin(event.origin)) return;
     const data = event.data;
-    if (!data || data.source !== SHELL_MESSAGE_SOURCE || data.type !== 'live-talk') return;
+    if (!data || data.source !== SHELL_MESSAGE_SOURCE) return;
+    if (data.type === 'surface') {
+      rememberLiveTalkSpec(data.spec);
+      return;
+    }
+    if (data.type !== 'live-talk') return;
     const action = clean(data.action);
     if (!['start', 'stop', 'toggle'].includes(action)) return;
     rememberLiveTalkSpec(data.spec);
@@ -1001,11 +1018,17 @@
     watchThreadChanges();
     patchAuthCapture();
     try {
-      config = await api(liveTalkPath('/live-talk/config'));
+      const bootSpec = resolveLiveTalkSpec();
+      config = await api(
+        bootSpec
+          ? `${liveTalkPath('/live-talk/config')}?spec=${encodeURIComponent(bootSpec)}`
+          : liveTalkPath('/live-talk/config'),
+      );
       liveTalkLog('overlay.config', {
         enabled: Boolean(config.enabled),
         agentId: config.agentId || '',
         mcpServer: config.mcpServer || '',
+        spec: config.spec || bootSpec || '',
         speakCoreRevision: config.speakCoreRevision || '',
       });
     } catch (error) {

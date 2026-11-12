@@ -40,6 +40,14 @@
     )[0];
   }
 
+  function caddieSpecFromLocation(windowLike) {
+    try {
+      return String(new URL(windowLike.location.href).searchParams.get('spec') || '').trim();
+    } catch {
+      return '';
+    }
+  }
+
   function decorateTitleCharacters(title) {
     const leaves = Array.from(title?.querySelectorAll?.('span') || []).filter(
       (element) => !element.children?.length && normalizeText(element.textContent),
@@ -47,15 +55,15 @@
     if (!leaves.length) {
       return;
     }
+    const label = normalizeText(title?.textContent);
+    const prefixLength = label.startsWith('Student ') ? 'Student '.length : 'Instructor '.length;
     let characterOffset = 0;
     for (const leaf of leaves) {
       const text = String(leaf.textContent || '');
       const nextOffset = characterOffset + text.length;
       addClass(
         leaf,
-        nextOffset > 'Instructor '.length
-          ? 'lc-assistant-title--accent'
-          : 'lc-assistant-title--base',
+        nextOffset > prefixLength ? 'lc-assistant-title--accent' : 'lc-assistant-title--base',
       );
       characterOffset = nextOffset;
     }
@@ -318,6 +326,11 @@
     const lessonCaddieDefault = readAppearanceMode() === LESSON_CADDIE_DEFAULT_APPEARANCE;
     root.dataset.lessonCaddieEmbed = 'true';
     body.dataset.lessonCaddieEmbed = 'true';
+    const spec = caddieSpecFromLocation(globalObject);
+    if (spec === 'student-caddie' || spec === 'instructor-assistant') {
+      root.dataset.lcCaddieSpec = spec;
+      body.dataset.lcCaddieSpec = spec;
+    }
     if (typeof root.toggleAttribute === 'function') {
       root.toggleAttribute('data-lesson-caddie-color-theme', lessonCaddieDefault);
       body.toggleAttribute('data-lesson-caddie-color-theme', lessonCaddieDefault);

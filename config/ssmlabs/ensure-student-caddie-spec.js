@@ -19,7 +19,8 @@ function caddieSpecsFromTemplate(
     JSON.stringify(student.mcpServers) !== JSON.stringify(['lessoncaddie-student']) ||
     !instructor ||
     instructor.preset?.endpoint !== 'agents' ||
-    instructor.preset?.agent_id !== 'agent_instructor_assistant'
+    instructor.preset?.agent_id !== 'agent_instructor_assistant' ||
+    JSON.stringify(instructor.mcpServers) !== JSON.stringify(['lessoncaddie-instructor'])
   ) {
     throw new Error('The Caddie model specifications are missing or invalid.');
   }

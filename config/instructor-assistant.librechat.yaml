@@ -64,6 +64,8 @@ modelSpecs:
         - Show my recent lessons
         - Help me schedule a lesson
         - Review a student’s practice plan
+      mcpServers:
+        - lessoncaddie-instructor
       preset:
         endpoint: agents
         agent_id: agent_instructor_assistant

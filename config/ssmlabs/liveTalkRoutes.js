@@ -4,6 +4,7 @@
 const crypto = require('node:crypto');
 const express = require('express');
 const {
+  LIVE_TALK_PACKS,
   resolveLiveTalkConfig,
   resolveLiveTalkPack,
   applyLiveTalkPack,
@@ -188,12 +189,18 @@ function createLiveTalkRouter(deps = {}) {
   const now = deps.now || (() => Date.now());
 
   router.get('/config', (req, res) => {
-    const config = loadConfig();
+    const baseConfig = loadConfig();
+    const pack =
+      resolveLiveTalkPack({ spec: clean(req.query?.spec), agentId: clean(req.query?.agentId) }) ||
+      LIVE_TALK_PACKS.instructor;
+    const config = applyLiveTalkPack(baseConfig, pack);
     res.set('Cache-Control', 'no-store');
     res.json({
       enabled: config.enabled,
       agentId: config.agentId,
       mcpServer: config.serverName,
+      spec: pack.spec,
+      displayName: pack.displayName,
       speakCoreRevision: config.speakCoreRevision,
     });
   });
@@ -237,7 +244,7 @@ function createLiveTalkRouter(deps = {}) {
       }
       const pack = resolveLiveTalkPack({
         spec: clean(req.body?.spec),
-        agentId: convoAgentId || clean(req.body?.agentId),
+        agentId: clean(req.body?.spec) ? '' : convoAgentId || clean(req.body?.agentId),
       });
       if (!pack) {
         throw publicError(

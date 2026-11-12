@@ -96,6 +96,10 @@ test('student Caddie selects the student MCP server', () => {
   assert.equal(studentSpec.preset.endpoint, 'agents');
   assert.equal(studentSpec.preset.agent_id, 'agent_student_caddie');
   assert.deepEqual(studentSpec.mcpServers, ['lessoncaddie-student']);
+  assert.deepEqual(
+    template.modelSpecs.list.find((spec) => spec.name === 'instructor-assistant').mcpServers,
+    ['lessoncaddie-instructor'],
+  );
   assert.equal(
     template.modelSpecs.list.find((spec) => spec.softDefault)?.name,
     'instructor-assistant',

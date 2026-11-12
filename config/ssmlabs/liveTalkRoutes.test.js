@@ -219,6 +219,46 @@ test('student spec starts Live Talk against student MCP', async () => {
   }
 });
 
+test('instructor spec keeps instructor MCP even on a leftover student thread', async () => {
+  const listed = [];
+  const app = createApp({
+    getConvo: async (userId, conversationId) => ({
+      conversationId,
+      agent_id: 'agent_student_caddie',
+      lastMessageId: 'msg-root',
+    }),
+    listMcpTools: async ({ config }) => {
+      listed.push(config.serverName);
+      return [{ name: 'search_directory', description: 'Search', inputSchema: { type: 'object' } }];
+    },
+    bootstrapOpenAi: async () => 'answer-sdp',
+  });
+  const server = await listen(app);
+  try {
+    const created = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        conversationId: 'student-thread',
+        spec: 'instructor-assistant',
+        sdp: 'offer',
+      }),
+    });
+    assert.equal(created.status, 201);
+    assert.deepEqual(listed, ['lessoncaddie-instructor']);
+    const config = await fetch(
+      `http://127.0.0.1:${server.address().port}/live-talk/config?spec=instructor-assistant`,
+    );
+    assert.equal(config.status, 200);
+    const body = await config.json();
+    assert.equal(body.mcpServer, 'lessoncaddie-instructor');
+    assert.equal(body.spec, 'instructor-assistant');
+  } finally {
+    resetLiveTalkSessions();
+    server.close();
+  }
+});
+
 test('student conversation threads keep student MCP even without spec', async () => {
   const listed = [];
   const app = createApp({

@@ -95,10 +95,17 @@ test('session start does not auto-create a spoken turn', () => {
   assert.equal(detection.create_response, false);
 });
 
-test('existing conversation agent wins over URL spec', () => {
+test('shell spec wins over a leftover conversation agent', () => {
   const pack = resolveLiveTalkPack({
-    spec: 'student-caddie',
-    agentId: 'agent_instructor_assistant',
+    spec: 'instructor-assistant',
+    agentId: 'agent_student_caddie',
   });
   assert.equal(pack.id, 'instructor');
+  assert.equal(
+    resolveLiveTalkPack({
+      spec: 'student-caddie',
+      agentId: 'agent_instructor_assistant',
+    }).id,
+    'student',
+  );
 });

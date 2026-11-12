@@ -55,44 +55,52 @@ function createBoundRouter() {
   const { CacheKeys } = require('librechat-data-provider');
 
   async function listMcpTools({ user, conversationId, config }) {
-    try {
-      const mcpManager = getMCPManager();
-      const flowManager = getFlowStateManager(getLogStores(CacheKeys.FLOWS));
-      const tokenMethods = { findToken, createToken, updateToken, deleteTokens };
-      const connection = await mcpManager.getConnection({
-        user,
-        serverName: config.serverName,
-        flowManager,
-        tokenMethods,
-        requestBody: { conversationId },
-      });
-      const tools = await readConnectionTools(connection);
-      if (Array.isArray(tools) && tools.length) {
-        console.info('[ssmlabs-live-talk] MCP tool list ok', {
+    const mcpManager = getMCPManager();
+    const flowManager = getFlowStateManager(getLogStores(CacheKeys.FLOWS));
+    const tokenMethods = { findToken, createToken, updateToken, deleteTokens };
+    let lastError = null;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const connection = await mcpManager.getConnection({
+          user,
           serverName: config.serverName,
-          count: tools.length,
+          flowManager,
+          tokenMethods,
+          requestBody: { conversationId },
         });
-        return tools;
+        const tools = await readConnectionTools(connection);
+        if (Array.isArray(tools) && tools.length) {
+          console.info('[ssmlabs-live-talk] MCP tool list ok', {
+            serverName: config.serverName,
+            count: tools.length,
+            attempt,
+          });
+          return tools;
+        }
+        lastError = new Error('LessonCaddie MCP returned no tools for Live Talk.');
+        lastError.status = 502;
+        lastError.code = 'mcp_tools_unavailable';
+      } catch (error) {
+        lastError = error;
+        console.warn('[ssmlabs-live-talk] MCP tool list failed', {
+          message: error.message,
+          name: error.name,
+          status: error.status,
+          attempt,
+          serverName: config.serverName,
+        });
       }
-      const empty = new Error('LessonCaddie MCP returned no tools for Live Talk.');
-      empty.status = 502;
-      empty.code = 'mcp_tools_unavailable';
-      throw empty;
-    } catch (error) {
-      console.warn('[ssmlabs-live-talk] MCP tool list failed', {
-        message: error.message,
-        name: error.name,
-        status: error.status,
-        stack: error.stack,
-      });
-      if (error.status && error.code) throw error;
-      const failed = new Error(
-        'Live Talk could not load LessonCaddie tools. Try typed Chat, then try voice again.',
-      );
-      failed.status = 502;
-      failed.code = 'mcp_tools_unavailable';
-      throw failed;
+      if (attempt < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 400 * attempt));
+      }
     }
+    if (lastError?.status && lastError?.code) throw lastError;
+    const failed = new Error(
+      'Live Talk could not load LessonCaddie tools. Try typed Chat, then try voice again.',
+    );
+    failed.status = 502;
+    failed.code = 'mcp_tools_unavailable';
+    throw failed;
   }
 
   async function callMcpTool({ user, serverName, toolName, toolArguments, conversationId }) {

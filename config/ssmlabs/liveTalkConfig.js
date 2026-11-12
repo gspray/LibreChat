@@ -70,10 +70,11 @@ function parseVadEagerness(value) {
 function resolveLiveTalkPack({ spec, agentId } = {}) {
   const requestedSpec = String(spec || '').trim();
   const requestedAgent = String(agentId || '').trim();
+  if (requestedSpec === LIVE_TALK_PACKS.student.spec) return LIVE_TALK_PACKS.student;
+  if (requestedSpec === LIVE_TALK_PACKS.instructor.spec) return LIVE_TALK_PACKS.instructor;
   if (requestedAgent === STUDENT_AGENT_ID) return LIVE_TALK_PACKS.student;
   if (requestedAgent === DEFAULT_AGENT_ID) return LIVE_TALK_PACKS.instructor;
-  if (requestedSpec === LIVE_TALK_PACKS.student.spec) return LIVE_TALK_PACKS.student;
-  if (requestedSpec === LIVE_TALK_PACKS.instructor.spec || (!requestedSpec && !requestedAgent)) {
+  if (!requestedSpec && !requestedAgent) {
     return LIVE_TALK_PACKS.instructor;
   }
   return null;
