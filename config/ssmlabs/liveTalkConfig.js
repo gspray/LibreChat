@@ -168,22 +168,23 @@ function applyLiveVoiceToConfig(config, liveVoice) {
   };
 }
 
-function liveTalkTurnDetection(config = resolveLiveTalkConfig()) {
+function liveTalkTurnDetection(config = resolveLiveTalkConfig(), options = {}) {
   const interrupt_response = config.interruptResponse === true;
+  const create_response = options.createResponse !== false;
   if (config.vadType === 'server_vad') {
     return {
       type: 'server_vad',
       threshold: config.vadThreshold,
       prefix_padding_ms: config.vadPrefixPaddingMs,
       silence_duration_ms: config.vadSilenceMs,
-      create_response: true,
+      create_response,
       interrupt_response,
     };
   }
   return {
     type: 'semantic_vad',
     eagerness: config.vadEagerness,
-    create_response: true,
+    create_response,
     interrupt_response,
   };
 }
@@ -210,7 +211,7 @@ function liveTalkInstructions(agentInstructions, pack) {
     isStudent
       ? 'You are in LessonCaddie Live Talk, the spoken form of Student Caddie.'
       : 'You are in LessonCaddie Live Talk, the spoken form of Instructor Assistant.',
-    'When a greeting turn is requested, speak only that short greeting, then wait silently. Do not call tools or ask a question until the user speaks.',
+    'Do not introduce yourself, greet the user, or say you are Student Caddie or Instructor Assistant unless the user asks who you are. The only allowed opening line is the exact greeting from a greeting turn. After that greeting, wait silently until the user speaks. Do not call tools or ask a question until the user speaks.',
     isStudent
       ? 'You have the same student LessonCaddie tools as typed Ask. LessonCaddie authorizes each call.'
       : 'You have the same LessonCaddie tools as typed Ask. LessonCaddie authorizes each call.',

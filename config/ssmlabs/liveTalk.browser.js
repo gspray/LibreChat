@@ -26,7 +26,7 @@
   let greetingLine = 'Good morning.';
   let liveTalkSpec = '';
   let greetingPending = false;
-  let greetingFallbackUsed = false;
+  let startInFlight = false;
   let readyTimer = 0;
   let liveVoiceSettings = {
     waitForYou: 'patient',
@@ -418,12 +418,57 @@
     }
   }
 
+  function turnDetectionForVoice(voice, createResponse) {
+    const interrupt_response = voice.allowInterrupt === true;
+    if (!voice.ignoreBackgroundNoise) {
+      return {
+        type: 'server_vad',
+        threshold: 0.75,
+        prefix_padding_ms: 300,
+        silence_duration_ms: 900,
+        create_response: createResponse,
+        interrupt_response,
+      };
+    }
+    let eagerness = 'low';
+    if (voice.waitForYou === 'fast') eagerness = 'high';
+    else if (voice.waitForYou === 'balanced') eagerness = 'medium';
+    return {
+      type: 'semantic_vad',
+      eagerness,
+      create_response: createResponse,
+      interrupt_response,
+    };
+  }
+
+  function enableTurnResponses(session) {
+    if (!session?.sendEvent) return;
+    try {
+      session.sendEvent({
+        type: 'session.update',
+        session: {
+          type: 'realtime',
+          audio: {
+            input: {
+              turn_detection: turnDetectionForVoice(
+                normalizeLiveVoiceSettings(liveVoiceSettings),
+                true,
+              ),
+            },
+          },
+        },
+      });
+    } catch (error) {
+      liveTalkWarn('turn-detection.enable-failed', summarizeError(error));
+    }
+  }
+
   function finishGreeting(reason) {
     if (!greetingPending) return;
     greetingPending = false;
-    greetingFallbackUsed = false;
     windowObject.clearTimeout(readyTimer);
     readyTimer = 0;
+    enableTurnResponses(active?.session);
     try {
       active?.session?.setMuted?.(false);
     } catch (_) {
@@ -451,14 +496,23 @@
 
   async function speakGreeting(session) {
     greetingPending = true;
-    greetingFallbackUsed = false;
     setStatus(ensureBar(), 'greeting', 'Starting…');
     const line = greetingLine || 'Good morning.';
+    try {
+      await sendWhenChannelOpen(session, { type: 'response.cancel' });
+    } catch (_) {
+      /* no in-flight response is fine */
+    }
+    try {
+      session.sendEvent({ type: 'output_audio_buffer.clear' });
+    } catch (_) {
+      /* buffer may already be empty */
+    }
     const greetingResponse = {
       type: 'response.create',
       response: {
         tool_choice: 'none',
-        instructions: `Speak only this greeting, then wait silently. Do not call tools. Do not ask a question. Say exactly: ${line}`,
+        instructions: `Do not introduce yourself. Speak only this exact greeting, then stop. Do not add any other sentence. Say exactly: ${line}`,
       },
     };
     try {
@@ -574,146 +628,167 @@
   }
 
   async function startCall(bar) {
-    liveTalkLog('start.clicked', {
-      href: String(windowObject.location?.href || ''),
-      framed: windowObject.parent !== windowObject,
-      speakCore: Boolean(SpeakCore),
-      sessionApi: Boolean(SpeakCore?.createSpeakRealtimeSession),
-      bridgeApi: Boolean(SpeakCore?.createOpenAIRealtimeFunctionCallBridge),
-      mediaDevices: Boolean(windowObject.navigator?.mediaDevices?.getUserMedia),
-    });
-    if (
-      !SpeakCore?.createSpeakRealtimeSession ||
-      !SpeakCore.createOpenAIRealtimeFunctionCallBridge
-    ) {
-      liveTalkError('start.engine-missing', {
-        speakCoreKeys: SpeakCore ? Object.keys(SpeakCore) : [],
-      });
-      setStatus(bar, 'error', 'Voice engine is not loaded. Reload Chat and try again.');
+    if (startInFlight) {
+      liveTalkLog('start.ignored-in-flight', {});
       return;
     }
-    const conversationId = conversationIdFromLocation() || 'new';
-    const spec = resolveLiveTalkSpec();
-    liveTalkLog('start.conversation', { conversationId, spec });
-    await stopCall(bar, 'restart');
-    setStatus(bar, 'connecting', 'Connecting…');
-    let sessionId = '';
-    const voice = normalizeLiveVoiceSettings(liveVoiceSettings);
-    const session = SpeakCore.createSpeakRealtimeSession({
-      provider: 'openai-realtime',
-      holdInput: voice.muteMicWhileSheTalks,
-      conversationBehavior: { interruption: voice.allowInterrupt ? 'enabled' : 'disabled' },
-      createAudioElement: createLiveTalkAudioElement,
-      bootstrapCall: async ({ sdp }) => {
-        liveTalkLog('bootstrap.offer', {
-          conversationId,
-          sdpChars: String(sdp || '').length,
-          waitForYou: voice.waitForYou,
-          allowInterrupt: voice.allowInterrupt,
-        });
-        const created = await api(liveTalkPath('/live-talk/session'), {
-          method: 'POST',
-          body: JSON.stringify({ conversationId, sdp, liveVoice: voice, spec }),
-        });
-        sessionId = created.sessionId;
-        liveTalkLog('bootstrap.answer', {
-          sessionId,
-          conversationId: created.conversationId || conversationId,
-          sdpChars: String(created.sdp || '').length,
-          toolCount: Array.isArray(created.tools) ? created.tools.length : 0,
-        });
-        return created.sdp;
-      },
-    });
-    const bridge = SpeakCore.createOpenAIRealtimeFunctionCallBridge({
-      holdInput: voice.muteMicWhileSheTalks,
-      conversationBehavior: { interruption: voice.allowInterrupt ? 'enabled' : 'disabled' },
-      invokeTool: async (call) => {
-        liveTalkLog('tool.invoke', { name: call.name, callId: call.callId || '', sessionId });
-        if (greetingPending || ui.state === 'connecting' || ui.state === 'greeting') {
-          liveTalkLog('tool.ignored-while-starting', { name: call.name });
-          return {
-            ok: false,
-            error: 'Live Talk is still starting. Do not call tools until the user speaks.',
-          };
-        }
-        setStatus(bar, 'tool', `Looking up ${call.name}…`);
-        const payload = await api(liveTalkPath(`/live-talk/session/${sessionId}/tool`), {
-          method: 'POST',
-          body: JSON.stringify({
-            name: call.name,
-            arguments: call.arguments,
-            callId: call.callId,
-          }),
-        });
-        const result = payload.result;
-        postAppDataChanged(call.name, result);
-        if (call.name === 'open_app_screen') {
-          const overlay = windowObject.LessonCaddieNavigationOverlay;
-          const opened = overlay?.onPayload?.(result);
-          liveTalkLog('tool.navigate', {
-            opened: Boolean(opened),
-            destination: result?.destination || result?.structuredContent?.destination || '',
-          });
-        }
-        return result;
-      },
-    });
-    bridge.attach(session);
-    session.onEvent((event) => {
-      const providerEvent = event.detail?.providerEvent || event.detail?.event?.type || '';
-      const transcript = clean(
-        event.detail?.event?.transcript || event.detail?.transcript || event.detail?.text,
-      );
-      const interesting =
-        event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED ||
-        event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CONNECTED ||
-        event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CLOSED ||
-        event.type === SpeakCore.SpeakRealtimeEvent.CONNECTION_STATE ||
-        event.type === SpeakCore.SpeakRealtimeEvent.TOOL_ERROR;
-      if (interesting || event.detail?.message) {
-        (event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED ? liveTalkError : liveTalkLog)(
-          'realtime.event',
-          summarizeEvent(event),
-        );
-      }
+    startInFlight = true;
+    try {
+      liveTalkLog('start.clicked', {
+        href: String(windowObject.location?.href || ''),
+        framed: windowObject.parent !== windowObject,
+        speakCore: Boolean(SpeakCore),
+        sessionApi: Boolean(SpeakCore?.createSpeakRealtimeSession),
+        bridgeApi: Boolean(SpeakCore?.createOpenAIRealtimeFunctionCallBridge),
+        mediaDevices: Boolean(windowObject.navigator?.mediaDevices?.getUserMedia),
+      });
       if (
-        event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CONNECT_START ||
-        event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CONNECTED
+        !SpeakCore?.createSpeakRealtimeSession ||
+        !SpeakCore.createOpenAIRealtimeFunctionCallBridge
       ) {
-        try {
-          session.setMuted?.(true);
-        } catch (_) {
-          /* mic may not exist yet */
-        }
+        liveTalkError('start.engine-missing', {
+          speakCoreKeys: SpeakCore ? Object.keys(SpeakCore) : [],
+        });
+        setStatus(bar, 'error', 'Voice engine is not loaded. Reload Chat and try again.');
+        return;
       }
-      if (event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CONNECTED) {
-        setStatus(bar, 'connecting', 'Connecting…');
-      }
-      if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_AUDIO_START) {
-        try {
-          session.setMuted?.(true);
-        } catch (_) {
-          /* holdInput still covers echo */
+      const conversationId = conversationIdFromLocation() || 'new';
+      const spec = resolveLiveTalkSpec();
+      liveTalkLog('start.conversation', { conversationId, spec });
+      await stopCall(bar, 'restart');
+      setStatus(bar, 'connecting', 'Connecting…');
+      let sessionId = '';
+      const voice = normalizeLiveVoiceSettings(liveVoiceSettings);
+      const session = SpeakCore.createSpeakRealtimeSession({
+        provider: 'openai-realtime',
+        holdInput: voice.muteMicWhileSheTalks,
+        conversationBehavior: { interruption: voice.allowInterrupt ? 'enabled' : 'disabled' },
+        createAudioElement: createLiveTalkAudioElement,
+        bootstrapCall: async ({ sdp }) => {
+          liveTalkLog('bootstrap.offer', {
+            conversationId,
+            sdpChars: String(sdp || '').length,
+            waitForYou: voice.waitForYou,
+            allowInterrupt: voice.allowInterrupt,
+          });
+          const created = await api(liveTalkPath('/live-talk/session'), {
+            method: 'POST',
+            body: JSON.stringify({ conversationId, sdp, liveVoice: voice, spec }),
+          });
+          sessionId = created.sessionId;
+          liveTalkLog('bootstrap.answer', {
+            sessionId,
+            conversationId: created.conversationId || conversationId,
+            sdpChars: String(created.sdp || '').length,
+            toolCount: Array.isArray(created.tools) ? created.tools.length : 0,
+          });
+          return created.sdp;
+        },
+      });
+      const bridge = SpeakCore.createOpenAIRealtimeFunctionCallBridge({
+        holdInput: voice.muteMicWhileSheTalks,
+        conversationBehavior: { interruption: voice.allowInterrupt ? 'enabled' : 'disabled' },
+        invokeTool: async (call) => {
+          liveTalkLog('tool.invoke', { name: call.name, callId: call.callId || '', sessionId });
+          if (greetingPending || ui.state === 'connecting' || ui.state === 'greeting') {
+            liveTalkLog('tool.ignored-while-starting', { name: call.name });
+            return {
+              ok: false,
+              error: 'Live Talk is still starting. Do not call tools until the user speaks.',
+            };
+          }
+          setStatus(bar, 'tool', `Looking up ${call.name}…`);
+          const payload = await api(liveTalkPath(`/live-talk/session/${sessionId}/tool`), {
+            method: 'POST',
+            body: JSON.stringify({
+              name: call.name,
+              arguments: call.arguments,
+              callId: call.callId,
+            }),
+          });
+          const result = payload.result;
+          postAppDataChanged(call.name, result);
+          if (call.name === 'open_app_screen') {
+            const overlay = windowObject.LessonCaddieNavigationOverlay;
+            const opened = overlay?.onPayload?.(result);
+            liveTalkLog('tool.navigate', {
+              opened: Boolean(opened),
+              destination: result?.destination || result?.structuredContent?.destination || '',
+            });
+          }
+          return result;
+        },
+      });
+      bridge.attach(session);
+      session.onEvent((event) => {
+        const providerEvent = event.detail?.providerEvent || event.detail?.event?.type || '';
+        const transcript = clean(
+          event.detail?.event?.transcript || event.detail?.transcript || event.detail?.text,
+        );
+        const interesting =
+          event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED ||
+          event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CONNECTED ||
+          event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CLOSED ||
+          event.type === SpeakCore.SpeakRealtimeEvent.CONNECTION_STATE ||
+          event.type === SpeakCore.SpeakRealtimeEvent.TOOL_ERROR;
+        if (interesting || event.detail?.message) {
+          (event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED
+            ? liveTalkError
+            : liveTalkLog)('realtime.event', summarizeEvent(event));
         }
-        if (greetingPending) {
-          setStatus(bar, 'greeting', 'Starting…');
-          diagnosePlayback(providerEvent || 'greeting-audio');
-        } else {
-          const alreadyResponding = bar.dataset.state === 'responding';
-          if (!alreadyResponding) {
-            setStatus(bar, 'responding', 'Responding…');
-            diagnosePlayback(providerEvent || 'assistant-audio');
+        if (
+          event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CONNECT_START ||
+          event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CONNECTED
+        ) {
+          try {
+            session.setMuted?.(true);
+          } catch (_) {
+            /* mic may not exist yet */
           }
         }
-      }
-      if (
-        event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE ||
-        providerEvent === 'response.done'
-      ) {
-        if (greetingPending) {
-          finishGreeting(providerEvent || event.type);
-        } else {
+        if (event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CONNECTED) {
+          setStatus(bar, 'connecting', 'Connecting…');
+        }
+        if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_AUDIO_START) {
+          try {
+            session.setMuted?.(true);
+          } catch (_) {
+            /* holdInput still covers echo */
+          }
+          if (greetingPending) {
+            setStatus(bar, 'greeting', 'Starting…');
+            diagnosePlayback(providerEvent || 'greeting-audio');
+          } else {
+            const alreadyResponding = bar.dataset.state === 'responding';
+            if (!alreadyResponding) {
+              setStatus(bar, 'responding', 'Responding…');
+              diagnosePlayback(providerEvent || 'assistant-audio');
+            }
+          }
+        }
+        if (
+          event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE ||
+          providerEvent === 'response.done'
+        ) {
+          if (greetingPending) {
+            finishGreeting(providerEvent || event.type);
+          } else {
+            try {
+              session.setMuted?.(false);
+            } catch (_) {
+              /* keep listening even if mute release throws */
+            }
+            if (isTalkingState(bar.dataset.state) && bar.dataset.state !== 'tool') {
+              setStatus(bar, 'listening', 'Listening…');
+            }
+          }
+        }
+        if (
+          !greetingPending &&
+          (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_INTERRUPTED ||
+            providerEvent === 'output_audio_buffer.stopped' ||
+            providerEvent === 'output_audio_buffer.cleared')
+        ) {
           try {
             session.setMuted?.(false);
           } catch (_) {
@@ -723,88 +798,69 @@
             setStatus(bar, 'listening', 'Listening…');
           }
         }
-      }
-      if (
-        !greetingPending &&
-        (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_INTERRUPTED ||
-          providerEvent === 'output_audio_buffer.stopped' ||
-          providerEvent === 'output_audio_buffer.cleared')
-      ) {
-        try {
-          session.setMuted?.(false);
-        } catch (_) {
-          /* keep listening even if mute release throws */
+        if (providerEvent === 'error' && greetingPending) {
+          liveTalkWarn('greeting.provider-error', summarizeEvent(event));
         }
-        if (isTalkingState(bar.dataset.state) && bar.dataset.state !== 'tool') {
+        if (event.type === SpeakCore.SpeakRealtimeEvent.USER_SPEECH_START) {
+          if (greetingPending) return;
           setStatus(bar, 'listening', 'Listening…');
         }
-      }
-      if (providerEvent === 'error' && greetingPending && !greetingFallbackUsed) {
-        greetingFallbackUsed = true;
-        liveTalkWarn('greeting.provider-error', summarizeEvent(event));
-        try {
-          session.sendEvent({ type: 'response.create' });
-        } catch (error) {
-          liveTalkWarn('greeting.fallback-failed', summarizeError(error));
+        if (event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED) {
+          const failed = summarizeError(
+            { message: event.detail?.message, name: event.detail?.name, code: event.detail?.code },
+            summarizeEvent(event),
+          );
+          liveTalkError('session.failed', failed);
+          setStatus(
+            bar,
+            'error',
+            event.detail?.message || event.detail?.name || 'Could not connect Live Talk.',
+          );
         }
-      }
-      if (event.type === SpeakCore.SpeakRealtimeEvent.USER_SPEECH_START) {
-        if (greetingPending) return;
-        setStatus(bar, 'listening', 'Listening…');
-      }
-      if (event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED) {
-        const failed = summarizeError(
-          { message: event.detail?.message, name: event.detail?.name, code: event.detail?.code },
-          summarizeEvent(event),
+        if (event.type === SpeakCore.SpeakRealtimeEvent.INPUT_TRANSCRIPT && transcript) {
+          liveTalkLog('transcript.heard', { chars: transcript.length });
+        }
+      });
+      active = {
+        session,
+        bridge,
+        get sessionId() {
+          return sessionId;
+        },
+      };
+      greetingPending = true;
+      try {
+        await session.start();
+        try {
+          session.setMuted?.(true);
+        } catch (_) {
+          /* mute until greeting finishes */
+        }
+        liveTalkLog('session.started', session.snapshot?.() || { sessionId });
+        watchPeer(session);
+        if (active?.session === session) {
+          await waitForRemotePlayback(session);
+          await speakGreeting(session);
+        }
+      } catch (error) {
+        liveTalkError(
+          'session.start-threw',
+          summarizeError(error, {
+            conversationId,
+            sessionId,
+            snapshot: session.snapshot?.() || null,
+          }),
         );
-        liveTalkError('session.failed', failed);
         setStatus(
           bar,
           'error',
-          event.detail?.message || event.detail?.name || 'Could not connect Live Talk.',
+          [error.name, error.message].filter(Boolean).join(': ') ||
+            'Microphone or voice session failed.',
         );
+        await stopCall(bar, 'failed');
       }
-      if (event.type === SpeakCore.SpeakRealtimeEvent.INPUT_TRANSCRIPT && transcript) {
-        liveTalkLog('transcript.heard', { chars: transcript.length });
-      }
-    });
-    active = {
-      session,
-      bridge,
-      get sessionId() {
-        return sessionId;
-      },
-    };
-    greetingPending = true;
-    try {
-      await session.start();
-      try {
-        session.setMuted?.(true);
-      } catch (_) {
-        /* mute until greeting finishes */
-      }
-      liveTalkLog('session.started', session.snapshot?.() || { sessionId });
-      watchPeer(session);
-      if (active?.session === session) {
-        await waitForRemotePlayback(session);
-        await speakGreeting(session);
-      }
-    } catch (error) {
-      liveTalkError(
-        'session.start-threw',
-        summarizeError(error, {
-          conversationId,
-          sessionId,
-          snapshot: session.snapshot?.() || null,
-        }),
-      );
-      setStatus(
-        bar,
-        'error',
-        [error.name, error.message].filter(Boolean).join(': ') ||
-          'Microphone or voice session failed.',
-      );
-      await stopCall(bar, 'failed');
+    } finally {
+      startInFlight = false;
     }
   }
 
@@ -845,7 +901,7 @@
     pendingShellAction = '';
     pendingLiveVoice = null;
     pendingGreeting = '';
-    if (!isTalkingState(ui.state)) {
+    if (!isTalkingState(ui.state) && !startInFlight) {
       await startCall(bar);
     }
   }

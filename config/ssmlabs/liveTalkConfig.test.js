@@ -86,7 +86,13 @@ test('student Live Talk pack uses student MCP and Student Caddie copy', () => {
   const text = liveTalkInstructions('Be a student caddie.', pack);
   assert.match(text, /spoken form of Student Caddie/i);
   assert.match(text, /student LessonCaddie tools/i);
+  assert.match(text, /do not introduce yourself/i);
   assert.doesNotMatch(text, /search_directory/);
+});
+
+test('session start does not auto-create a spoken turn', () => {
+  const detection = liveTalkTurnDetection(resolveLiveTalkConfig({}), { createResponse: false });
+  assert.equal(detection.create_response, false);
 });
 
 test('existing conversation agent wins over URL spec', () => {

@@ -285,7 +285,7 @@ function createLiveTalkRouter(deps = {}) {
           tool_choice: 'auto',
           audio: {
             input: {
-              turn_detection: liveTalkTurnDetection(sessionConfig),
+              turn_detection: liveTalkTurnDetection(sessionConfig, { createResponse: false }),
             },
             output: { voice: sessionConfig.voice },
           },
