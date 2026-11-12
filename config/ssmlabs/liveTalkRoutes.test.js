@@ -131,6 +131,34 @@ test('Live Talk fails closed when the MCP catalog is empty', async () => {
   }
 });
 
+test('a new Live Talk start replaces a leftover session for the same user', async () => {
+  const app = createApp();
+  const server = await listen(app);
+  try {
+    const first = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ conversationId: 'convo-1', sdp: 'offer-1' }),
+    });
+    assert.equal(first.status, 201);
+    const firstSession = await first.json();
+    const second = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ conversationId: 'convo-1', sdp: 'offer-2' }),
+    });
+    assert.equal(second.status, 201);
+    const ping = await fetch(
+      `http://127.0.0.1:${server.address().port}/live-talk/session/${firstSession.sessionId}/ping`,
+      { method: 'POST' },
+    );
+    assert.equal(ping.status, 404);
+  } finally {
+    resetLiveTalkSessions();
+    server.close();
+  }
+});
+
 test('Live Talk can start from a new Instructor Assistant thread', async () => {
   const saved = [];
   const app = createApp({

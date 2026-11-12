@@ -30,6 +30,7 @@
   let awaitingAssistant = false;
   let pendingKickTimer = 0;
   let readyTimer = 0;
+  let pingTimer = 0;
   let liveVoiceSettings = {
     waitForYou: 'patient',
     allowInterrupt: false,
@@ -325,11 +326,16 @@
 
   async function api(path, options) {
     const method = String(options?.method || 'GET').toUpperCase();
+    const quiet = options?.quiet === true;
+    const retry = Math.max(0, Number(options?.retry) || 0);
+    const fetchOptions = { ...(options || {}) };
+    delete fetchOptions.quiet;
+    delete fetchOptions.retry;
     const token = accessToken || (await waitForAccessToken());
     if (!token) {
       const error = new Error('Live Talk is waiting for Chat sign-in.');
       error.code = 'auth_missing';
-      liveTalkError('api.auth-missing', { method, path });
+      if (!quiet) liveTalkError('api.auth-missing', { method, path });
       throw error;
     }
     liveTalkLog('api.request', { method, path, tokenChars: token.length });
@@ -337,16 +343,20 @@
     try {
       response = await nativeFetch(path, {
         credentials: 'include',
-        ...options,
+        ...fetchOptions,
         headers: {
           accept: 'application/json',
           Authorization: `Bearer ${token}`,
-          ...(options?.body ? { 'content-type': 'application/json' } : {}),
-          ...(options?.headers || {}),
+          ...(fetchOptions.body ? { 'content-type': 'application/json' } : {}),
+          ...(fetchOptions.headers || {}),
         },
       });
     } catch (error) {
-      liveTalkError('api.network', summarizeError(error, { method, path }));
+      if (retry > 0) {
+        await sleep(400);
+        return api(path, { ...options, retry: retry - 1 });
+      }
+      if (!quiet) liveTalkError('api.network', summarizeError(error, { method, path }));
       throw error;
     }
     const payload = await response.json().catch(() => ({}));
@@ -355,10 +365,16 @@
       error.code = payload.error || `http_${response.status}`;
       error.status = response.status;
       error.debug = payload.debug || payload;
-      liveTalkError(
-        'api.failed',
-        summarizeError(error, { method, path, httpStatus: response.status }),
-      );
+      if (retry > 0 && (response.status >= 500 || response.status === 409)) {
+        await sleep(400);
+        return api(path, { ...options, retry: retry - 1 });
+      }
+      if (!quiet) {
+        liveTalkError(
+          'api.failed',
+          summarizeError(error, { method, path, httpStatus: response.status }),
+        );
+      }
       throw error;
     }
     liveTalkLog('api.ok', {
@@ -402,14 +418,19 @@
         /* ignore */
       }
     });
+    if (pingTimer) {
+      windowObject.clearInterval(pingTimer);
+      pingTimer = 0;
+    }
     if (current?.sessionId) {
       try {
         await api(liveTalkPath(`/live-talk/session/${current.sessionId}/stop`), {
           method: 'POST',
           body: JSON.stringify({ reason }),
+          quiet: true,
         });
-      } catch (error) {
-        liveTalkWarn('stop.server', summarizeError(error, { sessionId: current.sessionId }));
+      } catch (_) {
+        /* stop is best-effort if Chat already dropped the session */
       }
     }
     greetingPending = false;
@@ -723,6 +744,7 @@
           const created = await api(liveTalkPath('/live-talk/session'), {
             method: 'POST',
             body: JSON.stringify({ conversationId, sdp, liveVoice: voice, spec }),
+            retry: 2,
           });
           sessionId = created.sessionId;
           liveTalkLog('bootstrap.answer', {
@@ -908,6 +930,16 @@
           /* mute until greeting finishes */
         }
         liveTalkLog('session.started', session.snapshot?.() || { sessionId });
+        if (pingTimer) windowObject.clearInterval(pingTimer);
+        pingTimer = windowObject.setInterval(() => {
+          const id = active?.sessionId;
+          if (!id) return;
+          void api(liveTalkPath(`/live-talk/session/${id}/ping`), {
+            method: 'POST',
+            body: '{}',
+            quiet: true,
+          }).catch(() => {});
+        }, 20000);
         watchPeer(session);
         if (active?.session === session) {
           await waitForRemotePlayback(session);

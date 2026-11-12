@@ -76,7 +76,14 @@ function destroySession(sessionId, reason = 'stop') {
   rememberUserSession(record.userId, -1);
   record.closed = true;
   record.closedReason = reason;
+  liveTalkLog('info', 'session.destroyed', { sessionId, reason });
   return record;
+}
+
+function destroyUserSessions(userId, reason = 'replaced') {
+  for (const record of [...sessions.values()]) {
+    if (record.userId === userId) destroySession(record.id, reason);
+  }
 }
 
 function touchSession(record) {
@@ -225,12 +232,8 @@ function createLiveTalkRouter(deps = {}) {
       if (!sdp) {
         throw publicError(400, 'invalid_session', 'Live Talk is missing a voice offer.');
       }
-      if (countUserSessions(userId) >= baseConfig.maxSessionsPerUser) {
-        throw publicError(
-          409,
-          'session_limit',
-          'A Live Talk session is already active. Stop it before starting another.',
-        );
+      if (countUserSessions(userId) > 0) {
+        destroyUserSessions(userId, 'replaced');
       }
       let conversationId = requestedId;
       let convo = null;
@@ -417,6 +420,15 @@ function createLiveTalkRouter(deps = {}) {
       );
       record.parentMessageId = saved?.messageId || messageId;
       res.status(201).json({ ok: true, messageId: record.parentMessageId });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post('/session/:sessionId/ping', (req, res, next) => {
+    try {
+      requireSession(req);
+      res.json({ ok: true });
     } catch (error) {
       next(error);
     }
