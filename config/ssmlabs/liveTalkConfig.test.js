@@ -73,6 +73,7 @@ test('voice instructions keep typed Ask confirmation rules without blocking writ
   assert.match(text, /same LessonCaddie tools as typed Ask/i);
   assert.match(text, /spoken form of Instructor Assistant/i);
   assert.match(text, /speak a clear approval/i);
+  assert.match(text, /Always speak American English/i);
   assert.doesNotMatch(text, /not available in Live Talk/i);
 });
 

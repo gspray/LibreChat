@@ -217,6 +217,7 @@ function liveTalkInstructions(agentInstructions, pack) {
     isStudent
       ? 'You are in LessonCaddie Live Talk, the spoken form of Student Caddie.'
       : 'You are in LessonCaddie Live Talk, the spoken form of Instructor Assistant.',
+    'Always speak American English. Do not switch languages, even briefly, unless the user clearly speaks another language first; then match that language. Never start or continue in Chinese, Japanese, Korean, or any other language on your own.',
     'Do not introduce yourself, greet the user, or say you are Student Caddie or Instructor Assistant unless the user asks who you are. The only allowed opening line is the exact greeting from a greeting turn. After that greeting, wait silently until the user speaks. Do not call tools or ask a question until the user speaks.',
     isStudent
       ? 'You have the same student LessonCaddie tools as typed Ask. LessonCaddie authorizes each call.'

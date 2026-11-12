@@ -500,6 +500,11 @@
     awaitingAssistant = false;
     windowObject.clearTimeout(readyTimer);
     readyTimer = 0;
+    try {
+      active?.session?.sendEvent?.({ type: 'response.cancel' });
+    } catch (_) {
+      /* stop a follow-on spoken turn after the greeting */
+    }
     enableTurnResponses(active?.session);
     try {
       active?.session?.setMuted?.(false);
@@ -544,7 +549,7 @@
       type: 'response.create',
       response: {
         tool_choice: 'none',
-        instructions: `Do not introduce yourself. Speak only this exact greeting, then stop. Do not add any other sentence. Say exactly: ${line}`,
+        instructions: `Speak only American English. Do not introduce yourself. Speak only this exact greeting, then stop. Do not add any other sentence, word, or language. Do not continue in Chinese or any other language. Say exactly: ${line}`,
       },
     };
     try {
