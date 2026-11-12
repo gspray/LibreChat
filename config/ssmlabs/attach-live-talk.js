@@ -19,6 +19,25 @@ function resolveExpressApp(server) {
   return null;
 }
 
+function unwrapMcpToolList(listed) {
+  if (Array.isArray(listed)) return listed;
+  if (Array.isArray(listed?.tools)) return listed.tools;
+  return [];
+}
+
+/**
+ * LibreChat MCPConnection exposes fetchTools(), not the SDK Client.listTools().
+ * Calling listTools?.() is undefined after a successful connect, so Live Talk
+ * reports "no tools" even when MCP already refreshed the catalog.
+ */
+async function readConnectionTools(connection) {
+  if (typeof connection?.fetchTools === 'function') {
+    const fetched = unwrapMcpToolList(await connection.fetchTools());
+    if (fetched.length) return fetched;
+  }
+  return unwrapMcpToolList(await connection?.listTools?.());
+}
+
 function createBoundRouter() {
   const { requireJwtAuth } = require('~/server/middleware');
   const {
@@ -47,8 +66,7 @@ function createBoundRouter() {
         tokenMethods,
         requestBody: { conversationId },
       });
-      const listed = await connection.listTools?.();
-      const tools = listed?.tools || listed || [];
+      const tools = await readConnectionTools(connection);
       if (Array.isArray(tools) && tools.length) {
         console.info('[ssmlabs-live-talk] MCP tool list ok', {
           serverName: config.serverName,
@@ -170,4 +188,6 @@ http.Server.prototype.listen = function listenWithLiveTalk(...args) {
 
 module.exports = {
   attach,
+  unwrapMcpToolList,
+  readConnectionTools,
 };
