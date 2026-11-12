@@ -6,7 +6,6 @@
  */
 const http = require('http');
 const { createLiveTalkRouter } = require('./liveTalkRoutes');
-const { voiceToolHint } = require('./liveTalkConfig');
 
 const originalListen = http.Server.prototype.listen;
 
@@ -51,22 +50,31 @@ function createBoundRouter() {
       const listed = await connection.listTools?.();
       const tools = listed?.tools || listed || [];
       if (Array.isArray(tools) && tools.length) {
-        console.info('[ssmlabs-live-talk] MCP tool list ok', { count: tools.length });
+        console.info('[ssmlabs-live-talk] MCP tool list ok', {
+          serverName: config.serverName,
+          count: tools.length,
+        });
         return tools;
       }
+      const empty = new Error('Instructor MCP returned no tools for Live Talk.');
+      empty.status = 502;
+      empty.code = 'mcp_tools_unavailable';
+      throw empty;
     } catch (error) {
-      console.warn('[ssmlabs-live-talk] MCP tool list failed, using allowlist schemas', {
+      console.warn('[ssmlabs-live-talk] MCP tool list failed', {
         message: error.message,
         name: error.name,
         status: error.status,
         stack: error.stack,
       });
+      if (error.status && error.code) throw error;
+      const failed = new Error(
+        'Live Talk could not load LessonCaddie tools. Try typed Chat, then try voice again.',
+      );
+      failed.status = 502;
+      failed.code = 'mcp_tools_unavailable';
+      throw failed;
     }
-    return config.allowlist.map((name) => ({
-      name,
-      description: voiceToolHint(name),
-      inputSchema: { type: 'object', additionalProperties: true },
-    }));
   }
 
   async function callMcpTool({ user, serverName, toolName, toolArguments, conversationId }) {

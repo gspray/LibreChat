@@ -47,7 +47,7 @@ function createApp(overrides = {}) {
       bootstrapOpenAi: async ({ session }) => {
         assert.equal(
           session.tools.some((tool) => tool.name === 'create_lesson'),
-          false,
+          true,
         );
         assert.equal(
           session.tools.some((tool) => tool.name === 'search_directory'),
@@ -63,7 +63,7 @@ function createApp(overrides = {}) {
   return app;
 }
 
-test('Live Talk bootstraps a session and denies write tools', async () => {
+test('Live Talk bootstraps a session with the live MCP catalog including writes', async () => {
   const app = createApp();
   const server = await listen(app);
   try {
@@ -75,7 +75,8 @@ test('Live Talk bootstraps a session and denies write tools', async () => {
     assert.equal(created.status, 201);
     const session = await created.json();
     assert.equal(session.sdp, 'answer-sdp');
-    const denied = await fetch(
+    assert.deepEqual(session.tools, ['search_directory', 'create_lesson']);
+    const write = await fetch(
       `http://127.0.0.1:${server.address().port}/live-talk/session/${session.sessionId}/tool`,
       {
         method: 'POST',
@@ -83,7 +84,7 @@ test('Live Talk bootstraps a session and denies write tools', async () => {
         body: JSON.stringify({ name: 'create_lesson', arguments: {} }),
       },
     );
-    assert.equal(denied.status, 403);
+    assert.equal(write.status, 200);
     const allowed = await fetch(
       `http://127.0.0.1:${server.address().port}/live-talk/session/${session.sessionId}/tool`,
       {
@@ -93,6 +94,35 @@ test('Live Talk bootstraps a session and denies write tools', async () => {
       },
     );
     assert.equal(allowed.status, 200);
+    const unknown = await fetch(
+      `http://127.0.0.1:${server.address().port}/live-talk/session/${session.sessionId}/tool`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'not_a_catalog_tool', arguments: {} }),
+      },
+    );
+    assert.equal(unknown.status, 403);
+  } finally {
+    resetLiveTalkSessions();
+    server.close();
+  }
+});
+
+test('Live Talk fails closed when the MCP catalog is empty', async () => {
+  const app = createApp({
+    listMcpTools: async () => [],
+  });
+  const server = await listen(app);
+  try {
+    const created = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ conversationId: 'convo-1', sdp: 'offer' }),
+    });
+    assert.equal(created.status, 502);
+    const body = await created.json();
+    assert.equal(body.error, 'mcp_tools_unavailable');
   } finally {
     resetLiveTalkSessions();
     server.close();

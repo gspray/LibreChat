@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const express = require('express');
 const {
   resolveLiveTalkConfig,
+  liveTalkToolNames,
   isAllowedLiveTalkTool,
   liveTalkInstructions,
 } = require('./liveTalkConfig');
@@ -155,13 +156,13 @@ async function bootstrapOpenAi({ sdp, session }) {
   return answer;
 }
 
-function toOpenAiTools(mcpTools, config) {
+function toOpenAiTools(mcpTools) {
   const list = Array.isArray(mcpTools) ? mcpTools : [];
   return list
-    .filter((tool) => isAllowedLiveTalkTool(tool?.name, config))
+    .filter((tool) => String(tool?.name || '').trim())
     .map((tool) => ({
       type: 'function',
-      name: tool.name,
+      name: String(tool.name).trim(),
       description: String(tool.description || '').slice(0, 800),
       parameters:
         tool.inputSchema && typeof tool.inputSchema === 'object'
@@ -188,7 +189,7 @@ function createLiveTalkRouter(deps = {}) {
     res.json({
       enabled: config.enabled,
       agentId: config.agentId,
-      allowlist: config.allowlist,
+      mcpServer: config.serverName,
       speakCoreRevision: config.speakCoreRevision,
     });
   });
@@ -250,7 +251,15 @@ function createLiveTalkRouter(deps = {}) {
       }
       const agent = await getAgent({ id: config.agentId }).catch(() => null);
       const mcpTools = await listMcpTools({ user: req.user, conversationId, config });
-      const tools = toOpenAiTools(mcpTools, config);
+      const tools = toOpenAiTools(mcpTools);
+      const allowedTools = liveTalkToolNames(tools);
+      if (!allowedTools.size) {
+        throw publicError(
+          502,
+          'mcp_tools_unavailable',
+          'Live Talk could not load LessonCaddie tools. Try typed Chat, then try voice again.',
+        );
+      }
       const sessionId = crypto.randomUUID();
       const answerSdp = await bootstrap({
         sdp,
@@ -284,6 +293,7 @@ function createLiveTalkRouter(deps = {}) {
         lastActivityAt: now(),
         idleMs: config.idleMs,
         parentMessageId: clean(convo.lastMessageId || convo.last_message_id),
+        allowedTools,
         closed: false,
       };
       record.maxTimer = setTimeout(
@@ -303,7 +313,7 @@ function createLiveTalkRouter(deps = {}) {
         sessionId,
         sdp: answerSdp,
         conversationId,
-        allowlist: config.allowlist,
+        tools: tools.map((tool) => tool.name),
       });
     } catch (error) {
       next(error);
@@ -323,12 +333,15 @@ function createLiveTalkRouter(deps = {}) {
             ? Object.keys(req.body.arguments)
             : [],
       });
-      if (!isAllowedLiveTalkTool(name, config)) {
-        liveTalkLog('warn', 'tool.denied', { name, allowlist: config.allowlist });
+      if (!isAllowedLiveTalkTool(name, record.allowedTools)) {
+        liveTalkLog('warn', 'tool.denied', {
+          name,
+          toolCount: record.allowedTools instanceof Set ? record.allowedTools.size : 0,
+        });
         throw publicError(
           403,
           'tool_denied',
-          'That action is not available in Live Talk. Continue in typed Chat.',
+          'That action is not in the LessonCaddie catalog for this voice session.',
         );
       }
       const result = await callMcpTool({

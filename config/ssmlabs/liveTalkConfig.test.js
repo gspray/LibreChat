@@ -4,33 +4,33 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   resolveLiveTalkConfig,
+  liveTalkToolNames,
   isAllowedLiveTalkTool,
   liveTalkInstructions,
 } = require('./liveTalkConfig');
 
 test('Live Talk is on for this Chat branch', () => {
   assert.equal(resolveLiveTalkConfig({}).enabled, true);
+  assert.equal(resolveLiveTalkConfig({}).serverName, 'lessoncaddie-instructor');
 });
 
-test('write tools cannot enter the voice allowlist even if listed as reads', () => {
-  const config = resolveLiveTalkConfig({
-    LIVE_TALK_READ_TOOLS: 'search_directory,create_lesson,get_lesson',
-  });
-  assert.deepEqual(config.allowlist, ['search_directory', 'get_lesson']);
-  assert.equal(isAllowedLiveTalkTool('create_lesson', config), false);
-  assert.equal(isAllowedLiveTalkTool('search_directory', config), true);
-  assert.equal(isAllowedLiveTalkTool('open_app_screen', config), false);
+test('voice uses the live MCP catalog, including writes', () => {
+  const allowed = liveTalkToolNames([
+    { name: 'search_directory' },
+    { name: 'create_lesson' },
+    { name: 'open_app_screen' },
+    { name: '  ' },
+  ]);
+  assert.equal(isAllowedLiveTalkTool('search_directory', allowed), true);
+  assert.equal(isAllowedLiveTalkTool('create_lesson', allowed), true);
+  assert.equal(isAllowedLiveTalkTool('open_app_screen', allowed), true);
+  assert.equal(isAllowedLiveTalkTool('delete_student', allowed), false);
+  assert.equal(isAllowedLiveTalkTool('create_lesson'), false);
 });
 
-test('Live Talk includes roster reads and app navigation by default', () => {
-  const config = resolveLiveTalkConfig({});
-  assert.equal(isAllowedLiveTalkTool('search_directory', config), true);
-  assert.equal(isAllowedLiveTalkTool('open_app_screen', config), true);
-  assert.equal(isAllowedLiveTalkTool('create_lesson', config), false);
-});
-
-test('voice instructions keep writes out of Live Talk even if the agent prompt is silent', () => {
-  assert.match(liveTalkInstructions('Be helpful.'), /not available in Live Talk/i);
-  assert.match(liveTalkInstructions('Be helpful.'), /search_directory/i);
-  assert.match(liveTalkInstructions('Be helpful.'), /open_app_screen/i);
+test('voice instructions keep typed Ask confirmation rules without blocking writes', () => {
+  const text = liveTalkInstructions('Be helpful.');
+  assert.match(text, /same LessonCaddie tools as typed Ask/i);
+  assert.match(text, /speak a clear approval/i);
+  assert.doesNotMatch(text, /not available in Live Talk/i);
 });

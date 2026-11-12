@@ -2,7 +2,7 @@
 
 Overlay on this Chat branch. Related umbrella: LessonCaddie [#443](https://github.com/gspray/lessoncaddie/pull/443).
 
-Native OpenAI Realtime speech-to-speech via pinned `@spray/speak-core` `36581f2` (0.2.21). LessonCaddie facts use the existing instructor MCP path. Writes are denied on the Chat server.
+Native OpenAI Realtime speech-to-speech via pinned `@spray/speak-core` `36581f2` (0.2.21). Live Talk uses the live `lessoncaddie-instructor` MCP catalog — the same tools as typed Ask. LessonCaddie still authorizes each call, including writes.
 
 Live Talk is on whenever this overlay is loaded. There is no env flag to disable it.
 
@@ -20,7 +20,7 @@ Leaving this branch (or dropping the overlay attach) is the off switch. Existing
 
 - Native mic in / spoken reply out; interrupt during playback.
 - Ask a directory or lesson question; the spoken answer uses a read tool.
-- Ask to schedule or message; the tool is denied and nothing is written.
+- Ask to schedule or message; Live Talk can call the same write tools as typed Ask after spoken confirmation. LessonCaddie still authorizes the mutation.
 - Stop, then type in the same thread. Voice transcripts remain.
 - Leave the thread or reload: microphone and provider session stop.
 

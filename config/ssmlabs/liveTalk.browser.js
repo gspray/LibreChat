@@ -377,6 +377,7 @@
           sessionId,
           conversationId: created.conversationId || conversationId,
           sdpChars: String(created.sdp || '').length,
+          toolCount: Array.isArray(created.tools) ? created.tools.length : 0,
         });
         return created.sdp;
       },
@@ -571,8 +572,8 @@
       liveTalkLog('overlay.config', {
         enabled: Boolean(config.enabled),
         agentId: config.agentId || '',
+        mcpServer: config.mcpServer || '',
         speakCoreRevision: config.speakCoreRevision || '',
-        allowlistCount: Array.isArray(config.allowlist) ? config.allowlist.length : 0,
       });
     } catch (error) {
       liveTalkError(
