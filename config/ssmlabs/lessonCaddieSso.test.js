@@ -10,6 +10,7 @@ const {
   sanitizeAppReturnTo,
   buildLessonCaddieStartUrl,
   ssoBrowserStateAllowsCallback,
+  ssoScopedEmail,
   resolveLibreChatUser,
 } = require('./lessonCaddieSso');
 
@@ -176,6 +177,13 @@ test('callback reports a retry hint when LessonCaddie DNS is unavailable', async
 
 test('resolveLibreChatUser creates on first login and does not merge by email', async () => {
   const created = { _id: 'lc-new', provider: 'lessoncaddie', openidId: 'fb-1', role: 'USER' };
+  const scoped = {
+    _id: 'lc-scoped',
+    provider: 'lessoncaddie',
+    openidId: 'fb-1',
+    email: ssoScopedEmail('fb-1'),
+    role: 'USER',
+  };
   const models = {
     async findUser(query) {
       if (query.provider === 'lessoncaddie' && query.openidId === 'fb-1') {
@@ -189,14 +197,22 @@ test('resolveLibreChatUser creates on first login and does not merge by email', 
     async updateUser() {
       throw new Error('should not update on email collision');
     },
-    async createUserIfAbsent() {
-      return { ok: false, error: { code: 'user_exists' } };
+    async createUserIfAbsent(data) {
+      if (data.email === 'greg@example.com') {
+        return { ok: false, error: { code: 'user_exists' } };
+      }
+      assert.equal(data.email, ssoScopedEmail('fb-1'));
+      assert.equal(data.openidId, 'fb-1');
+      assert.equal(data.role, 'USER');
+      return { ok: true, value: scoped };
     },
   };
-  await assert.rejects(
-    () => resolveLibreChatUser({ firebaseUid: 'fb-1', email: 'greg@example.com' }, models),
-    (error) => error.code === 'LINK_REQUIRED',
+  const switched = await resolveLibreChatUser(
+    { firebaseUid: 'fb-1', email: 'greg@example.com' },
+    models,
   );
+  assert.equal(switched._id, 'lc-scoped');
+  assert.equal(switched.email, ssoScopedEmail('fb-1'));
 
   const createModels = {
     async findUser(query) {
