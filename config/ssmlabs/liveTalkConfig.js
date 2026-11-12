@@ -1,8 +1,27 @@
 'use strict';
 
-/** SSM Labs Live Talk — same Instructor Assistant MCP catalog as typed Ask. */
+/** SSM Labs Live Talk — same MCP catalog as typed Ask for the active Caddie pack. */
 const DEFAULT_SERVER = 'lessoncaddie-instructor';
 const DEFAULT_AGENT_ID = 'agent_instructor_assistant';
+const STUDENT_SERVER = 'lessoncaddie-student';
+const STUDENT_AGENT_ID = 'agent_student_caddie';
+
+const LIVE_TALK_PACKS = Object.freeze({
+  instructor: Object.freeze({
+    id: 'instructor',
+    spec: 'instructor-assistant',
+    agentId: DEFAULT_AGENT_ID,
+    serverName: DEFAULT_SERVER,
+    displayName: 'Instructor Assistant',
+  }),
+  student: Object.freeze({
+    id: 'student',
+    spec: 'student-caddie',
+    agentId: STUDENT_AGENT_ID,
+    serverName: STUDENT_SERVER,
+    displayName: 'Student Caddie',
+  }),
+});
 const DEFAULT_MODEL = 'gpt-realtime';
 const DEFAULT_VOICE = 'marin';
 const DEFAULT_MAX_SESSION_MS = 15 * 60 * 1000;
@@ -46,6 +65,29 @@ function parseVadEagerness(value) {
     .trim()
     .toLowerCase();
   return ['low', 'medium', 'high', 'auto'].includes(raw) ? raw : DEFAULT_VAD_EAGERNESS;
+}
+
+function resolveLiveTalkPack({ spec, agentId } = {}) {
+  const requestedSpec = String(spec || '').trim();
+  const requestedAgent = String(agentId || '').trim();
+  if (requestedAgent === STUDENT_AGENT_ID) return LIVE_TALK_PACKS.student;
+  if (requestedAgent === DEFAULT_AGENT_ID) return LIVE_TALK_PACKS.instructor;
+  if (requestedSpec === LIVE_TALK_PACKS.student.spec) return LIVE_TALK_PACKS.student;
+  if (requestedSpec === LIVE_TALK_PACKS.instructor.spec || (!requestedSpec && !requestedAgent)) {
+    return LIVE_TALK_PACKS.instructor;
+  }
+  return null;
+}
+
+function applyLiveTalkPack(config, pack) {
+  if (!pack) return config;
+  return {
+    ...config,
+    agentId: pack.agentId,
+    serverName: pack.serverName,
+    packId: pack.id,
+    displayName: pack.displayName,
+  };
 }
 
 function resolveLiveTalkConfig(env = process.env) {
@@ -161,22 +203,38 @@ function isAllowedLiveTalkTool(name, allowedNames) {
   return allowedNames.has(tool);
 }
 
-function liveTalkInstructions(agentInstructions) {
+function liveTalkInstructions(agentInstructions, pack) {
   const base = String(agentInstructions || '').trim();
+  const isStudent = pack?.id === 'student';
   const extra = [
-    'You are in LessonCaddie Live Talk, the spoken form of Instructor Assistant.',
+    isStudent
+      ? 'You are in LessonCaddie Live Talk, the spoken form of Student Caddie.'
+      : 'You are in LessonCaddie Live Talk, the spoken form of Instructor Assistant.',
     'When a greeting turn is requested, speak only that short greeting, then wait silently. Do not call tools or ask a question until the user speaks.',
-    'You have the same LessonCaddie tools as typed Ask. LessonCaddie authorizes each call.',
+    isStudent
+      ? 'You have the same student LessonCaddie tools as typed Ask. LessonCaddie authorizes each call.'
+      : 'You have the same LessonCaddie tools as typed Ask. LessonCaddie authorizes each call.',
     'Speak naturally. LessonCaddie facts must come from tools.',
-    'For how many students or roster size, call search_directory with no query and speak the returned total.',
-    'When the user asks to open, go to, or show a page, call open_app_screen. Calendar is destination calendar. Today is today. Students list is student-list.',
+    isStudent
+      ? 'When the user asks to open, go to, or show a page, call open_app_screen. Calendar is destination calendar. Lessons is sessions. Practices is practices. Goals is goals.'
+      : 'For how many students or roster size, call search_directory with no query and speak the returned total.',
+    isStudent
+      ? null
+      : 'When the user asks to open, go to, or show a page, call open_app_screen. Calendar is destination calendar. Today is today. Students list is student-list.',
     'Follow the same confirmation rules as typed Chat before mutating data. In voice, do not use Markdown approval links; ask the user to speak a clear approval, then call the tool with confirmed true and a stable mutation ID.',
     'Do not claim a write succeeded until the tool returns success. If LessonCaddie asks for confirmation or denies the action, say that.',
-  ].join(' ');
+  ]
+    .filter(Boolean)
+    .join(' ');
   return base ? `${base}\n\n${extra}` : extra;
 }
 
 module.exports = {
+  LIVE_TALK_PACKS,
+  DEFAULT_AGENT_ID,
+  STUDENT_AGENT_ID,
+  resolveLiveTalkPack,
+  applyLiveTalkPack,
   resolveLiveTalkConfig,
   normalizeLiveVoiceSettings,
   applyLiveVoiceToConfig,

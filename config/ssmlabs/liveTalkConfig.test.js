@@ -4,6 +4,8 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   resolveLiveTalkConfig,
+  resolveLiveTalkPack,
+  applyLiveTalkPack,
   applyLiveVoiceToConfig,
   liveTalkTurnDetection,
   liveTalkToolNames,
@@ -69,6 +71,28 @@ test('voice uses the live MCP catalog, including writes', () => {
 test('voice instructions keep typed Ask confirmation rules without blocking writes', () => {
   const text = liveTalkInstructions('Be helpful.');
   assert.match(text, /same LessonCaddie tools as typed Ask/i);
+  assert.match(text, /spoken form of Instructor Assistant/i);
   assert.match(text, /speak a clear approval/i);
   assert.doesNotMatch(text, /not available in Live Talk/i);
+});
+
+test('student Live Talk pack uses student MCP and Student Caddie copy', () => {
+  const pack = resolveLiveTalkPack({ spec: 'student-caddie' });
+  assert.equal(pack.id, 'student');
+  assert.equal(pack.serverName, 'lessoncaddie-student');
+  assert.equal(pack.agentId, 'agent_student_caddie');
+  const config = applyLiveTalkPack(resolveLiveTalkConfig({}), pack);
+  assert.equal(config.serverName, 'lessoncaddie-student');
+  const text = liveTalkInstructions('Be a student caddie.', pack);
+  assert.match(text, /spoken form of Student Caddie/i);
+  assert.match(text, /student LessonCaddie tools/i);
+  assert.doesNotMatch(text, /search_directory/);
+});
+
+test('existing conversation agent wins over URL spec', () => {
+  const pack = resolveLiveTalkPack({
+    spec: 'student-caddie',
+    agentId: 'agent_instructor_assistant',
+  });
+  assert.equal(pack.id, 'instructor');
 });

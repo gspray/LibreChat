@@ -158,6 +158,102 @@ test('Live Talk can start from a new Instructor Assistant thread', async () => {
   }
 });
 
+test('student spec starts Live Talk against student MCP', async () => {
+  const saved = [];
+  const listed = [];
+  const called = [];
+  const app = createApp({
+    getAgent: async ({ id }) => ({
+      instructions: id === 'agent_student_caddie' ? 'You are Student Caddie.' : 'Instructor',
+    }),
+    saveConvo: async (_ctx, convo) => {
+      saved.push(convo);
+      return convo;
+    },
+    listMcpTools: async ({ config }) => {
+      listed.push(config.serverName);
+      return [
+        { name: 'get_student_briefing', description: 'Briefing', inputSchema: { type: 'object' } },
+        { name: 'open_app_screen', description: 'Open a page', inputSchema: { type: 'object' } },
+      ];
+    },
+    callMcpTool: async ({ serverName, toolName }) => {
+      called.push({ serverName, toolName });
+      return { ok: true, toolName };
+    },
+    bootstrapOpenAi: async ({ session }) => {
+      assert.match(session.instructions, /Student Caddie/);
+      assert.equal(
+        session.tools.some((tool) => tool.name === 'get_student_briefing'),
+        true,
+      );
+      return 'answer-sdp';
+    },
+  });
+  const server = await listen(app);
+  try {
+    const created = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ conversationId: 'new', spec: 'student-caddie', sdp: 'offer' }),
+    });
+    assert.equal(created.status, 201);
+    const session = await created.json();
+    assert.deepEqual(listed, ['lessoncaddie-student']);
+    assert.equal(saved[0].agent_id, 'agent_student_caddie');
+    const tool = await fetch(
+      `http://127.0.0.1:${server.address().port}/live-talk/session/${session.sessionId}/tool`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'get_student_briefing', arguments: {} }),
+      },
+    );
+    assert.equal(tool.status, 200);
+    assert.deepEqual(called, [
+      { serverName: 'lessoncaddie-student', toolName: 'get_student_briefing' },
+    ]);
+  } finally {
+    resetLiveTalkSessions();
+    server.close();
+  }
+});
+
+test('student conversation threads keep student MCP even without spec', async () => {
+  const listed = [];
+  const app = createApp({
+    getConvo: async (userId, conversationId) => ({
+      conversationId,
+      agent_id: 'agent_student_caddie',
+      lastMessageId: 'msg-root',
+    }),
+    listMcpTools: async ({ config }) => {
+      listed.push(config.serverName);
+      return [
+        {
+          name: 'find_activities',
+          description: 'Find activities',
+          inputSchema: { type: 'object' },
+        },
+      ];
+    },
+    bootstrapOpenAi: async () => 'answer-sdp',
+  });
+  const server = await listen(app);
+  try {
+    const created = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ conversationId: 'student-thread', sdp: 'offer' }),
+    });
+    assert.equal(created.status, 201);
+    assert.deepEqual(listed, ['lessoncaddie-student']);
+  } finally {
+    resetLiveTalkSessions();
+    server.close();
+  }
+});
+
 test('a second instructor cannot use another instructor session', async () => {
   const app = createApp();
   const server = await listen(app);

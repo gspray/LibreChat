@@ -74,7 +74,7 @@ function createBoundRouter() {
         });
         return tools;
       }
-      const empty = new Error('Instructor MCP returned no tools for Live Talk.');
+      const empty = new Error('LessonCaddie MCP returned no tools for Live Talk.');
       empty.status = 502;
       empty.code = 'mcp_tools_unavailable';
       throw empty;

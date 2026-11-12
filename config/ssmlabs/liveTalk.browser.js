@@ -271,6 +271,14 @@
     return id;
   }
 
+  function liveTalkSpecFromLocation() {
+    try {
+      return new URL(windowObject.location.href).searchParams.get('spec') || '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   function isTalkingState(state) {
     return (
       state === 'connecting' ||
@@ -529,7 +537,8 @@
       return;
     }
     const conversationId = conversationIdFromLocation() || 'new';
-    liveTalkLog('start.conversation', { conversationId });
+    const spec = liveTalkSpecFromLocation();
+    liveTalkLog('start.conversation', { conversationId, spec });
     await stopCall(bar, 'restart');
     setStatus(bar, 'connecting', 'Connecting…');
     let sessionId = '';
@@ -548,7 +557,7 @@
         });
         const created = await api(liveTalkPath('/live-talk/session'), {
           method: 'POST',
-          body: JSON.stringify({ conversationId, sdp, liveVoice: voice }),
+          body: JSON.stringify({ conversationId, sdp, liveVoice: voice, spec }),
         });
         sessionId = created.sessionId;
         liveTalkLog('bootstrap.answer', {

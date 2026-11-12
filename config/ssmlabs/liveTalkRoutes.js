@@ -5,6 +5,8 @@ const crypto = require('node:crypto');
 const express = require('express');
 const {
   resolveLiveTalkConfig,
+  resolveLiveTalkPack,
+  applyLiveTalkPack,
   liveTalkTurnDetection,
   applyLiveVoiceToConfig,
   liveTalkToolNames,
@@ -198,12 +200,14 @@ function createLiveTalkRouter(deps = {}) {
 
   router.post('/session', async (req, res, next) => {
     try {
-      const config = loadConfig();
+      const baseConfig = loadConfig();
       const userId = userIdOf(req);
       const sdp = normalizeSdp(req.body?.sdp);
       liveTalkLog('info', 'session.create.request', {
         userId: userId ? 'set' : '',
         conversationId: clean(req.body?.conversationId),
+        spec: clean(req.body?.spec),
+        agentId: clean(req.body?.agentId),
         sdpChars: sdp.length,
         sdpEndsWithNewline: sdp.endsWith('\n'),
       });
@@ -214,7 +218,7 @@ function createLiveTalkRouter(deps = {}) {
       if (!sdp) {
         throw publicError(400, 'invalid_session', 'Live Talk is missing a voice offer.');
       }
-      if (countUserSessions(userId) >= config.maxSessionsPerUser) {
+      if (countUserSessions(userId) >= baseConfig.maxSessionsPerUser) {
         throw publicError(
           409,
           'session_limit',
@@ -223,20 +227,27 @@ function createLiveTalkRouter(deps = {}) {
       }
       let conversationId = requestedId;
       let convo = null;
+      let convoAgentId = '';
       if (conversationId && conversationId !== 'new') {
         convo = await getConvo(userId, conversationId);
         if (!convo) {
           throw publicError(404, 'conversation_not_found', 'That conversation was not found.');
         }
-        const agentId = clean(convo.agent_id || convo.agentId);
-        if (agentId && agentId !== config.agentId) {
-          throw publicError(
-            403,
-            'agent_not_allowed',
-            'Live Talk is only available on Instructor Assistant threads.',
-          );
-        }
-      } else {
+        convoAgentId = clean(convo.agent_id || convo.agentId);
+      }
+      const pack = resolveLiveTalkPack({
+        spec: clean(req.body?.spec),
+        agentId: convoAgentId || clean(req.body?.agentId),
+      });
+      if (!pack) {
+        throw publicError(
+          403,
+          'agent_not_allowed',
+          'Live Talk is only available on LessonCaddie Caddie threads.',
+        );
+      }
+      const config = applyLiveTalkPack(baseConfig, pack);
+      if (!conversationId || conversationId === 'new') {
         conversationId = crypto.randomUUID();
         convo = {
           conversationId,
@@ -269,7 +280,7 @@ function createLiveTalkRouter(deps = {}) {
         session: {
           type: 'realtime',
           model: sessionConfig.model,
-          instructions: liveTalkInstructions(agent?.instructions),
+          instructions: liveTalkInstructions(agent?.instructions, pack),
           tools,
           tool_choice: 'auto',
           audio: {
@@ -285,6 +296,9 @@ function createLiveTalkRouter(deps = {}) {
         userId,
         conversationId,
         agentId: config.agentId,
+        serverName: config.serverName,
+        packId: pack.id,
+        displayName: pack.displayName,
         createdAt: now(),
         lastActivityAt: now(),
         idleMs: config.idleMs,
@@ -302,6 +316,9 @@ function createLiveTalkRouter(deps = {}) {
       liveTalkLog('info', 'session.create.ok', {
         sessionId,
         conversationId,
+        packId: pack.id,
+        agentId: config.agentId,
+        serverName: config.serverName,
         toolCount: tools.length,
         tools: tools.map((tool) => tool.name),
       });
@@ -342,7 +359,7 @@ function createLiveTalkRouter(deps = {}) {
       }
       const result = await callMcpTool({
         user: req.user,
-        serverName: config.serverName,
+        serverName: record.serverName || config.serverName,
         toolName: name,
         toolArguments:
           req.body?.arguments && typeof req.body.arguments === 'object' ? req.body.arguments : {},
@@ -382,7 +399,7 @@ function createLiveTalkRouter(deps = {}) {
           messageId,
           conversationId: record.conversationId,
           parentMessageId: record.parentMessageId || undefined,
-          sender: role === 'user' ? 'User' : 'Instructor Assistant',
+          sender: role === 'user' ? 'User' : record.displayName || 'Instructor Assistant',
           isCreatedByUser: role === 'user',
           text: interrupted ? `${text}\n\n[Interrupted]` : text,
           endpoint: 'agents',
