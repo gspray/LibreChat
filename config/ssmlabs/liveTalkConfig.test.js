@@ -4,6 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   resolveLiveTalkConfig,
+  liveTalkTurnDetection,
   liveTalkToolNames,
   isAllowedLiveTalkTool,
   liveTalkInstructions,
@@ -12,6 +13,27 @@ const {
 test('Live Talk is on for this Chat branch', () => {
   assert.equal(resolveLiveTalkConfig({}).enabled, true);
   assert.equal(resolveLiveTalkConfig({}).serverName, 'lessoncaddie-instructor');
+});
+
+test('Live Talk waits out noise instead of barging in', () => {
+  const defaults = liveTalkTurnDetection(resolveLiveTalkConfig({}));
+  assert.deepEqual(defaults, {
+    type: 'semantic_vad',
+    eagerness: 'low',
+    create_response: true,
+    interrupt_response: false,
+  });
+  const serverVad = liveTalkTurnDetection(
+    resolveLiveTalkConfig({
+      LIVE_TALK_VAD_TYPE: 'server_vad',
+      LIVE_TALK_VAD_THRESHOLD: '0.8',
+      LIVE_TALK_VAD_SILENCE_MS: '1200',
+    }),
+  );
+  assert.equal(serverVad.type, 'server_vad');
+  assert.equal(serverVad.threshold, 0.8);
+  assert.equal(serverVad.silence_duration_ms, 1200);
+  assert.equal(serverVad.interrupt_response, false);
 });
 
 test('voice uses the live MCP catalog, including writes', () => {

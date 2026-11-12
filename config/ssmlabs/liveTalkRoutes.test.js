@@ -53,8 +53,10 @@ function createApp(overrides = {}) {
           session.tools.some((tool) => tool.name === 'search_directory'),
           true,
         );
-        assert.equal(session.audio?.input?.turn_detection?.type, 'server_vad');
+        assert.equal(session.audio?.input?.turn_detection?.type, 'semantic_vad');
+        assert.equal(session.audio?.input?.turn_detection?.eagerness, 'low');
         assert.equal(session.audio?.input?.turn_detection?.create_response, true);
+        assert.equal(session.audio?.input?.turn_detection?.interrupt_response, false);
         return 'answer-sdp';
       },
       ...overrides,

@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const express = require('express');
 const {
   resolveLiveTalkConfig,
+  liveTalkTurnDetection,
   liveTalkToolNames,
   isAllowedLiveTalkTool,
   liveTalkInstructions,
@@ -271,14 +272,7 @@ function createLiveTalkRouter(deps = {}) {
           tool_choice: 'auto',
           audio: {
             input: {
-              turn_detection: {
-                type: 'server_vad',
-                threshold: 0.5,
-                prefix_padding_ms: 300,
-                silence_duration_ms: 500,
-                create_response: true,
-                interrupt_response: false,
-              },
+              turn_detection: liveTalkTurnDetection(config),
             },
             output: { voice: config.voice },
           },
