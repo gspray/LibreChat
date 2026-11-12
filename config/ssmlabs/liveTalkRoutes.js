@@ -6,6 +6,7 @@ const express = require('express');
 const {
   resolveLiveTalkConfig,
   liveTalkTurnDetection,
+  applyLiveVoiceToConfig,
   liveTalkToolNames,
   isAllowedLiveTalkTool,
   liveTalkInstructions,
@@ -262,19 +263,20 @@ function createLiveTalkRouter(deps = {}) {
         );
       }
       const sessionId = crypto.randomUUID();
+      const sessionConfig = applyLiveVoiceToConfig(config, req.body?.liveVoice);
       const answerSdp = await bootstrap({
         sdp,
         session: {
           type: 'realtime',
-          model: config.model,
+          model: sessionConfig.model,
           instructions: liveTalkInstructions(agent?.instructions),
           tools,
           tool_choice: 'auto',
           audio: {
             input: {
-              turn_detection: liveTalkTurnDetection(config),
+              turn_detection: liveTalkTurnDetection(sessionConfig),
             },
-            output: { voice: config.voice },
+            output: { voice: sessionConfig.voice },
           },
         },
       });

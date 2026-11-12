@@ -21,6 +21,36 @@
   let accessToken = '';
   let ui = { state: 'idle', text: '' };
   let pendingShellAction = '';
+  let pendingLiveVoice = null;
+  let liveVoiceSettings = {
+    waitForYou: 'patient',
+    allowInterrupt: false,
+    ignoreBackgroundNoise: true,
+    muteMicWhileSheTalks: true,
+    voice: 'marin',
+  };
+
+  function normalizeLiveVoiceSettings(raw) {
+    const src = raw && typeof raw === 'object' ? raw : {};
+    const waitForYou = ['patient', 'balanced', 'fast'].includes(
+      String(src.waitForYou || '')
+        .trim()
+        .toLowerCase(),
+    )
+      ? String(src.waitForYou).trim().toLowerCase()
+      : 'patient';
+    const voiceRaw = String(src.voice || '')
+      .trim()
+      .toLowerCase();
+    const voices = ['marin', 'cedar', 'shimmer', 'verse', 'alloy'];
+    return {
+      waitForYou,
+      allowInterrupt: src.allowInterrupt === true,
+      ignoreBackgroundNoise: src.ignoreBackgroundNoise !== false,
+      muteMicWhileSheTalks: src.muteMicWhileSheTalks !== false,
+      voice: voices.includes(voiceRaw) ? voiceRaw : 'marin',
+    };
+  }
 
   function clean(value) {
     return String(value || '').trim();
@@ -358,19 +388,22 @@
     await stopCall(bar, 'restart');
     setStatus(bar, 'connecting', 'Connecting…');
     let sessionId = '';
+    const voice = normalizeLiveVoiceSettings(liveVoiceSettings);
     const session = SpeakCore.createSpeakRealtimeSession({
       provider: 'openai-realtime',
-      holdInput: true,
-      conversationBehavior: { interruption: 'disabled' },
+      holdInput: voice.muteMicWhileSheTalks,
+      conversationBehavior: { interruption: voice.allowInterrupt ? 'enabled' : 'disabled' },
       createAudioElement: createLiveTalkAudioElement,
       bootstrapCall: async ({ sdp }) => {
         liveTalkLog('bootstrap.offer', {
           conversationId,
           sdpChars: String(sdp || '').length,
+          waitForYou: voice.waitForYou,
+          allowInterrupt: voice.allowInterrupt,
         });
         const created = await api(liveTalkPath('/live-talk/session'), {
           method: 'POST',
-          body: JSON.stringify({ conversationId, sdp }),
+          body: JSON.stringify({ conversationId, sdp, liveVoice: voice }),
         });
         sessionId = created.sessionId;
         liveTalkLog('bootstrap.answer', {
@@ -383,8 +416,8 @@
       },
     });
     const bridge = SpeakCore.createOpenAIRealtimeFunctionCallBridge({
-      holdInput: true,
-      conversationBehavior: { interruption: 'disabled' },
+      holdInput: voice.muteMicWhileSheTalks,
+      conversationBehavior: { interruption: voice.allowInterrupt ? 'enabled' : 'disabled' },
       invokeTool: async (call) => {
         liveTalkLog('tool.invoke', { name: call.name, callId: call.callId || '', sessionId });
         setStatus(bar, 'tool', `Looking up ${call.name}…`);
@@ -431,6 +464,13 @@
         diagnosePlayback('connected');
       }
       if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_AUDIO_START) {
+        if (voice.muteMicWhileSheTalks) {
+          try {
+            session.setMuted?.(true);
+          } catch (_) {
+            /* holdInput still covers echo */
+          }
+        }
         const alreadyResponding = bar.dataset.state === 'responding';
         if (!alreadyResponding) {
           setStatus(bar, 'responding', 'Responding…');
@@ -516,18 +556,24 @@
     setStatus(bar, ui.state || 'listening', ui.text || 'Listening…');
   }
 
-  async function applyShellAction(action) {
+  async function applyShellAction(action, settings) {
+    if (settings) {
+      liveVoiceSettings = normalizeLiveVoiceSettings(settings);
+    }
     const bar = ensureBar();
     if (action === 'stop' || (action === 'toggle' && isTalkingState(ui.state))) {
       pendingShellAction = '';
+      pendingLiveVoice = null;
       if (active) await stopCall(bar, 'stop');
       return;
     }
     if (!config.enabled) {
       pendingShellAction = action;
+      pendingLiveVoice = settings || pendingLiveVoice;
       return;
     }
     pendingShellAction = '';
+    pendingLiveVoice = null;
     if (!isTalkingState(ui.state)) {
       await startCall(bar);
     }
@@ -540,8 +586,8 @@
     if (!data || data.source !== SHELL_MESSAGE_SOURCE || data.type !== 'live-talk') return;
     const action = clean(data.action);
     if (!['start', 'stop', 'toggle'].includes(action)) return;
-    liveTalkLog('shell.command', { action });
-    void applyShellAction(action);
+    liveTalkLog('shell.command', { action, waitForYou: data.liveVoice?.waitForYou || '' });
+    void applyShellAction(action, data.liveVoice);
   }
 
   function watchThreadChanges() {
@@ -585,7 +631,7 @@
     syncBar();
     liveTalkLog('overlay.chrome', { host: 'shell-fab' });
     if (pendingShellAction) {
-      void applyShellAction(pendingShellAction);
+      void applyShellAction(pendingShellAction, pendingLiveVoice);
     }
   }
 

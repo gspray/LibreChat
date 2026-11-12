@@ -4,6 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   resolveLiveTalkConfig,
+  applyLiveVoiceToConfig,
   liveTalkTurnDetection,
   liveTalkToolNames,
   isAllowedLiveTalkTool,
@@ -13,6 +14,21 @@ const {
 test('Live Talk is on for this Chat branch', () => {
   assert.equal(resolveLiveTalkConfig({}).enabled, true);
   assert.equal(resolveLiveTalkConfig({}).serverName, 'lessoncaddie-instructor');
+});
+
+test('user Live Voice settings override VAD patience', () => {
+  const fast = applyLiveVoiceToConfig(resolveLiveTalkConfig({}), {
+    waitForYou: 'fast',
+    allowInterrupt: true,
+    ignoreBackgroundNoise: false,
+    muteMicWhileSheTalks: false,
+    voice: 'cedar',
+  });
+  assert.equal(fast.vadType, 'server_vad');
+  assert.equal(fast.interruptResponse, true);
+  assert.equal(fast.holdInput, false);
+  assert.equal(fast.voice, 'cedar');
+  assert.equal(liveTalkTurnDetection(fast).interrupt_response, true);
 });
 
 test('Live Talk waits out noise instead of barging in', () => {

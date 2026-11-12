@@ -75,6 +75,57 @@ function resolveLiveTalkConfig(env = process.env) {
   };
 }
 
+const WAIT_FOR_YOU = ['patient', 'balanced', 'fast'];
+const VOICES = ['marin', 'cedar', 'shimmer', 'verse', 'alloy'];
+const WAIT_PRESETS = {
+  patient: { vadEagerness: 'low', vadThreshold: 0.75, vadSilenceMs: 900, vadPrefixPaddingMs: 300 },
+  balanced: {
+    vadEagerness: 'medium',
+    vadThreshold: 0.55,
+    vadSilenceMs: 600,
+    vadPrefixPaddingMs: 250,
+  },
+  fast: { vadEagerness: 'high', vadThreshold: 0.4, vadSilenceMs: 400, vadPrefixPaddingMs: 200 },
+};
+
+function normalizeLiveVoiceSettings(raw) {
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const waitForYou = WAIT_FOR_YOU.includes(
+    String(src.waitForYou || '')
+      .trim()
+      .toLowerCase(),
+  )
+    ? String(src.waitForYou).trim().toLowerCase()
+    : 'patient';
+  const voiceRaw = String(src.voice || '')
+    .trim()
+    .toLowerCase();
+  return {
+    waitForYou,
+    allowInterrupt: src.allowInterrupt === true,
+    ignoreBackgroundNoise: src.ignoreBackgroundNoise !== false,
+    muteMicWhileSheTalks: src.muteMicWhileSheTalks !== false,
+    voice: VOICES.includes(voiceRaw) ? voiceRaw : '',
+  };
+}
+
+function applyLiveVoiceToConfig(config, liveVoice) {
+  const settings = normalizeLiveVoiceSettings(liveVoice);
+  const preset = WAIT_PRESETS[settings.waitForYou] || WAIT_PRESETS.patient;
+  return {
+    ...config,
+    vadType: settings.ignoreBackgroundNoise ? 'semantic_vad' : 'server_vad',
+    vadEagerness: preset.vadEagerness,
+    vadThreshold: preset.vadThreshold,
+    vadSilenceMs: preset.vadSilenceMs,
+    vadPrefixPaddingMs: preset.vadPrefixPaddingMs,
+    interruptResponse: settings.allowInterrupt,
+    voice: settings.voice || config.voice,
+    holdInput: settings.muteMicWhileSheTalks,
+    interruption: settings.allowInterrupt ? 'enabled' : 'disabled',
+  };
+}
+
 function liveTalkTurnDetection(config = resolveLiveTalkConfig()) {
   const interrupt_response = config.interruptResponse === true;
   if (config.vadType === 'server_vad') {
@@ -126,6 +177,8 @@ function liveTalkInstructions(agentInstructions) {
 
 module.exports = {
   resolveLiveTalkConfig,
+  normalizeLiveVoiceSettings,
+  applyLiveVoiceToConfig,
   liveTalkTurnDetection,
   liveTalkToolNames,
   isAllowedLiveTalkTool,
