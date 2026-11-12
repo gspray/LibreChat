@@ -14,7 +14,8 @@ function caddieSpecsFromTemplate(
   const instructor = template.modelSpecs?.list?.find((item) => item.name === INSTRUCTOR_SPEC_NAME);
   if (
     !student ||
-    student.preset?.endpoint !== 'openAI' ||
+    student.preset?.endpoint !== 'agents' ||
+    student.preset?.agent_id !== 'agent_student_caddie' ||
     JSON.stringify(student.mcpServers) !== JSON.stringify(['lessoncaddie-student']) ||
     !instructor ||
     instructor.preset?.endpoint !== 'agents' ||

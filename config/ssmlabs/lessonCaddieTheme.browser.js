@@ -10,6 +10,8 @@
     'help me schedule a lesson': 'schedule',
     'review a student’s practice plan': 'practice',
     "review a student's practice plan": 'practice',
+    "what's on my schedule?": 'schedule',
+    'what should i practice?': 'practice',
   });
 
   function normalizeText(value) {

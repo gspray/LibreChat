@@ -80,5 +80,5 @@ modelSpecs:
       mcpServers:
         - lessoncaddie-student
       preset:
-        endpoint: openAI
-        model: gpt-4o-mini
+        endpoint: agents
+        agent_id: agent_student_caddie

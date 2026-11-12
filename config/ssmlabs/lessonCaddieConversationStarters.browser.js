@@ -12,6 +12,11 @@
     'Help me schedule a lesson',
     'Review a student\u2019s practice plan',
   ];
+  const STUDENT_DEFAULT_PROMPTS = [
+    "What's on my schedule?",
+    'Show my recent lessons',
+    'What should I practice?',
+  ];
 
   let cachedPrompts = null;
   let loadPromise = null;
@@ -65,8 +70,29 @@
     });
   }
 
+  function isStudentChat() {
+    try {
+      const spec = new URL(globalObject.location.href).searchParams.get('spec');
+      if (spec === 'student-caddie') {
+        return true;
+      }
+    } catch {
+      /* ignore */
+    }
+    const title = globalObject.document?.querySelector?.('h1,h2,h3,[role="heading"]');
+    return /\bstudent caddie\b/i.test(String(title?.textContent || ''));
+  }
+
+  function defaultPrompts() {
+    return isStudentChat() ? [...STUDENT_DEFAULT_PROMPTS] : [...DEFAULT_PROMPTS];
+  }
+
   async function loadPrompts() {
     if (cachedPrompts) {
+      return cachedPrompts;
+    }
+    if (isStudentChat()) {
+      cachedPrompts = [...STUDENT_DEFAULT_PROMPTS];
       return cachedPrompts;
     }
     if (!loadPromise) {
@@ -80,7 +106,7 @@
           return cachedPrompts;
         })
         .catch(() => {
-          cachedPrompts = [...DEFAULT_PROMPTS];
+          cachedPrompts = defaultPrompts();
           return cachedPrompts;
         })
         .finally(() => {
@@ -95,7 +121,7 @@
     const saved =
       Array.isArray(next.prompts) && next.prompts.length
         ? next.prompts.map((item) => String(item || '').trim()).filter(Boolean)
-        : [...DEFAULT_PROMPTS];
+        : defaultPrompts();
     cachedPrompts = saved.slice(0, 4);
     return cachedPrompts;
   }

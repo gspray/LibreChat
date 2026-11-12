@@ -10,6 +10,8 @@ test('student spec comes from the tracked Chat configuration', () => {
   assert.equal(student.name, 'student-caddie');
   assert.equal(student.label, 'Student Caddie');
   assert.equal(student.iconURL, 'https://chat.ssmlabs.com/assets/student-caddie.png');
+  assert.equal(student.preset.endpoint, 'agents');
+  assert.equal(student.preset.agent_id, 'agent_student_caddie');
   assert.deepEqual(student.mcpServers, ['lessoncaddie-student']);
 });
 

@@ -26,6 +26,13 @@ test('conversation starters overlay hides native band siblings and inserts above
   assert.match(startersSrc, /band\.insertBefore\(host, form\)/);
 });
 
+test('student Chat uses Student Caddie prompts instead of instructor starters', () => {
+  assert.match(startersSrc, /spec === 'student-caddie'/);
+  assert.match(startersSrc, /What's on my schedule\?/);
+  assert.match(startersSrc, /What should I practice\?/);
+  assert.match(startersSrc, /function isStudentChat/);
+});
+
 test('conversation starters render only on new chats with no messages', () => {
   assert.match(startersSrc, /function isNewChatLanding/);
   assert.match(startersSrc, /removeManagedStarters/);

@@ -93,7 +93,8 @@ test('student Caddie selects the student MCP server', () => {
     'https://lessoncaddie.ssmlabs.com/api/student-mcp',
   );
   const studentSpec = template.modelSpecs.list.find((spec) => spec.name === 'student-caddie');
-  assert.equal(studentSpec.preset.endpoint, 'openAI');
+  assert.equal(studentSpec.preset.endpoint, 'agents');
+  assert.equal(studentSpec.preset.agent_id, 'agent_student_caddie');
   assert.deepEqual(studentSpec.mcpServers, ['lessoncaddie-student']);
   assert.equal(
     template.modelSpecs.list.find((spec) => spec.softDefault)?.name,

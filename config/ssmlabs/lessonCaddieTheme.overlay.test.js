@@ -172,6 +172,8 @@ test('starterKind recognizes every Instructor Assistant quick action', () => {
   assert.equal(theme.starterKind('Show my recent lessons'), 'lessons');
   assert.equal(theme.starterKind('Help me schedule a lesson'), 'schedule');
   assert.equal(theme.starterKind("Review a student's practice plan"), 'practice');
+  assert.equal(theme.starterKind("What's on my schedule?"), 'schedule');
+  assert.equal(theme.starterKind('What should I practice?'), 'practice');
   assert.equal(theme.starterKind('Unrelated action'), '');
 });
 
