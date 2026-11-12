@@ -25,6 +25,7 @@
   let pendingGreeting = '';
   let greetingLine = 'Good morning.';
   let greetingPending = false;
+  let greetingFallbackUsed = false;
   let readyTimer = 0;
   let liveVoiceSettings = {
     waitForYou: 'patient',
@@ -215,31 +216,6 @@
     return new Promise((resolve) => windowObject.setTimeout(resolve, ms));
   }
 
-  function waitForSessionSignal(session, isReady, timeoutMs) {
-    return new Promise((resolve) => {
-      if (isReady(session.snapshot?.() || {})) {
-        resolve(true);
-        return;
-      }
-      let done = false;
-      const finish = (ok) => {
-        if (done) return;
-        done = true;
-        try {
-          off?.();
-        } catch (_) {
-          /* ignore */
-        }
-        windowObject.clearTimeout(timer);
-        resolve(ok);
-      };
-      const off = session.onEvent((event) => {
-        if (isReady(session.snapshot?.() || {}, event)) finish(true);
-      });
-      const timer = windowObject.setTimeout(() => finish(false), timeoutMs);
-    });
-  }
-
   function setStatus(_bar, state, text) {
     ui.state = String(state || 'idle');
     ui.text = String(text || '');
@@ -346,6 +322,7 @@
   function finishGreeting(reason) {
     if (!greetingPending) return;
     greetingPending = false;
+    greetingFallbackUsed = false;
     windowObject.clearTimeout(readyTimer);
     readyTimer = 0;
     try {
@@ -359,36 +336,55 @@
     liveTalkLog('greeting.done', { reason: String(reason || '') });
   }
 
-  async function waitUntilReadyToSpeak(session) {
-    const channelOpen = await waitForSessionSignal(
-      session,
-      (snap) => String(snap.dataChannelState || '') === 'open',
-      8000,
-    );
-    const deadline = Date.now() + 4000;
-    while (Date.now() < deadline) {
-      if (liveTalkAudioElements().some((audio) => Boolean(audio.srcObject))) {
-        return { channelOpen, hasRemoteAudio: true };
+  async function sendWhenChannelOpen(session, event) {
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      try {
+        session.sendEvent(event);
+        return true;
+      } catch (error) {
+        if (error?.code === 'SPEAK_REALTIME_CLOSED') throw error;
+        if (error?.code !== 'SPEAK_REALTIME_CHANNEL_CLOSED') throw error;
+        await sleep(100);
       }
-      await sleep(50);
     }
-    return {
-      channelOpen,
-      hasRemoteAudio: liveTalkAudioElements().some((audio) => Boolean(audio.srcObject)),
-    };
+    return false;
   }
 
-  function speakGreeting(session) {
+  async function speakGreeting(session) {
     greetingPending = true;
+    greetingFallbackUsed = false;
     setStatus(ensureBar(), 'greeting', 'Starting…');
     const line = greetingLine || 'Good morning.';
     try {
-      session.sendEvent({
-        type: 'response.create',
-        response: {
-          instructions: `Speak only this greeting, then stop and wait. Do not call tools. Do not ask a question. Say exactly: ${line}`,
+      try {
+        await sendWhenChannelOpen(session, { type: 'response.cancel' });
+      } catch (_) {
+        /* no in-flight response */
+      }
+      const created = await sendWhenChannelOpen(session, {
+        type: 'conversation.item.create',
+        item: {
+          type: 'message',
+          role: 'user',
+          content: [
+            {
+              type: 'input_text',
+              text: `Live Talk just connected. Speak only this greeting, then wait silently. Do not call tools. Say exactly: ${line}`,
+            },
+          ],
         },
       });
+      const started =
+        created &&
+        (await sendWhenChannelOpen(session, {
+          type: 'response.create',
+          response: { tool_choice: 'none' },
+        }));
+      if (!started) {
+        liveTalkWarn('greeting.send-failed', { line, snapshot: session.snapshot?.() || {} });
+        finishGreeting('send-failed');
+        return;
+      }
       liveTalkLog('greeting.sent', { line });
     } catch (error) {
       liveTalkWarn('greeting.send-failed', summarizeError(error));
@@ -617,6 +613,15 @@
           setStatus(bar, 'listening', 'Listening…');
         }
       }
+      if (providerEvent === 'error' && greetingPending && !greetingFallbackUsed) {
+        greetingFallbackUsed = true;
+        liveTalkWarn('greeting.provider-error', summarizeEvent(event));
+        try {
+          session.sendEvent({ type: 'response.create' });
+        } catch (error) {
+          liveTalkWarn('greeting.fallback-failed', summarizeError(error));
+        }
+      }
       if (event.type === SpeakCore.SpeakRealtimeEvent.USER_SPEECH_START) {
         if (greetingPending) return;
         setStatus(bar, 'listening', 'Listening…');
@@ -651,14 +656,10 @@
       } catch (_) {
         /* mute until greeting finishes */
       }
-      const ready = await waitUntilReadyToSpeak(session);
-      liveTalkLog('session.started', {
-        ...(session.snapshot?.() || { sessionId }),
-        ...ready,
-      });
+      liveTalkLog('session.started', session.snapshot?.() || { sessionId });
       watchPeer(session);
       if (active?.session === session) {
-        speakGreeting(session);
+        await speakGreeting(session);
       }
     } catch (error) {
       liveTalkError(
