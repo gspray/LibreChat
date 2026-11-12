@@ -69,9 +69,10 @@
   function findHeroRow(title) {
     let current = title?.parentElement || null;
     for (let depth = 0; current && depth < 6; depth += 1) {
+      const text = normalizeText(current.textContent);
       if (
         current.querySelector?.('img, .avatar-stroke') &&
-        normalizeText(current.textContent).includes('Instructor Assistant')
+        (text.includes('Instructor Assistant') || text.includes('Student Caddie'))
       ) {
         return current;
       }
@@ -81,7 +82,7 @@
   }
 
   function decorateHero(documentObject) {
-    const title = findExactTextElement(documentObject, 'Instructor Assistant');
+    const title = findNamedLandingTitle(documentObject);
     if (!title) {
       return false;
     }
@@ -353,10 +354,14 @@
       decorateHero(documentObject);
     }
     const composer = Boolean(documentObject.querySelector?.('[data-testid="composer-surface"]'));
+    decorateComposer(documentObject);
+    decorateHeader(documentObject);
+    const chrome = Boolean(
+      documentObject.querySelector?.('[data-testid="header-open-sidebar-button"]') ||
+        documentObject.querySelector?.('.lc-chat-header'),
+    );
     const landingActive = Boolean(newChat && namedTitle);
-    // Student Caddie sets showOnLanding: false, so the named title never appears.
-    // Keep the pane hidden only while the new-chat shell is still mounting.
-    const landingPending = Boolean(newChat && !namedTitle && !composer);
+    const landingPending = Boolean(newChat && !namedTitle && !composer && !chrome);
     documentObject.body.classList.toggle('lc-chat-landing', landingActive);
     documentObject.body.classList.toggle('lc-chat-landing-pending', landingPending);
     const pane = documentObject.querySelector?.('[data-chat-pane]');
@@ -365,13 +370,12 @@
     } else {
       pane?.classList?.remove?.('lc-chat-pane-landing');
     }
-    decorateComposer(documentObject);
-    decorateHeader(documentObject);
     decorateApproveLinks(documentObject);
     notifyShellIfReady({
       landing: landingActive,
       pending: landingPending,
-      composer: Boolean(documentObject.querySelector?.('[data-testid="composer-surface"]')),
+      composer,
+      chrome,
     });
     return { landing: landingActive };
   }
@@ -384,7 +388,9 @@
     if (!(globalObject.parent && globalObject.parent !== globalObject)) {
       return;
     }
-    const ready = state?.landing === true || (state?.composer && state?.pending !== true);
+    const ready =
+      state?.landing === true ||
+      (state?.pending !== true && Boolean(state?.composer || state?.chrome));
     if (!ready) {
       return;
     }

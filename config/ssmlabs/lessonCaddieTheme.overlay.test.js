@@ -216,6 +216,25 @@ test('decorate waits for the agent title before applying landing layout', () => 
   assert.equal(documentObject.body.classList.contains('lc-chat-landing-pending'), true);
 });
 
+test('decorate does not hide a new chat once the sidebar chrome is present', () => {
+  const documentObject = buildThemeDocument();
+  const header = new FakeElement();
+  const originalAll = documentObject.querySelectorAll.bind(documentObject);
+  const originalQuery = documentObject.querySelector.bind(documentObject);
+  documentObject.querySelectorAll = (selector) => {
+    if (selector === 'button') return [];
+    if (selector === 'h1,h2,h3,[role="heading"],span,div') return [];
+    return originalAll(selector);
+  };
+  documentObject.querySelector = (selector) => {
+    if (selector === '[data-testid="composer-surface"]') return null;
+    if (selector === '[data-testid="header-open-sidebar-button"]') return header;
+    return originalQuery(selector);
+  };
+  assert.deepEqual(theme.decorate(documentObject), { landing: false });
+  assert.equal(documentObject.body.classList.contains('lc-chat-landing-pending'), false);
+});
+
 test('decorate does not hide Student Caddie once the composer is present', () => {
   const documentObject = buildThemeDocument();
   const originalAll = documentObject.querySelectorAll.bind(documentObject);
@@ -239,7 +258,7 @@ test('decorate treats Student Caddie as a named landing title', () => {
     return originalAll(selector);
   };
   assert.deepEqual(theme.decorate(documentObject), { landing: true });
-  assert.equal(title.classList.contains('lc-assistant-title'), false);
+  assert.equal(title.classList.contains('lc-assistant-title'), true);
   assert.equal(documentObject.body.classList.contains('lc-chat-landing'), true);
   assert.equal(documentObject.body.classList.contains('lc-chat-landing-pending'), false);
 });
