@@ -209,9 +209,24 @@ test('decorate waits for the agent title before applying landing layout', () => 
   const originalAll = documentObject.querySelectorAll.bind(documentObject);
   documentObject.querySelectorAll = (selector) =>
     selector === 'h1,h2,h3,[role="heading"],span,div' ? [welcome] : originalAll(selector);
+  documentObject.querySelector = (selector) =>
+    selector === '[data-testid="composer-surface"]' ? null : null;
   assert.deepEqual(theme.decorate(documentObject), { landing: false });
   assert.equal(documentObject.body.classList.contains('lc-chat-landing'), false);
   assert.equal(documentObject.body.classList.contains('lc-chat-landing-pending'), true);
+});
+
+test('decorate does not hide Student Caddie once the composer is present', () => {
+  const documentObject = buildThemeDocument();
+  const originalAll = documentObject.querySelectorAll.bind(documentObject);
+  documentObject.querySelectorAll = (selector) => {
+    if (selector === 'button') return [];
+    if (selector === 'h1,h2,h3,[role="heading"],span,div') return [];
+    return originalAll(selector);
+  };
+  assert.deepEqual(theme.decorate(documentObject), { landing: false });
+  assert.equal(documentObject.body.classList.contains('lc-chat-landing'), false);
+  assert.equal(documentObject.body.classList.contains('lc-chat-landing-pending'), false);
 });
 
 test('decorate treats Student Caddie as a named landing title', () => {

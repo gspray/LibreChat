@@ -352,8 +352,11 @@
     if (newChat) {
       decorateHero(documentObject);
     }
+    const composer = Boolean(documentObject.querySelector?.('[data-testid="composer-surface"]'));
     const landingActive = Boolean(newChat && namedTitle);
-    const landingPending = Boolean(newChat && !namedTitle);
+    // Student Caddie sets showOnLanding: false, so the named title never appears.
+    // Keep the pane hidden only while the new-chat shell is still mounting.
+    const landingPending = Boolean(newChat && !namedTitle && !composer);
     documentObject.body.classList.toggle('lc-chat-landing', landingActive);
     documentObject.body.classList.toggle('lc-chat-landing-pending', landingPending);
     const pane = documentObject.querySelector?.('[data-chat-pane]');
