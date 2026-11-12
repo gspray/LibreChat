@@ -176,6 +176,38 @@
     return allowedParentOrigins().includes(clean(origin));
   }
 
+  const DIRECTORY_MUTATION_TOOLS = {
+    add_student: true,
+    update_student: true,
+    delete_student: true,
+    delete_students_by_filter: true,
+  };
+
+  function postAppDataChanged(toolName, result) {
+    const name = clean(toolName);
+    if (!DIRECTORY_MUTATION_TOOLS[name]) return;
+    if (windowObject.parent === windowObject) return;
+    const contactId = clean(
+      result?.contactId || result?.structuredContent?.contactId || result?.id,
+    );
+    try {
+      windowObject.parent.postMessage(
+        {
+          source: ASSISTANT_MESSAGE_SOURCE,
+          type: 'data-changed',
+          version: 1,
+          scopes: ['directory'],
+          toolName: name,
+          contactId: contactId || undefined,
+        },
+        '*',
+      );
+    } catch (_) {
+      /* parent may be gone */
+    }
+    liveTalkLog('app.data-changed', { toolName: name, contactId: Boolean(contactId) });
+  }
+
   function postStatus() {
     if (windowObject.parent === windowObject) return;
     try {
@@ -513,6 +545,7 @@
           }),
         });
         const result = payload.result;
+        postAppDataChanged(call.name, result);
         if (call.name === 'open_app_screen') {
           const overlay = windowObject.LessonCaddieNavigationOverlay;
           const opened = overlay?.onPayload?.(result);
