@@ -168,7 +168,7 @@ function buildLoginFallbackScript() {
 }
 
 function buildChatThemeTags() {
-  const version = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '11').trim() || '11';
+  const version = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '12').trim() || '12';
   return {
     style: `<link rel="stylesheet" href="ssmlabs/lesson-caddie-theme.css?v=${escapeHtml(version)}" ${CHAT_THEME_STYLE_SENTINEL} />`,
     script: `<script src="ssmlabs/lesson-caddie-theme.js?v=${escapeHtml(version)}" defer ${CHAT_THEME_SCRIPT_SENTINEL}></script>`,
@@ -224,7 +224,7 @@ function injectOverlayScripts(html) {
   if (!next.includes(LOGIN_FALLBACK_SENTINEL)) {
     next = next.replace('</head>', `${buildLoginFallbackScript()}\n</head>`);
   }
-  const liveTalkVersion = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '47').trim() || '47';
+  const liveTalkVersion = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '48').trim() || '48';
   if (!next.includes(LIVE_TALK_STYLE_SENTINEL)) {
     next = next.replace(
       '</head>',

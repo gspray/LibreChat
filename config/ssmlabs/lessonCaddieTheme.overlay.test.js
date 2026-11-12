@@ -373,22 +373,7 @@ test('theme CSS hides the MCP Servers sidebar for every Chat user', () => {
   assert.match(themeCss, /nav:has\(#mcp-filter\)/);
 });
 
-test('decorate leaves the MCP sidebar when another panel is active', () => {
-  const documentObject = buildThemeDocument();
-  const mcp = new FakeElement();
-  mcp.setAttribute('aria-pressed', 'false');
-  const conversations = new FakeElement();
-  const originalQuery = documentObject.querySelector.bind(documentObject);
-  documentObject.querySelector = (selector) => {
-    if (selector === '[data-testid="nav-panel-mcp-builder"]') return mcp;
-    if (selector === '[data-testid="nav-panel-conversations"]') return conversations;
-    return originalQuery(selector);
-  };
-  theme.decorate(documentObject);
-  assert.equal(conversations.clicked, undefined);
-});
-
-test('decorate switches away from an open MCP Servers sidebar', () => {
+test('decorate does not click Chat nav buttons to hide MCP Servers', () => {
   const documentObject = buildThemeDocument();
   const mcp = new FakeElement();
   mcp.setAttribute('aria-pressed', 'true');
@@ -400,7 +385,7 @@ test('decorate switches away from an open MCP Servers sidebar', () => {
     return originalQuery(selector);
   };
   theme.decorate(documentObject);
-  assert.equal(conversations.clicked, true);
+  assert.equal(conversations.clicked, undefined);
 });
 
 test('message avatars use the Caddie mark instead of the default robot glyph', () => {

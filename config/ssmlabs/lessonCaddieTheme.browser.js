@@ -294,20 +294,6 @@
     addClass(form?.parentElement, 'lc-composer-band');
   }
 
-  function hideMcpServersSidebar(documentObject) {
-    const mcpButton = documentObject.querySelector?.('[data-testid="nav-panel-mcp-builder"]');
-    if (!mcpButton) {
-      return;
-    }
-    if (mcpButton.getAttribute?.('aria-pressed') !== 'true') {
-      return;
-    }
-    const conversations = documentObject.querySelector?.('[data-testid="nav-panel-conversations"]');
-    if (typeof conversations?.click === 'function') {
-      conversations.click();
-    }
-  }
-
   function decorateHeader(documentObject) {
     const sidebarButton = documentObject.querySelector?.(
       '[data-testid="header-open-sidebar-button"]',
@@ -372,7 +358,6 @@
     const composer = Boolean(documentObject.querySelector?.('[data-testid="composer-surface"]'));
     decorateComposer(documentObject);
     decorateHeader(documentObject);
-    hideMcpServersSidebar(documentObject);
     const chrome = Boolean(
       documentObject.querySelector?.('[data-testid="header-open-sidebar-button"]') ||
         documentObject.querySelector?.('.lc-chat-header'),
