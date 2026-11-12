@@ -355,31 +355,15 @@
     greetingFallbackUsed = false;
     setStatus(ensureBar(), 'greeting', 'Starting…');
     const line = greetingLine || 'Good morning.';
+    const greetingResponse = {
+      type: 'response.create',
+      response: {
+        tool_choice: 'none',
+        instructions: `Speak only this greeting, then wait silently. Do not call tools. Do not ask a question. Say exactly: ${line}`,
+      },
+    };
     try {
-      try {
-        await sendWhenChannelOpen(session, { type: 'response.cancel' });
-      } catch (_) {
-        /* no in-flight response */
-      }
-      const created = await sendWhenChannelOpen(session, {
-        type: 'conversation.item.create',
-        item: {
-          type: 'message',
-          role: 'user',
-          content: [
-            {
-              type: 'input_text',
-              text: `Live Talk just connected. Speak only this greeting, then wait silently. Do not call tools. Say exactly: ${line}`,
-            },
-          ],
-        },
-      });
-      const started =
-        created &&
-        (await sendWhenChannelOpen(session, {
-          type: 'response.create',
-          response: { tool_choice: 'none' },
-        }));
+      const started = await sendWhenChannelOpen(session, greetingResponse);
       if (!started) {
         liveTalkWarn('greeting.send-failed', { line, snapshot: session.snapshot?.() || {} });
         finishGreeting('send-failed');
@@ -512,6 +496,13 @@
       conversationBehavior: { interruption: voice.allowInterrupt ? 'enabled' : 'disabled' },
       invokeTool: async (call) => {
         liveTalkLog('tool.invoke', { name: call.name, callId: call.callId || '', sessionId });
+        if (greetingPending || ui.state === 'connecting' || ui.state === 'greeting') {
+          liveTalkLog('tool.ignored-while-starting', { name: call.name });
+          return {
+            ok: false,
+            error: 'Live Talk is still starting. Do not call tools until the user speaks.',
+          };
+        }
         setStatus(bar, 'tool', `Looking up ${call.name}…`);
         const payload = await api(liveTalkPath(`/live-talk/session/${sessionId}/tool`), {
           method: 'POST',
@@ -649,6 +640,7 @@
         return sessionId;
       },
     };
+    greetingPending = true;
     try {
       await session.start();
       try {

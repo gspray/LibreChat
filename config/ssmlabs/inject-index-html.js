@@ -224,7 +224,7 @@ function injectOverlayScripts(html) {
   if (!next.includes(LOGIN_FALLBACK_SENTINEL)) {
     next = next.replace('</head>', `${buildLoginFallbackScript()}\n</head>`);
   }
-  const liveTalkVersion = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '38').trim() || '38';
+  const liveTalkVersion = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '39').trim() || '39';
   if (!next.includes(LIVE_TALK_STYLE_SENTINEL)) {
     next = next.replace(
       '</head>',
