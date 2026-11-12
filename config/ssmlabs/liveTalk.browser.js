@@ -176,36 +176,73 @@
     return allowedParentOrigins().includes(clean(origin));
   }
 
-  const DIRECTORY_MUTATION_TOOLS = {
+  const WRITE_TOOLS = {
     add_student: true,
     update_student: true,
     delete_student: true,
     delete_students_by_filter: true,
+    create_mock_student: true,
+    create_lesson: true,
+    create_mock_lesson: true,
+    create_mock_lessons: true,
+    move_lesson: true,
+    update_lesson_details: true,
+    delete_lesson: true,
+    delete_lessons_by_filter: true,
+    generate_lesson_summary: true,
+    update_lesson_summary_draft: true,
+    share_lesson_summary: true,
+    attach_library_media: true,
+    create_notice: true,
+    delete_notice: true,
+    create_playbook_system: true,
+    update_playbook_system: true,
+    delete_playbook_system: true,
+    create_playbook_practice: true,
+    update_playbook_practice: true,
+    delete_playbook_practice: true,
+    update_lesson_charges: true,
+    set_assistant_conversation_starters: true,
   };
+
+  function recordIdsFromToolResult(result) {
+    let src = {};
+    if (result?.structuredContent && typeof result.structuredContent === 'object') {
+      src = result.structuredContent;
+    } else if (result && typeof result === 'object') {
+      src = result;
+    }
+    const lessonIds = Array.isArray(src.lessonIds) ? src.lessonIds.map(clean).filter(Boolean) : [];
+    return {
+      contactId: clean(src.contactId || src.relationshipRecordId) || undefined,
+      lessonId: clean(src.lessonId) || lessonIds[0] || undefined,
+      lessonIds: lessonIds.length ? lessonIds : undefined,
+      noticeId: clean(src.noticeId) || undefined,
+      systemId: clean(src.systemId) || undefined,
+      practiceId: clean(src.practiceId) || undefined,
+    };
+  }
 
   function postAppDataChanged(toolName, result) {
     const name = clean(toolName);
-    if (!DIRECTORY_MUTATION_TOOLS[name]) return;
+    if (!WRITE_TOOLS[name]) return;
     if (windowObject.parent === windowObject) return;
-    const contactId = clean(
-      result?.contactId || result?.structuredContent?.contactId || result?.id,
-    );
+    const ids = recordIdsFromToolResult(result);
     try {
       windowObject.parent.postMessage(
         {
           source: ASSISTANT_MESSAGE_SOURCE,
           type: 'data-changed',
           version: 1,
-          scopes: ['directory'],
           toolName: name,
-          contactId: contactId || undefined,
+          ...ids,
         },
         '*',
       );
     } catch (_) {
       /* parent may be gone */
     }
-    liveTalkLog('app.data-changed', { toolName: name, contactId: Boolean(contactId) });
+    liveTalkLog('app.data-changed', { toolName: name, keys: Object.keys(ids) });
   }
 
   function postStatus() {
