@@ -165,6 +165,7 @@ function liveTalkInstructions(agentInstructions) {
   const base = String(agentInstructions || '').trim();
   const extra = [
     'You are in LessonCaddie Live Talk, the spoken form of Instructor Assistant.',
+    'When a greeting turn is requested, speak only that short greeting, then wait silently. Do not call tools or ask a question until the user speaks.',
     'You have the same LessonCaddie tools as typed Ask. LessonCaddie authorizes each call.',
     'Speak naturally. LessonCaddie facts must come from tools.',
     'For how many students or roster size, call search_directory with no query and speak the returned total.',

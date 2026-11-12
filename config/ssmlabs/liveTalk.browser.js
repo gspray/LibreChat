@@ -22,6 +22,10 @@
   let ui = { state: 'idle', text: '' };
   let pendingShellAction = '';
   let pendingLiveVoice = null;
+  let pendingGreeting = '';
+  let greetingLine = 'Good morning.';
+  let greetingPending = false;
+  let readyTimer = 0;
   let liveVoiceSettings = {
     waitForYou: 'patient',
     allowInterrupt: false,
@@ -199,8 +203,41 @@
 
   function isTalkingState(state) {
     return (
-      state === 'connecting' || state === 'listening' || state === 'responding' || state === 'tool'
+      state === 'connecting' ||
+      state === 'greeting' ||
+      state === 'listening' ||
+      state === 'responding' ||
+      state === 'tool'
     );
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => windowObject.setTimeout(resolve, ms));
+  }
+
+  function waitForSessionSignal(session, isReady, timeoutMs) {
+    return new Promise((resolve) => {
+      if (isReady(session.snapshot?.() || {})) {
+        resolve(true);
+        return;
+      }
+      let done = false;
+      const finish = (ok) => {
+        if (done) return;
+        done = true;
+        try {
+          off?.();
+        } catch (_) {
+          /* ignore */
+        }
+        windowObject.clearTimeout(timer);
+        resolve(ok);
+      };
+      const off = session.onEvent((event) => {
+        if (isReady(session.snapshot?.() || {}, event)) finish(true);
+      });
+      const timer = windowObject.setTimeout(() => finish(false), timeoutMs);
+    });
   }
 
   function setStatus(_bar, state, text) {
@@ -298,9 +335,68 @@
         liveTalkWarn('stop.server', summarizeError(error, { sessionId: current.sessionId }));
       }
     }
+    greetingPending = false;
+    windowObject.clearTimeout(readyTimer);
+    readyTimer = 0;
     if (reason !== 'restart' && reason !== 'failed') {
       setStatus(bar, 'idle', 'Live Talk stopped.');
     }
+  }
+
+  function finishGreeting(reason) {
+    if (!greetingPending) return;
+    greetingPending = false;
+    windowObject.clearTimeout(readyTimer);
+    readyTimer = 0;
+    try {
+      active?.session?.setMuted?.(false);
+    } catch (_) {
+      /* user must be able to speak after the greeting */
+    }
+    if (isTalkingState(ui.state)) {
+      setStatus(ensureBar(), 'listening', 'Ready — go ahead');
+    }
+    liveTalkLog('greeting.done', { reason: String(reason || '') });
+  }
+
+  async function waitUntilReadyToSpeak(session) {
+    const channelOpen = await waitForSessionSignal(
+      session,
+      (snap) => String(snap.dataChannelState || '') === 'open',
+      8000,
+    );
+    const deadline = Date.now() + 4000;
+    while (Date.now() < deadline) {
+      if (liveTalkAudioElements().some((audio) => Boolean(audio.srcObject))) {
+        return { channelOpen, hasRemoteAudio: true };
+      }
+      await sleep(50);
+    }
+    return {
+      channelOpen,
+      hasRemoteAudio: liveTalkAudioElements().some((audio) => Boolean(audio.srcObject)),
+    };
+  }
+
+  function speakGreeting(session) {
+    greetingPending = true;
+    setStatus(ensureBar(), 'greeting', 'Starting…');
+    const line = greetingLine || 'Good morning.';
+    try {
+      session.sendEvent({
+        type: 'response.create',
+        response: {
+          instructions: `Speak only this greeting, then stop and wait. Do not call tools. Do not ask a question. Say exactly: ${line}`,
+        },
+      });
+      liveTalkLog('greeting.sent', { line });
+    } catch (error) {
+      liveTalkWarn('greeting.send-failed', summarizeError(error));
+      finishGreeting('send-failed');
+      return;
+    }
+    windowObject.clearTimeout(readyTimer);
+    readyTimer = windowObject.setTimeout(() => finishGreeting('timeout'), 8000);
   }
 
   function liveTalkAudioElements() {
@@ -459,30 +555,58 @@
           summarizeEvent(event),
         );
       }
+      if (
+        event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CONNECT_START ||
+        event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CONNECTED
+      ) {
+        try {
+          session.setMuted?.(true);
+        } catch (_) {
+          /* mic may not exist yet */
+        }
+      }
       if (event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CONNECTED) {
-        setStatus(bar, 'listening', 'Listening…');
-        diagnosePlayback('connected');
+        setStatus(bar, 'connecting', 'Connecting…');
       }
       if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_AUDIO_START) {
-        if (voice.muteMicWhileSheTalks) {
-          try {
-            session.setMuted?.(true);
-          } catch (_) {
-            /* holdInput still covers echo */
-          }
+        try {
+          session.setMuted?.(true);
+        } catch (_) {
+          /* holdInput still covers echo */
         }
-        const alreadyResponding = bar.dataset.state === 'responding';
-        if (!alreadyResponding) {
-          setStatus(bar, 'responding', 'Responding…');
-          diagnosePlayback(providerEvent || 'assistant-audio');
+        if (greetingPending) {
+          setStatus(bar, 'greeting', 'Starting…');
+          diagnosePlayback(providerEvent || 'greeting-audio');
+        } else {
+          const alreadyResponding = bar.dataset.state === 'responding';
+          if (!alreadyResponding) {
+            setStatus(bar, 'responding', 'Responding…');
+            diagnosePlayback(providerEvent || 'assistant-audio');
+          }
         }
       }
       if (
         event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE ||
-        event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_INTERRUPTED ||
-        providerEvent === 'output_audio_buffer.stopped' ||
-        providerEvent === 'output_audio_buffer.cleared' ||
         providerEvent === 'response.done'
+      ) {
+        if (greetingPending) {
+          finishGreeting(providerEvent || event.type);
+        } else {
+          try {
+            session.setMuted?.(false);
+          } catch (_) {
+            /* keep listening even if mute release throws */
+          }
+          if (isTalkingState(bar.dataset.state) && bar.dataset.state !== 'tool') {
+            setStatus(bar, 'listening', 'Listening…');
+          }
+        }
+      }
+      if (
+        !greetingPending &&
+        (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_INTERRUPTED ||
+          providerEvent === 'output_audio_buffer.stopped' ||
+          providerEvent === 'output_audio_buffer.cleared')
       ) {
         try {
           session.setMuted?.(false);
@@ -494,6 +618,7 @@
         }
       }
       if (event.type === SpeakCore.SpeakRealtimeEvent.USER_SPEECH_START) {
+        if (greetingPending) return;
         setStatus(bar, 'listening', 'Listening…');
       }
       if (event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED) {
@@ -521,8 +646,20 @@
     };
     try {
       await session.start();
-      liveTalkLog('session.started', session.snapshot?.() || { sessionId });
+      try {
+        session.setMuted?.(true);
+      } catch (_) {
+        /* mute until greeting finishes */
+      }
+      const ready = await waitUntilReadyToSpeak(session);
+      liveTalkLog('session.started', {
+        ...(session.snapshot?.() || { sessionId }),
+        ...ready,
+      });
       watchPeer(session);
+      if (active?.session === session) {
+        speakGreeting(session);
+      }
     } catch (error) {
       liveTalkError(
         'session.start-threw',
@@ -556,24 +693,29 @@
     setStatus(bar, ui.state || 'listening', ui.text || 'Listening…');
   }
 
-  async function applyShellAction(action, settings) {
+  async function applyShellAction(action, settings, greeting) {
     if (settings) {
       liveVoiceSettings = normalizeLiveVoiceSettings(settings);
     }
+    const line = clean(greeting);
+    if (line) greetingLine = line;
     const bar = ensureBar();
     if (action === 'stop' || (action === 'toggle' && isTalkingState(ui.state))) {
       pendingShellAction = '';
       pendingLiveVoice = null;
+      pendingGreeting = '';
       if (active) await stopCall(bar, 'stop');
       return;
     }
     if (!config.enabled) {
       pendingShellAction = action;
       pendingLiveVoice = settings || pendingLiveVoice;
+      pendingGreeting = line || pendingGreeting;
       return;
     }
     pendingShellAction = '';
     pendingLiveVoice = null;
+    pendingGreeting = '';
     if (!isTalkingState(ui.state)) {
       await startCall(bar);
     }
@@ -586,8 +728,12 @@
     if (!data || data.source !== SHELL_MESSAGE_SOURCE || data.type !== 'live-talk') return;
     const action = clean(data.action);
     if (!['start', 'stop', 'toggle'].includes(action)) return;
-    liveTalkLog('shell.command', { action, waitForYou: data.liveVoice?.waitForYou || '' });
-    void applyShellAction(action, data.liveVoice);
+    liveTalkLog('shell.command', {
+      action,
+      waitForYou: data.liveVoice?.waitForYou || '',
+      greeting: Boolean(clean(data.greeting)),
+    });
+    void applyShellAction(action, data.liveVoice, data.greeting);
   }
 
   function watchThreadChanges() {
@@ -631,7 +777,7 @@
     syncBar();
     liveTalkLog('overlay.chrome', { host: 'shell-fab' });
     if (pendingShellAction) {
-      void applyShellAction(pendingShellAction, pendingLiveVoice);
+      void applyShellAction(pendingShellAction, pendingLiveVoice, pendingGreeting);
     }
   }
 
