@@ -630,6 +630,15 @@ body[data-lesson-caddie-color-theme="default"] a[href$="#lc-approve"]:hover {
   text-decoration: underline;
 }
 
+/* MCP stays available to Caddie tools. The sidebar catalog is not a product surface. */
+body[data-lesson-caddie-embed="true"] [data-testid="nav-panel-mcp-builder"] {
+  display: none !important;
+}
+
+body[data-lesson-caddie-embed="true"] nav:has(#mcp-filter) {
+  display: none !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   body[data-lesson-caddie-embed="true"] *,
   body[data-lesson-caddie-embed="true"] *::before,

@@ -97,6 +97,10 @@ class FakeElement {
   closest(selector) {
     return this.closestMatch?.(selector) || null;
   }
+
+  click() {
+    this.clicked = true;
+  }
 }
 
 function buildThemeDocument() {
@@ -362,6 +366,41 @@ test('decorate injects I approve on the latest confirmation message', () => {
   assert.equal(body.children[0].textContent, 'I approve');
   assert.equal(body.children[0].href, '#lc-approve');
   assert.equal(body.children[0].classList.contains('lc-approve-link'), true);
+});
+
+test('theme CSS hides the MCP Servers sidebar for every Chat user', () => {
+  assert.match(themeCss, /\[data-testid="nav-panel-mcp-builder"\]/);
+  assert.match(themeCss, /nav:has\(#mcp-filter\)/);
+});
+
+test('decorate leaves the MCP sidebar when another panel is active', () => {
+  const documentObject = buildThemeDocument();
+  const mcp = new FakeElement();
+  mcp.setAttribute('aria-pressed', 'false');
+  const conversations = new FakeElement();
+  const originalQuery = documentObject.querySelector.bind(documentObject);
+  documentObject.querySelector = (selector) => {
+    if (selector === '[data-testid="nav-panel-mcp-builder"]') return mcp;
+    if (selector === '[data-testid="nav-panel-conversations"]') return conversations;
+    return originalQuery(selector);
+  };
+  theme.decorate(documentObject);
+  assert.equal(conversations.clicked, undefined);
+});
+
+test('decorate switches away from an open MCP Servers sidebar', () => {
+  const documentObject = buildThemeDocument();
+  const mcp = new FakeElement();
+  mcp.setAttribute('aria-pressed', 'true');
+  const conversations = new FakeElement();
+  const originalQuery = documentObject.querySelector.bind(documentObject);
+  documentObject.querySelector = (selector) => {
+    if (selector === '[data-testid="nav-panel-mcp-builder"]') return mcp;
+    if (selector === '[data-testid="nav-panel-conversations"]') return conversations;
+    return originalQuery(selector);
+  };
+  theme.decorate(documentObject);
+  assert.equal(conversations.clicked, true);
 });
 
 test('message avatars use the Caddie mark instead of the default robot glyph', () => {
