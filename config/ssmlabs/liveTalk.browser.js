@@ -24,6 +24,7 @@
   let pendingLiveVoice = null;
   let pendingGreeting = '';
   let greetingLine = 'Good morning.';
+  let liveTalkSpec = '';
   let greetingPending = false;
   let greetingFallbackUsed = false;
   let readyTimer = 0;
@@ -277,6 +278,27 @@
     } catch (_) {
       return '';
     }
+  }
+
+  function rememberLiveTalkSpec(value) {
+    const spec = clean(value);
+    if (spec === 'student-caddie' || spec === 'instructor-assistant') {
+      liveTalkSpec = spec;
+    }
+    return liveTalkSpec;
+  }
+
+  function resolveLiveTalkSpec() {
+    rememberLiveTalkSpec(liveTalkSpecFromLocation());
+    if (liveTalkSpec) return liveTalkSpec;
+    try {
+      const title = String(windowObject.document?.title || '');
+      const heading = String(windowObject.document?.querySelector?.('h1')?.textContent || '');
+      if (/student caddie/i.test(`${title} ${heading}`)) return 'student-caddie';
+    } catch (_) {
+      /* title may be unavailable */
+    }
+    return '';
   }
 
   function isTalkingState(state) {
@@ -537,7 +559,7 @@
       return;
     }
     const conversationId = conversationIdFromLocation() || 'new';
-    const spec = liveTalkSpecFromLocation();
+    const spec = resolveLiveTalkSpec();
     liveTalkLog('start.conversation', { conversationId, spec });
     await stopCall(bar, 'restart');
     setStatus(bar, 'connecting', 'Connecting…');
@@ -800,8 +822,10 @@
     if (!data || data.source !== SHELL_MESSAGE_SOURCE || data.type !== 'live-talk') return;
     const action = clean(data.action);
     if (!['start', 'stop', 'toggle'].includes(action)) return;
+    rememberLiveTalkSpec(data.spec);
     liveTalkLog('shell.command', {
       action,
+      spec: liveTalkSpec || resolveLiveTalkSpec(),
       waitForYou: data.liveVoice?.waitForYou || '',
       greeting: Boolean(clean(data.greeting)),
     });
