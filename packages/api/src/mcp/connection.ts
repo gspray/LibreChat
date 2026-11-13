@@ -2867,6 +2867,25 @@ export class MCPConnection extends EventEmitter {
     return requireToolsSnapshot(await this.readToolsSnapshot(deadlineMs, signal));
   }
 
+  /** Reuses the completed refresh only while it belongs to the current transport and tool list. */
+  public getCurrentToolsSnapshot(): MCPToolsSnapshot | undefined {
+    const published = this.publishedToolListSnapshot;
+    if (
+      this.connectionState !== 'connected' ||
+      this.toolListRefreshPromise ||
+      published?.epoch !== this.toolListRefreshEpoch ||
+      published.generation !== this.toolListChangeGeneration ||
+      this.handledToolListChangeGeneration !== this.toolListChangeGeneration
+    ) {
+      return undefined;
+    }
+    return {
+      tools: published.tools,
+      complete: true,
+      publicationRevision: published.publicationRevision,
+    };
+  }
+
   /** Refresh workers retain failure evidence without publishing or retrying a fatal denial. */
   private async readToolsSnapshot(
     deadlineMs?: number,
