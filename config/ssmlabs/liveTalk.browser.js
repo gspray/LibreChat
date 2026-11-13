@@ -476,11 +476,6 @@
       /* session may be connecting */
     }
     try {
-      active?.session?.cancel?.('paused');
-    } catch (_) {
-      /* no active response */
-    }
-    try {
       active?.session?.sendEvent?.({ type: 'output_audio_buffer.clear' });
     } catch (_) {
       /* buffer may be empty */
@@ -499,12 +494,7 @@
     if (!active || !paused) return;
     paused = false;
     try {
-      active.bridge?.attach?.(active.session);
-    } catch (error) {
-      liveTalkWarn('resume.bridge-failed', summarizeError(error));
-    }
-    try {
-      active.session?.setMuted?.(false);
+      active.session?.setMuted?.(active.inputHeld);
     } catch (_) {
       /* reconnect can still fail later */
     }
@@ -815,6 +805,7 @@
       if (stopRequested) return;
       setStatus(bar, 'connecting', 'Connecting…');
       let sessionId = '';
+      let bridgeInputHeld = false;
       const voice = normalizeLiveVoiceSettings(liveVoiceSettings);
       const session = SpeakCore.createSpeakRealtimeSession({
         provider: 'openai-realtime',
@@ -848,7 +839,14 @@
       const bridge = SpeakCore.createOpenAIRealtimeFunctionCallBridge({
         holdInput: voice.muteMicWhileSheTalks,
         conversationBehavior: { interruption: voice.allowInterrupt ? 'enabled' : 'disabled' },
-        shouldInvoke: () => !paused,
+        pauseInput: () => {
+          bridgeInputHeld = true;
+          session.setMuted?.(true);
+        },
+        resumeInput: () => {
+          bridgeInputHeld = false;
+          session.setMuted?.(paused);
+        },
         invokeTool: async (call) => {
           const startedAt = Date.now();
           liveTalkLog('tool.invoke', { name: call.name, callId: call.callId || '', sessionId });
@@ -902,6 +900,13 @@
           (event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED
             ? liveTalkError
             : liveTalkLog)('realtime.event', summarizeEvent(event));
+        }
+        if (paused && event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_AUDIO_START) {
+          try {
+            session.sendEvent({ type: 'output_audio_buffer.clear' });
+          } catch (_) {
+            /* playback element is already paused */
+          }
         }
         if (
           paused &&
@@ -1039,6 +1044,9 @@
       active = {
         session,
         bridge,
+        get inputHeld() {
+          return bridgeInputHeld;
+        },
         get sessionId() {
           return sessionId;
         },
