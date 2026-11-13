@@ -7,6 +7,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const { createHash } = require('crypto');
 
 const { resolveLessonCaddieConfig } = require('./lessonCaddieReturn');
 
@@ -22,6 +23,10 @@ const CONVERSATION_STARTERS_SENTINEL = 'data-ssmlabs-conversation-starters="true
 const LIVE_TALK_STYLE_SENTINEL = 'data-ssmlabs-live-talk-style="true"';
 const LIVE_TALK_CORE_SENTINEL = 'data-ssmlabs-live-talk-core="true"';
 const LIVE_TALK_SCRIPT_SENTINEL = 'data-ssmlabs-live-talk-script="true"';
+const LIVE_TALK_SCRIPT_HASH = createHash('sha256')
+  .update(fs.readFileSync(path.join(__dirname, 'liveTalk.browser.js')))
+  .digest('hex')
+  .slice(0, 12);
 const CHAT_THEME_SEED_SENTINEL = 'data-ssmlabs-chat-theme-seed="true"';
 const LESSON_CADDIE_DEFAULT_APPEARANCE = 'lesson-caddie-default';
 const CHAT_THEME_APPEARANCE_SEED_SCRIPT = `<script ${CHAT_THEME_SEED_SENTINEL}>
@@ -225,6 +230,7 @@ function injectOverlayScripts(html) {
     next = next.replace('</head>', `${buildLoginFallbackScript()}\n</head>`);
   }
   const liveTalkVersion = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '51').trim() || '51';
+  const liveTalkScriptVersion = `${liveTalkVersion}-${LIVE_TALK_SCRIPT_HASH}`;
   if (!next.includes(LIVE_TALK_STYLE_SENTINEL)) {
     next = next.replace(
       '</head>',
@@ -240,7 +246,7 @@ function injectOverlayScripts(html) {
   if (!next.includes(LIVE_TALK_SCRIPT_SENTINEL)) {
     next = next.replace(
       '</head>',
-      `<script src="ssmlabs/lesson-caddie-live-talk.js?v=${escapeHtml(liveTalkVersion)}" defer ${LIVE_TALK_SCRIPT_SENTINEL}></script>\n</head>`,
+      `<script src="ssmlabs/lesson-caddie-live-talk.js?v=${escapeHtml(liveTalkScriptVersion)}" defer ${LIVE_TALK_SCRIPT_SENTINEL}></script>\n</head>`,
     );
   }
   return next;

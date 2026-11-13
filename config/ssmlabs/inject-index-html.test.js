@@ -130,6 +130,7 @@ test('injectIndexHtml loads the cache-versioned LessonCaddie Chat theme once', (
     const html = injectIndexHtml(SAMPLE);
     assert.match(html, /lesson-caddie-theme\.css\?v=12/);
     assert.match(html, /lesson-caddie-theme\.js\?v=12/);
+    assert.match(html, /lesson-caddie-live-talk\.js\?v=12-[a-f0-9]{12}/);
     assert.match(html, /data-ssmlabs-chat-theme-style="true"/);
     assert.match(html, /data-ssmlabs-chat-theme-script="true"/);
     assert.match(html, /<html[^>]*data-lesson-caddie-embed="true"/);
