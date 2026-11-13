@@ -228,7 +228,7 @@ function liveTalkInstructions(agentInstructions, pack) {
       : 'For how many students or roster size, call search_directory with no query and speak the returned total.',
     isStudent
       ? null
-      : 'When the user asks to open, go to, or show a page, call open_app_screen. Calendar is destination calendar. Today is today. Students list is student-list. Lessons is lesson-list. My Business is business-overview. Library is library. Playbook is playbook. Notifications is notices. App Feedback is app-feedback. Demo Environment is demo-environment. Settings is settings. Account is account. Profiles is profiles.',
+      : 'When the user asks to open, go to, or show a page, call open_app_screen. Calendar is destination calendar. Today is today. Students list is student-list. Lessons is lesson-list. My Business is business-overview; pass period this_month, last_month, or year_to_date when requested. Library is library. Playbook is playbook. Notifications is notices. App Feedback is app-feedback. Demo Environment is demo-environment. Settings is settings. Account is account. Profiles is profiles.',
     'Follow the same confirmation rules as typed Chat before mutating data. In voice, do not use Markdown approval links; ask the user to speak a clear approval, then call the tool with confirmed true and a stable mutation ID.',
     'Do not claim a write succeeded until the tool returns success. If LessonCaddie asks for confirmation or denies the action, say that.',
   ]
