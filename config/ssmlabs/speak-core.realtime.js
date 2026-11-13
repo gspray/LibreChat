@@ -5519,6 +5519,9 @@ var SpeakCore = (() => {
         });
       }
       channel.send(JSON.stringify(event));
+      if (event?.type === 'output_audio_buffer.clear') {
+        setAssistantOutputActive(false);
+      }
     }
     function teardown(reason = 'stop') {
       closed = true;

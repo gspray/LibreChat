@@ -494,7 +494,12 @@
     if (!active || !paused) return;
     paused = false;
     try {
-      active.session?.setMuted?.(active.inputHeld);
+      active.session?.sendEvent?.({ type: 'output_audio_buffer.clear' });
+    } catch (_) {
+      /* audio may already be clear */
+    }
+    try {
+      active.session?.setMuted?.(false);
     } catch (_) {
       /* reconnect can still fail later */
     }
