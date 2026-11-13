@@ -27,6 +27,8 @@
   let liveTalkSpec = '';
   let greetingPending = false;
   let greetingAudioStarted = false;
+  let greetingResponseId = '';
+  let greetingSent = false;
   let startInFlight = false;
   let awaitingAssistant = false;
   let pendingKickTimer = 0;
@@ -435,6 +437,9 @@
       }
     }
     greetingPending = false;
+    greetingAudioStarted = false;
+    greetingResponseId = '';
+    greetingSent = false;
     awaitingAssistant = false;
     clearPendingKick();
     windowObject.clearTimeout(readyTimer);
@@ -521,6 +526,8 @@
     if (!greetingPending) return;
     greetingPending = false;
     greetingAudioStarted = false;
+    greetingResponseId = '';
+    greetingSent = false;
     awaitingAssistant = false;
     windowObject.clearTimeout(readyTimer);
     readyTimer = 0;
@@ -560,6 +567,8 @@
   async function speakGreeting(session) {
     greetingPending = true;
     greetingAudioStarted = false;
+    greetingResponseId = '';
+    greetingSent = false;
     setStatus(ensureBar(), 'greeting', 'Starting…');
     const line = greetingLine || 'Good morning.';
     try {
@@ -586,6 +595,7 @@
         finishGreeting('send-failed');
         return;
       }
+      greetingSent = true;
       liveTalkLog('greeting.sent', { line });
     } catch (error) {
       liveTalkWarn('greeting.send-failed', summarizeError(error));
@@ -593,7 +603,7 @@
       return;
     }
     windowObject.clearTimeout(readyTimer);
-    readyTimer = windowObject.setTimeout(() => finishGreeting('timeout'), 8000);
+    readyTimer = windowObject.setTimeout(() => finishGreeting('timeout'), 20000);
   }
 
   function liveTalkAudioElements() {
@@ -741,6 +751,8 @@
         conversationBehavior: { interruption: voice.allowInterrupt ? 'enabled' : 'disabled' },
         createAudioElement: createLiveTalkAudioElement,
         bootstrapCall: async ({ sdp }) => {
+          /* The mic stream now exists; apply the startup mute before sending the offer. */
+          session.setMuted?.(true);
           liveTalkLog('bootstrap.offer', {
             conversationId,
             sdpChars: String(sdp || '').length,
@@ -838,6 +850,9 @@
         ) {
           awaitingAssistant = true;
           clearPendingKick();
+          if (greetingPending && greetingSent && !greetingResponseId) {
+            greetingResponseId = event.detail?.event?.response?.id || '';
+          }
           liveTalkLog('response.created', {
             id: event.detail?.event?.response?.id || '',
             greeting: greetingPending,
@@ -850,7 +865,12 @@
             /* holdInput still covers echo */
           }
           if (greetingPending) {
-            greetingAudioStarted = true;
+            if (
+              providerEvent === 'output_audio_buffer.started' &&
+              event.detail?.event?.response_id === greetingResponseId
+            ) {
+              greetingAudioStarted = true;
+            }
             setStatus(bar, 'greeting', 'Starting…');
             diagnosePlayback(providerEvent || 'greeting-audio');
           } else {
@@ -885,7 +905,8 @@
         if (
           providerEvent === 'output_audio_buffer.stopped' &&
           greetingPending &&
-          greetingAudioStarted
+          greetingAudioStarted &&
+          event.detail?.event?.response_id === greetingResponseId
         ) {
           finishGreeting('playback-stopped');
         }
