@@ -17,6 +17,7 @@
     'http://localhost:3021',
   ];
   let config = { enabled: false };
+  let overlayReady = false;
   let active = null;
   let accessToken = '';
   let ui = { state: 'idle', text: '' };
@@ -261,6 +262,7 @@
           type: 'live-talk-status',
           version: 1,
           enabled: Boolean(config.enabled),
+          ready: overlayReady,
           state: ui.state,
           text: ui.text,
         },
@@ -1117,6 +1119,7 @@
       );
       config = { enabled: false };
     }
+    overlayReady = true;
     syncBar();
     liveTalkLog('overlay.chrome', { host: 'shell-fab' });
     if (pendingShellAction) {
