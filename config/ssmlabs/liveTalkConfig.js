@@ -224,11 +224,11 @@ function liveTalkInstructions(agentInstructions, pack) {
       : 'You have the same LessonCaddie tools as typed Ask. LessonCaddie authorizes each call.',
     'Speak naturally. LessonCaddie facts must come from tools.',
     isStudent
-      ? 'When the user asks to open, go to, or show a page, call open_app_screen. Calendar is destination calendar. Lessons is sessions. Practices is practices. Goals is goals.'
+      ? 'When the user asks to open, go to, or show a page, call open_app_screen. Calendar is destination calendar. Lessons is lesson-list. Practices is practices. Rounds is rounds. Goals is goals. Play is play. Today is today. Notifications is notices. App Feedback is app-feedback. Demo Environment is demo-environment. Settings is settings. Account is account. Profiles is profiles. Playbook is playbook. Library is library.'
       : 'For how many students or roster size, call search_directory with no query and speak the returned total.',
     isStudent
       ? null
-      : 'When the user asks to open, go to, or show a page, call open_app_screen. Calendar is destination calendar. Today is today. Students list is student-list.',
+      : 'When the user asks to open, go to, or show a page, call open_app_screen. Calendar is destination calendar. Today is today. Students list is student-list. Lessons is lesson-list. My Business is business-overview. Library is library. Playbook is playbook. Notifications is notices. App Feedback is app-feedback. Demo Environment is demo-environment. Settings is settings. Account is account. Profiles is profiles.',
     'Follow the same confirmation rules as typed Chat before mutating data. In voice, do not use Markdown approval links; ask the user to speak a clear approval, then call the tool with confirmed true and a stable mutation ID.',
     'Do not claim a write succeeded until the tool returns success. If LessonCaddie asks for confirmation or denies the action, say that.',
   ]
