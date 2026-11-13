@@ -26,6 +26,7 @@
   let greetingLine = 'Good morning.';
   let liveTalkSpec = '';
   let greetingPending = false;
+  let greetingAudioStarted = false;
   let startInFlight = false;
   let awaitingAssistant = false;
   let pendingKickTimer = 0;
@@ -469,6 +470,7 @@
   function enableTurnResponses(session) {
     if (!session?.sendEvent) return;
     try {
+      /* The speech-end handler owns response.create; automatic VAD responses would duplicate it. */
       session.sendEvent({
         type: 'session.update',
         session: {
@@ -477,7 +479,7 @@
             input: {
               turn_detection: turnDetectionForVoice(
                 normalizeLiveVoiceSettings(liveVoiceSettings),
-                true,
+                false,
               ),
             },
           },
@@ -518,13 +520,16 @@
   function finishGreeting(reason) {
     if (!greetingPending) return;
     greetingPending = false;
+    greetingAudioStarted = false;
     awaitingAssistant = false;
     windowObject.clearTimeout(readyTimer);
     readyTimer = 0;
-    try {
-      active?.session?.sendEvent?.({ type: 'response.cancel' });
-    } catch (_) {
-      /* stop a follow-on spoken turn after the greeting */
+    if (reason !== 'playback-stopped') {
+      try {
+        active?.session?.sendEvent?.({ type: 'response.cancel' });
+      } catch (_) {
+        /* stop an unfinished greeting before opening the mic */
+      }
     }
     enableTurnResponses(active?.session);
     try {
@@ -554,6 +559,7 @@
 
   async function speakGreeting(session) {
     greetingPending = true;
+    greetingAudioStarted = false;
     setStatus(ensureBar(), 'greeting', 'Starting…');
     const line = greetingLine || 'Good morning.';
     try {
@@ -832,6 +838,10 @@
         ) {
           awaitingAssistant = true;
           clearPendingKick();
+          liveTalkLog('response.created', {
+            id: event.detail?.event?.response?.id || '',
+            greeting: greetingPending,
+          });
         }
         if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_AUDIO_START) {
           try {
@@ -840,6 +850,7 @@
             /* holdInput still covers echo */
           }
           if (greetingPending) {
+            greetingAudioStarted = true;
             setStatus(bar, 'greeting', 'Starting…');
             diagnosePlayback(providerEvent || 'greeting-audio');
           } else {
@@ -855,9 +866,12 @@
           providerEvent === 'response.done'
         ) {
           awaitingAssistant = false;
-          if (greetingPending) {
-            finishGreeting(providerEvent || event.type);
-          } else {
+          liveTalkLog('response.done', {
+            id: event.detail?.event?.response?.id || '',
+            greeting: greetingPending,
+          });
+          /* response.done ends generation, but WebRTC may still be playing the greeting. */
+          if (!greetingPending) {
             try {
               session.setMuted?.(false);
             } catch (_) {
@@ -867,6 +881,13 @@
               setStatus(bar, 'listening', 'Listening…');
             }
           }
+        }
+        if (
+          providerEvent === 'output_audio_buffer.stopped' &&
+          greetingPending &&
+          greetingAudioStarted
+        ) {
+          finishGreeting('playback-stopped');
         }
         if (
           !greetingPending &&
