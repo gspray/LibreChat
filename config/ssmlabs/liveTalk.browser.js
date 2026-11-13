@@ -30,6 +30,7 @@
   let greetingAudioStarted = false;
   let greetingResponseId = '';
   let greetingSent = false;
+  let assistantAudioPlaying = false;
   let startInFlight = false;
   let awaitingAssistant = false;
   let pendingKickTimer = 0;
@@ -442,6 +443,7 @@
     greetingAudioStarted = false;
     greetingResponseId = '';
     greetingSent = false;
+    assistantAudioPlaying = false;
     awaitingAssistant = false;
     clearPendingKick();
     windowObject.clearTimeout(readyTimer);
@@ -876,6 +878,7 @@
             setStatus(bar, 'greeting', 'Starting…');
             diagnosePlayback(providerEvent || 'greeting-audio');
           } else {
+            assistantAudioPlaying = true;
             const alreadyResponding = bar.dataset.state === 'responding';
             if (!alreadyResponding) {
               setStatus(bar, 'responding', 'Responding…');
@@ -893,7 +896,7 @@
             greeting: greetingPending,
           });
           /* response.done ends generation, but WebRTC may still be playing the greeting. */
-          if (!greetingPending) {
+          if (!greetingPending && !assistantAudioPlaying) {
             try {
               session.setMuted?.(false);
             } catch (_) {
@@ -918,6 +921,7 @@
             providerEvent === 'output_audio_buffer.stopped' ||
             providerEvent === 'output_audio_buffer.cleared')
         ) {
+          assistantAudioPlaying = false;
           try {
             session.setMuted?.(false);
           } catch (_) {
