@@ -34,17 +34,35 @@ function normalizeHeard(text) {
 
 function isLiveTalkDonePhrase(text) {
   const heard = normalizeHeard(text);
-  if (!heard || heard.length > 72) return false;
-  return /^(ok(?:ay)? |all right |alright )?(thanks? |thank you )?(i(?:'m| am) done|that(?:'s| is) (?:all|it)|we(?:'re| are) done|you can (?:hang up|stop|go)|hang up|stop (?:talking|listening)|end (?:talk|the (?:call|session)|live talk)|good ?bye|bye(?: bye)?)( now| please)?$/.test(
-    heard,
-  );
+  if (!heard || heard.length > 96) return false;
+  if (/\b(don'?t|do not|never) (hang up|go|stop|goodbye|good bye)\b/.test(heard)) return false;
+  if (/\bi(?:'m| am) done (with|for)\b/.test(heard)) return false;
+  const core = heard
+    .replace(/^(ok(?:ay)? |all right |alright |please |thanks? |thank you )+/g, '')
+    .replace(/ (please|thanks?|thank you|now)$/g, '')
+    .trim();
+  if (
+    /^(i(?:'m| am) done|that(?:'s| is) (?:all|it)|we(?:'re| are) done|you can (?:hang up|stop|go)|hang up|stop (?:talking|listening)|end (?:talk|the (?:call|session)|live talk)|good ?bye|bye(?: bye)?)$/.test(
+      core,
+    )
+  ) {
+    return true;
+  }
+  return /\b(good ?bye|bye bye|hang up)\b/.test(heard) && heard.split(' ').length <= 12;
 }
 
 function isLiveTalkFarewellPhrase(text) {
   const heard = normalizeHeard(text);
-  if (!heard || heard.length > 240) return false;
+  if (!heard || heard.length > 280) return false;
   if (isLiveTalkDonePhrase(heard)) return true;
-  return /(^| )((ok(?:ay)?|alright|all right) )?(thanks? |thank you )?(good ?bye|bye bye|talk to you later|see you later|have a (good|great) (one|day|night)|take care|i(?:'ll| will) let you go|hanging up)( now)?$/.test(
+  if (
+    /\b(good ?bye|bye bye|hanging up|i(?:'m| am) hanging up|i(?:'ll| will) let you go)\b/.test(
+      heard,
+    )
+  ) {
+    return true;
+  }
+  return /\b(talk to you later|see you later|take care|have a (good|great) (one|day|night))( now)?$/.test(
     heard,
   );
 }

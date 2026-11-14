@@ -41,6 +41,7 @@
   let gptLiveIdleTimer = 0;
   let gptLiveHeardTimer = 0;
   let gptLiveHangupSpeechTimer = 0;
+  let gptLiveAssistantDoneTimer = 0;
   let gptLiveHangupInFlight = false;
   let gptLiveHangupKind = '';
   let gptLiveHeard = '';
@@ -122,17 +123,35 @@
 
   function isLiveTalkDonePhrase(text) {
     const heard = normalizeHeard(text);
-    if (!heard || heard.length > 72) return false;
-    return /^(ok(?:ay)? |all right |alright )?(thanks? |thank you )?(i(?:'m| am) done|that(?:'s| is) (?:all|it)|we(?:'re| are) done|you can (?:hang up|stop|go)|hang up|stop (?:talking|listening)|end (?:talk|the (?:call|session)|live talk)|good ?bye|bye(?: bye)?)( now| please)?$/.test(
-      heard,
-    );
+    if (!heard || heard.length > 96) return false;
+    if (/\b(don'?t|do not|never) (hang up|go|stop|goodbye|good bye)\b/.test(heard)) return false;
+    if (/\bi(?:'m| am) done (with|for)\b/.test(heard)) return false;
+    const core = heard
+      .replace(/^(ok(?:ay)? |all right |alright |please |thanks? |thank you )+/g, '')
+      .replace(/ (please|thanks?|thank you|now)$/g, '')
+      .trim();
+    if (
+      /^(i(?:'m| am) done|that(?:'s| is) (?:all|it)|we(?:'re| are) done|you can (?:hang up|stop|go)|hang up|stop (?:talking|listening)|end (?:talk|the (?:call|session)|live talk)|good ?bye|bye(?: bye)?)$/.test(
+        core,
+      )
+    ) {
+      return true;
+    }
+    return /\b(good ?bye|bye bye|hang up)\b/.test(heard) && heard.split(' ').length <= 12;
   }
 
   function isLiveTalkFarewellPhrase(text) {
     const heard = normalizeHeard(text);
-    if (!heard || heard.length > 240) return false;
+    if (!heard || heard.length > 280) return false;
     if (isLiveTalkDonePhrase(heard)) return true;
-    return /(^| )((ok(?:ay)?|alright|all right) )?(thanks? |thank you )?(good ?bye|bye bye|talk to you later|see you later|have a (good|great) (one|day|night)|take care|i(?:'ll| will) let you go|hanging up)( now)?$/.test(
+    if (
+      /\b(good ?bye|bye bye|hanging up|i(?:'m| am) hanging up|i(?:'ll| will) let you go)\b/.test(
+        heard,
+      )
+    ) {
+      return true;
+    }
+    return /\b(talk to you later|see you later|take care|have a (good|great) (one|day|night))( now)?$/.test(
       heard,
     );
   }
@@ -848,6 +867,8 @@
     stopGptLiveHangupWatch();
     windowObject.clearTimeout(gptLiveHangupSpeechTimer);
     gptLiveHangupSpeechTimer = 0;
+    windowObject.clearTimeout(gptLiveAssistantDoneTimer);
+    gptLiveAssistantDoneTimer = 0;
     gptLiveHangupInFlight = false;
     gptLiveHangupKind = '';
     gptLiveHeard = '';
@@ -1301,6 +1322,8 @@
     gptLiveHangupInFlight = true;
     gptLiveHangupKind = kind || gptLiveHangupKind || 'farewell';
     stopGptLiveHangupWatch();
+    windowObject.clearTimeout(gptLiveAssistantDoneTimer);
+    gptLiveAssistantDoneTimer = 0;
     const copy = gptLiveHangupCopy(gptLiveHangupKind);
     liveTalkLog('hangup.after-speech', { kind: gptLiveHangupKind, status: copy.status });
     setStatus(ensureBar(), 'responding', copy.status);
@@ -1308,6 +1331,27 @@
     gptLiveHangupSpeechTimer = windowObject.setTimeout(() => {
       void finishGptLiveHangup(session, gptLiveHangupKind);
     }, 700);
+  }
+
+  function maybeHangupAfterAssistantTurn(session) {
+    if (!session || active?.session !== session) return;
+    const farewell = isLiveTalkFarewellPhrase(liveTalkAssistantHeard);
+    if (gptLiveHangupInFlight) {
+      hangupAfterSpokenTurn(session, gptLiveHangupKind || (farewell ? 'farewell' : 'done'));
+      return;
+    }
+    if (farewell || gptLiveUserWantsHangup) {
+      hangupAfterSpokenTurn(session, farewell ? 'farewell' : 'done');
+    }
+  }
+
+  function scheduleAssistantTurnEnd(session) {
+    windowObject.clearTimeout(gptLiveAssistantDoneTimer);
+    gptLiveAssistantDoneTimer = windowObject.setTimeout(() => {
+      awaitingAssistant = false;
+      assistantAudioPlaying = false;
+      maybeHangupAfterAssistantTurn(session);
+    }, 900);
   }
 
   function stopGptLiveHangupWatch() {
@@ -1367,11 +1411,16 @@
     gptLiveLastTranscriptAt = 0;
     gptLiveIdleTimer = windowObject.setInterval(() => {
       if (active?.session !== session || paused || gptLiveHangupInFlight) return;
-      if (assistantAudioPlaying || awaitingAssistant) return;
-      if (['connecting', 'greeting', 'responding', 'tool'].includes(ui.state)) return;
+      if (['connecting', 'greeting', 'tool'].includes(ui.state)) return;
       const at = Date.now();
       const silenceMs = gptLiveSilenceMs();
       const noiseMs = gptLiveNoiseMs();
+      if (
+        (assistantAudioPlaying || awaitingAssistant || ui.state === 'responding') &&
+        at - gptLiveLastUsefulAt < silenceMs
+      ) {
+        return;
+      }
       const transcriptIsFresh = gptLiveLastTranscriptAt && at - gptLiveLastTranscriptAt < 2500;
       if (transcriptIsFresh && at - gptLiveLastUsefulAt >= noiseMs) {
         beginGptLiveHangup(session, 'noise');
@@ -1535,17 +1584,17 @@
             markUserHangupIfDone();
           }
           if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE) {
-            const spoken = liveTalkAssistantHeard;
             flushLiveTranscript('assistant');
-            const farewell = isLiveTalkFarewellPhrase(spoken);
-            if (gptLiveHangupInFlight) {
-              windowObject.clearTimeout(gptLiveHangupSpeechTimer);
-              hangupAfterSpokenTurn(session, gptLiveHangupKind || (farewell ? 'farewell' : 'done'));
-            } else if (farewell || gptLiveUserWantsHangup) {
-              hangupAfterSpokenTurn(session, farewell ? 'farewell' : 'done');
-            }
+            maybeHangupAfterAssistantTurn(session);
           }
-          if (useful && !gptLiveUserWantsHangup && !gptLiveHangupInFlight) resetGptLiveHeard();
+          if (
+            useful &&
+            event.type !== SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_START &&
+            !gptLiveUserWantsHangup &&
+            !gptLiveHangupInFlight
+          ) {
+            resetGptLiveHeard();
+          }
         }
         const providerEvent = event.detail?.providerEvent || event.detail?.event?.type || '';
         const deltaText = String(
@@ -1654,12 +1703,10 @@
             id: event.detail?.event?.response?.id || '',
             greeting: greetingPending,
           });
-          /* response.done ends generation, but WebRTC may still be playing the greeting. */
-          if (gptLive && gptLiveHangupInFlight && active?.session === session) {
-            windowObject.clearTimeout(gptLiveHangupSpeechTimer);
-            gptLiveHangupSpeechTimer = 0;
-            void finishGptLiveHangup(session, gptLiveHangupKind);
-            return;
+          /* GPT-Live often never sends response.done; hangup waits for audio/transcript end. */
+          if (gptLive && active?.session === session) {
+            maybeHangupAfterAssistantTurn(session);
+            if (gptLiveHangupInFlight) return;
           }
           if (!greetingPending && !assistantAudioPlaying) {
             try {
@@ -1684,9 +1731,15 @@
           !greetingPending &&
           (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_INTERRUPTED ||
             providerEvent === 'output_audio_buffer.stopped' ||
-            providerEvent === 'output_audio_buffer.cleared')
+            providerEvent === 'output_audio_buffer.cleared' ||
+            providerEvent === 'session.output_transcript.done')
         ) {
+          awaitingAssistant = false;
           assistantAudioPlaying = false;
+          if (gptLive && active?.session === session) {
+            maybeHangupAfterAssistantTurn(session);
+            if (gptLiveHangupInFlight) return;
+          }
           try {
             session.setMuted?.(false);
           } catch (_) {
@@ -1743,6 +1796,10 @@
         ) {
           liveTalkAssistantHeard = appendLiveTalkDelta(liveTalkAssistantHeard, deltaText);
           scheduleLivePreview('assistant');
+          if (isLiveTalkFarewellPhrase(liveTalkAssistantHeard)) {
+            gptLiveHangupKind = gptLiveHangupKind || 'farewell';
+          }
+          scheduleAssistantTurnEnd(session);
         }
         if (event.type === SpeakCore.SpeakRealtimeEvent.INPUT_TRANSCRIPT && deltaText) {
           liveTalkLog('transcript.heard', { chars: deltaText.length });
@@ -1760,7 +1817,10 @@
             gptLiveHeardTimer = windowObject.setTimeout(() => {
               if (active?.session !== session || gptLiveHangupInFlight) return;
               if (!markUserHangupIfDone()) return;
-              if (assistantAudioPlaying || awaitingAssistant) return;
+              if (assistantAudioPlaying || awaitingAssistant) {
+                scheduleAssistantTurnEnd(session);
+                return;
+              }
               beginGptLiveHangup(session, 'done');
             }, 900);
           }

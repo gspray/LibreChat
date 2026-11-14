@@ -36,15 +36,22 @@ test('done phrases hang up, longer requests do not', () => {
   assert.equal(isLiveTalkDonePhrase('okay thanks that is all'), true);
   assert.equal(isLiveTalkDonePhrase('hang up'), true);
   assert.equal(isLiveTalkDonePhrase('goodbye'), true);
+  assert.equal(isLiveTalkDonePhrase('Goodbye Lesson Caddie'), true);
   assert.equal(isLiveTalkDonePhrase("I'm done with Janet's lesson"), false);
+  assert.equal(isLiveTalkDonePhrase("don't hang up"), false);
   assert.equal(isLiveTalkDonePhrase('open my calendar'), false);
 });
 
 test('assistant goodbye hangs up after the spoken farewell', () => {
   assert.equal(isLiveTalkFarewellPhrase('Okay, goodbye.'), true);
   assert.equal(isLiveTalkFarewellPhrase("I'll let you go. Goodbye"), true);
+  assert.equal(isLiveTalkFarewellPhrase('Okay, goodbye. Touch Speak to talk.'), true);
   assert.equal(isLiveTalkFarewellPhrase('Talk to you later'), true);
   assert.equal(isLiveTalkFarewellPhrase('Opening your calendar now.'), false);
+  assert.equal(
+    isLiveTalkFarewellPhrase("I'll open your calendar so you have a great day planned."),
+    false,
+  );
 });
 
 test('noise filler is not a useful turn', () => {
