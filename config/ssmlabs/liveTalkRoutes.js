@@ -22,6 +22,7 @@ const {
 
 const sessions = new Map();
 const userSessionCounts = new Map();
+const pendingUsageWrites = new Map();
 
 function clean(value) {
   return String(value || '').trim();
@@ -174,7 +175,12 @@ function destroySession(sessionId, reason = 'stop') {
   record.closed = true;
   record.closedReason = reason;
   if (record.gptLive && record.mcpProxy) {
-    void saveSessionUsage(record, reason);
+    const write = saveSessionUsage(record, reason);
+    record.usageWrite = write;
+    pendingUsageWrites.set(record.userId, write);
+    void write.finally(() => {
+      if (pendingUsageWrites.get(record.userId) === write) pendingUsageWrites.delete(record.userId);
+    });
   }
   liveTalkLog('info', 'session.destroyed', { sessionId, reason });
   return record;
@@ -225,6 +231,21 @@ async function saveSessionUsage(record, reason) {
   } catch (error) {
     liveTalkLog('warn', 'session.usage-failed', { sessionId: record.id, message: error.message });
   }
+}
+
+async function readSessionUsage(delegation) {
+  const secret = clean(process.env.LESSONCADDIE_SSO_SHARED_SECRET);
+  const url = new URL('/api/user/live-talk-sessions', delegation.serverUrl);
+  const response = await fetch(url, {
+    headers: {
+      'X-LessonCaddie-Sso-Secret': secret,
+      'X-LibreChat-Firebase-Uid': delegation.firebaseUid,
+      'X-LibreChat-User-Provider': 'lessoncaddie',
+    },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new Error(`Usage lookup returned ${response.status}`);
+  return response.json();
 }
 
 function createLiveTalkMcpProxy() {
@@ -475,6 +496,7 @@ function createLiveTalkRouter(deps = {}) {
   const saveMessage = deps.saveMessage;
   const listMcpTools = deps.listMcpTools;
   const getMcpDelegation = deps.getMcpDelegation;
+  const getSessionUsage = deps.readSessionUsage || readSessionUsage;
   const callMcpTool = deps.callMcpTool;
   const bootstrap = deps.bootstrapOpenAi || bootstrapOpenAi;
   const bootstrapLive = deps.bootstrapGptLive || bootstrapGptLive;
@@ -623,6 +645,41 @@ function createLiveTalkRouter(deps = {}) {
             'Live Talk MCP authentication is unavailable.',
           );
         }
+        await pendingUsageWrites.get(userId);
+        let usage;
+        try {
+          usage = await timed('usageMs', () => getSessionUsage(delegation));
+        } catch (error) {
+          liveTalkLog('warn', 'session.usage-unavailable', { message: error.message });
+          throw publicError(
+            503,
+            'usage_unavailable',
+            'Live Talk minutes are unavailable. Try again shortly.',
+          );
+        }
+        const totalMs = Number(usage?.totalMs);
+        const quotaMinutes = Number(usage?.quotaMinutes);
+        const quotaRemainingMs = quotaMinutes * 60000 - totalMs;
+        if (
+          !Number.isSafeInteger(totalMs) ||
+          totalMs < 0 ||
+          !Number.isSafeInteger(quotaMinutes) ||
+          quotaMinutes <= 0
+        ) {
+          throw publicError(
+            503,
+            'usage_unavailable',
+            'Live Talk minutes are unavailable. Try again shortly.',
+          );
+        }
+        if (quotaRemainingMs <= 0) {
+          throw publicError(
+            429,
+            'live_talk_quota_reached',
+            `You have used your ${quotaMinutes} Live Talk minutes.`,
+          );
+        }
+        sessionConfig.maxSessionMs = Math.min(config.maxSessionMs, quotaRemainingMs);
         let proxyUrl;
         try {
           proxyUrl = new URL(config.gptLiveMcpProxyUrl);
@@ -743,7 +800,7 @@ function createLiveTalkRouter(deps = {}) {
         record.draining = true;
         /* Keep the current response and MCP actions alive while the browser flushes them. */
         record.drainTimer = setTimeout(() => destroySession(sessionId, 'duration'), 120000);
-      }, config.maxSessionMs);
+      }, sessionConfig.maxSessionMs);
       if (proxyRecord) clearTimers(proxyRecord);
       sessions.set(sessionId, record);
       if (!proxyRecord) rememberUserSession(userId, 1);
@@ -892,7 +949,7 @@ function createLiveTalkRouter(deps = {}) {
     }
   });
 
-  router.post('/session/:sessionId/stop', (req, res, next) => {
+  router.post('/session/:sessionId/stop', async (req, res, next) => {
     try {
       const sessionId = clean(req.params.sessionId);
       const record = sessions.get(sessionId);
@@ -903,7 +960,8 @@ function createLiveTalkRouter(deps = {}) {
           'That Live Talk session belongs to another user.',
         );
       }
-      destroySession(sessionId, clean(req.body?.reason) || 'stop');
+      const stopped = destroySession(sessionId, clean(req.body?.reason) || 'stop');
+      await stopped?.usageWrite;
       res.json({ ok: true, stopped: true });
     } catch (error) {
       next(error);
@@ -936,6 +994,7 @@ function resetLiveTalkSessions() {
   }
   sessions.clear();
   userSessionCounts.clear();
+  pendingUsageWrites.clear();
 }
 
 module.exports = {

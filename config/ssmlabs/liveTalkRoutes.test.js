@@ -53,6 +53,7 @@ function createApp(overrides = {}) {
         { name: 'create_lesson', description: 'Create a lesson', inputSchema: { type: 'object' } },
       ],
       callMcpTool: async ({ toolName }) => ({ toolName, ok: true }),
+      readSessionUsage: async () => ({ totalMs: 0, quotaMinutes: 60 }),
       bootstrapOpenAi: async ({ session }) => {
         assert.equal(
           session.tools.some((tool) => tool.name === 'create_lesson'),
@@ -73,6 +74,44 @@ function createApp(overrides = {}) {
   );
   return app;
 }
+
+test('GPT-Live refuses a session after the 60-minute quota is used', async () => {
+  const originalSecret = process.env.LESSONCADDIE_SSO_SHARED_SECRET;
+  process.env.LESSONCADDIE_SSO_SHARED_SECRET = 's'.repeat(32);
+  const app = createApp({
+    resolveLiveTalkConfig: () => ({
+      ...liveTalkConfig(),
+      gptLiveMcpProxyUrl: 'https://chat.example.test/chat/live-talk/mcp',
+    }),
+    getMcpDelegation: async () => ({
+      serverUrl: 'https://mcp.example.test/api/instructor-mcp',
+      firebaseUid: 'firebase-instructor-1',
+    }),
+    readSessionUsage: async () => ({ totalMs: 60 * 60000, quotaMinutes: 60 }),
+    bootstrapGptLive: async () => {
+      throw new Error('Voice must not start after quota.');
+    },
+  });
+  const server = await listen(app);
+  try {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        conversationId: 'convo-1',
+        sdp: 'offer',
+        liveVoice: { provider: 'gpt-live' },
+      }),
+    });
+    assert.equal(response.status, 429);
+    assert.match((await response.json()).message, /60 Live Talk minutes/);
+  } finally {
+    server.close();
+    resetLiveTalkSessions();
+    if (originalSecret === undefined) delete process.env.LESSONCADDIE_SSO_SHARED_SECRET;
+    else process.env.LESSONCADDIE_SSO_SHARED_SECRET = originalSecret;
+  }
+});
 
 test('GPT-Live forwards the exact offer and returns the raw OpenAI SDP answer', async () => {
   const originalKey = process.env.OPENAI_API_KEY;
