@@ -20,6 +20,15 @@ function isLiveTalkDonePhrase(text) {
   );
 }
 
+function isLiveTalkFarewellPhrase(text) {
+  const heard = normalizeHeard(text);
+  if (!heard || heard.length > 240) return false;
+  if (isLiveTalkDonePhrase(heard)) return true;
+  return /(^| )((ok(?:ay)?|alright|all right) )?(thanks? |thank you )?(good ?bye|bye bye|talk to you later|see you later|have a (good|great) (one|day|night)|take care|i(?:'ll| will) let you go|hanging up)( now)?$/.test(
+    heard,
+  );
+}
+
 function isSubstantialHeard(text) {
   const words = normalizeHeard(text)
     .split(' ')
@@ -34,6 +43,12 @@ function gptLiveHangupCopy(kind, options = {}) {
     return {
       say: 'Okay, hanging up.',
       status: 'Hung up because you said you were done.',
+    };
+  }
+  if (kind === 'farewell') {
+    return {
+      say: '',
+      status: 'Hung up after goodbye.',
     };
   }
   if (kind === 'noise') {
@@ -51,6 +66,7 @@ function gptLiveHangupCopy(kind, options = {}) {
 module.exports = {
   normalizeHeard,
   isLiveTalkDonePhrase,
+  isLiveTalkFarewellPhrase,
   isSubstantialHeard,
   gptLiveHangupCopy,
 };

@@ -2,7 +2,12 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { isLiveTalkDonePhrase, isSubstantialHeard, gptLiveHangupCopy } = require('./liveTalkHangup');
+const {
+  isLiveTalkDonePhrase,
+  isLiveTalkFarewellPhrase,
+  isSubstantialHeard,
+  gptLiveHangupCopy,
+} = require('./liveTalkHangup');
 
 test('done phrases hang up, longer requests do not', () => {
   assert.equal(isLiveTalkDonePhrase("I'm done"), true);
@@ -11,6 +16,13 @@ test('done phrases hang up, longer requests do not', () => {
   assert.equal(isLiveTalkDonePhrase('goodbye'), true);
   assert.equal(isLiveTalkDonePhrase("I'm done with Janet's lesson"), false);
   assert.equal(isLiveTalkDonePhrase('open my calendar'), false);
+});
+
+test('assistant goodbye hangs up after the spoken farewell', () => {
+  assert.equal(isLiveTalkFarewellPhrase('Okay, goodbye.'), true);
+  assert.equal(isLiveTalkFarewellPhrase("I'll let you go. Goodbye"), true);
+  assert.equal(isLiveTalkFarewellPhrase('Talk to you later'), true);
+  assert.equal(isLiveTalkFarewellPhrase('Opening your calendar now.'), false);
 });
 
 test('noise filler is not a useful turn', () => {
@@ -22,4 +34,5 @@ test('hangup copy names the reason', () => {
   assert.match(gptLiveHangupCopy('silence', { silenceSec: 20 }).status, /20 seconds of silence/);
   assert.match(gptLiveHangupCopy('noise', { noiseSec: 60 }).status, /60 seconds of noise/);
   assert.match(gptLiveHangupCopy('done').status, /you said you were done/);
+  assert.match(gptLiveHangupCopy('farewell').status, /after goodbye/);
 });

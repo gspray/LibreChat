@@ -44,6 +44,7 @@
   let gptLiveHangupInFlight = false;
   let gptLiveHangupKind = '';
   let gptLiveHeard = '';
+  let gptLiveUserWantsHangup = false;
   let liveTalkConversationId = '';
   let liveTalkUserHeard = '';
   let liveTalkAssistantHeard = '';
@@ -107,6 +108,15 @@
     );
   }
 
+  function isLiveTalkFarewellPhrase(text) {
+    const heard = normalizeHeard(text);
+    if (!heard || heard.length > 240) return false;
+    if (isLiveTalkDonePhrase(heard)) return true;
+    return /(^| )((ok(?:ay)?|alright|all right) )?(thanks? |thank you )?(good ?bye|bye bye|talk to you later|see you later|have a (good|great) (one|day|night)|take care|i(?:'ll| will) let you go|hanging up)( now)?$/.test(
+      heard,
+    );
+  }
+
   function gptLiveSilenceMs() {
     return Number(config.gptLiveIdleMs) > 0 ? Number(config.gptLiveIdleMs) : 20000;
   }
@@ -121,6 +131,9 @@
     if (kind === 'done') {
       return { say: 'Okay, hanging up.', status: 'Hung up because you said you were done.' };
     }
+    if (kind === 'farewell') {
+      return { say: '', status: 'Hung up after goodbye.' };
+    }
     if (kind === 'noise') {
       return {
         say: 'Okay, hanging up. I am not catching words.',
@@ -134,7 +147,13 @@
   }
 
   function gptLiveStopStatus(reason) {
-    if (reason === 'done' || reason === 'silence' || reason === 'noise' || reason === 'idle') {
+    if (
+      reason === 'done' ||
+      reason === 'farewell' ||
+      reason === 'silence' ||
+      reason === 'noise' ||
+      reason === 'idle'
+    ) {
       return gptLiveHangupCopy(reason === 'idle' ? 'silence' : reason).status;
     }
     if (reason === 'failed') return ui.text || 'Could not connect Live Talk.';
@@ -602,6 +621,7 @@
     gptLiveHangupInFlight = false;
     gptLiveHangupKind = '';
     gptLiveHeard = '';
+    gptLiveUserWantsHangup = false;
     stopGptLiveClientActionPoll();
     stopGptLivePlaybackMeter();
     if (!current?.gptLive) {
@@ -1034,6 +1054,25 @@
     gptLiveHeardTimer = 0;
   }
 
+  function markUserHangupIfDone() {
+    if (isLiveTalkDonePhrase(gptLiveHeard)) gptLiveUserWantsHangup = true;
+    return gptLiveUserWantsHangup;
+  }
+
+  function hangupAfterSpokenTurn(session, kind) {
+    if (!session || active?.session !== session) return;
+    gptLiveHangupInFlight = true;
+    gptLiveHangupKind = kind || gptLiveHangupKind || 'farewell';
+    stopGptLiveHangupWatch();
+    const copy = gptLiveHangupCopy(gptLiveHangupKind);
+    liveTalkLog('hangup.after-speech', { kind: gptLiveHangupKind, status: copy.status });
+    setStatus(ensureBar(), 'responding', copy.status);
+    windowObject.clearTimeout(gptLiveHangupSpeechTimer);
+    gptLiveHangupSpeechTimer = windowObject.setTimeout(() => {
+      void finishGptLiveHangup(session, gptLiveHangupKind);
+    }, 700);
+  }
+
   function stopGptLiveHangupWatch() {
     windowObject.clearInterval(gptLiveIdleTimer);
     gptLiveIdleTimer = 0;
@@ -1085,6 +1124,7 @@
     gptLiveHangupInFlight = false;
     gptLiveHangupKind = '';
     gptLiveHeard = '';
+    gptLiveUserWantsHangup = false;
     gptLiveLastEventAt = now;
     gptLiveLastUsefulAt = now;
     gptLiveLastTranscriptAt = 0;
@@ -1246,11 +1286,20 @@
           noteGptLiveActivity(useful ? 'useful' : 'speech');
           if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_START) {
             flushLiveTranscript('user');
+            markUserHangupIfDone();
           }
           if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE) {
+            const spoken = liveTalkAssistantHeard;
             flushLiveTranscript('assistant');
+            const farewell = isLiveTalkFarewellPhrase(spoken);
+            if (gptLiveHangupInFlight) {
+              windowObject.clearTimeout(gptLiveHangupSpeechTimer);
+              hangupAfterSpokenTurn(session, gptLiveHangupKind || (farewell ? 'farewell' : 'done'));
+            } else if (farewell || gptLiveUserWantsHangup) {
+              hangupAfterSpokenTurn(session, farewell ? 'farewell' : 'done');
+            }
           }
-          if (useful) resetGptLiveHeard();
+          if (useful && !gptLiveUserWantsHangup && !gptLiveHangupInFlight) resetGptLiveHeard();
         }
         const providerEvent = event.detail?.providerEvent || event.detail?.event?.type || '';
         const transcript = clean(
@@ -1452,10 +1501,13 @@
             gptLiveHeard = `${gptLiveHeard} ${transcript}`.replace(/\s+/g, ' ').trim();
             if (gptLiveHeard.length > 240) gptLiveHeard = gptLiveHeard.slice(-240);
             noteGptLiveActivity('transcript');
+            markUserHangupIfDone();
             windowObject.clearTimeout(gptLiveHeardTimer);
             gptLiveHeardTimer = windowObject.setTimeout(() => {
               if (active?.session !== session || gptLiveHangupInFlight) return;
-              if (isLiveTalkDonePhrase(gptLiveHeard)) beginGptLiveHangup(session, 'done');
+              if (!markUserHangupIfDone()) return;
+              if (assistantAudioPlaying || awaitingAssistant) return;
+              beginGptLiveHangup(session, 'done');
             }, 900);
           }
         }
