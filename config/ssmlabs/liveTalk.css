@@ -39,20 +39,32 @@ body[data-lc-chrome='composer-only'] aside,
 body[data-lc-chrome='composer-only'] header,
 body[data-lc-chrome='composer-only'] .lc-chat-header,
 body[data-lc-chrome='composer-only'] .lc-assistant-landing-shell,
+body[data-lc-chrome='composer-only'] .lc-chat-pane-landing,
 body[data-lc-chrome='composer-only'] [data-chat-pane] > *:not(:has([data-testid='composer-surface'])) {
   display: none !important;
 }
 
 body[data-lc-chrome='composer-only'],
+body[data-lc-chrome='composer-only'] html,
 body[data-lc-chrome='composer-only'] #root,
+body[data-lc-chrome='composer-only'] #root > div,
 body[data-lc-chrome='composer-only'] [data-chat-pane] {
-  height: 100% !important;
+  height: auto !important;
   min-height: 0 !important;
+  max-height: none !important;
   overflow: hidden !important;
+  background: transparent !important;
+}
+
+body[data-lc-chrome='composer-only'] [data-chat-pane] {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: flex-end !important;
 }
 
 body[data-lc-chrome='composer-only'] .lc-composer-band,
 body[data-lc-chrome='composer-only'] [data-testid='composer-surface'] {
   margin-top: 0 !important;
-  padding-bottom: 0.35rem !important;
+  padding-top: 0.25rem !important;
+  padding-bottom: 0.25rem !important;
 }
