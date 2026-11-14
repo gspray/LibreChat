@@ -2,6 +2,8 @@
 
 /** Authenticated Live Talk routes. Keys, tools, and limits stay on the server. */
 const crypto = require('node:crypto');
+const { Readable } = require('node:stream');
+const { pipeline } = require('node:stream/promises');
 const express = require('express');
 const {
   LIVE_TALK_PACKS,
@@ -72,12 +74,89 @@ function destroySession(sessionId, reason = 'stop') {
   const record = sessions.get(sessionId);
   if (!record) return null;
   clearTimers(record);
+  for (const controller of record.proxyRequests || []) controller.abort();
   sessions.delete(sessionId);
   rememberUserSession(record.userId, -1);
   record.closed = true;
   record.closedReason = reason;
   liveTalkLog('info', 'session.destroyed', { sessionId, reason });
   return record;
+}
+
+function createLiveTalkMcpProxy() {
+  const router = express.Router();
+  router.use(express.json({ limit: '16kb' }));
+  router.all('/:sessionId', async (req, res) => {
+    const record = sessions.get(clean(req.params.sessionId));
+    const bearer = clean(req.headers.authorization).replace(/^Bearer\s+/i, '');
+    const expected = record?.proxyToken || '';
+    const authorized =
+      bearer &&
+      expected &&
+      Buffer.byteLength(bearer) === Buffer.byteLength(expected) &&
+      crypto.timingSafeEqual(Buffer.from(bearer), Buffer.from(expected));
+    if (!authorized || record.closed || !record.mcpProxy) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+    if (!['GET', 'POST', 'DELETE'].includes(req.method)) {
+      res.set('Allow', 'GET, POST, DELETE').status(405).end();
+      return;
+    }
+    const secret = clean(process.env.LESSONCADDIE_SSO_SHARED_SECRET);
+    if (secret.length < 32) {
+      res.status(503).json({ error: 'MCP connection unavailable' });
+      return;
+    }
+    let body = null;
+    if (req.method === 'POST') {
+      body = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body ?? {}));
+    }
+    if (body && body.length > 16 * 1024) {
+      res.status(413).json({ error: 'MCP request too large' });
+      return;
+    }
+    const controller = new AbortController();
+    record.proxyRequests.add(controller);
+    res.on('close', () => controller.abort());
+    try {
+      const upstream = await fetch(record.mcpProxy.serverUrl, {
+        method: req.method,
+        signal: controller.signal,
+        headers: {
+          'X-LessonCaddie-Sso-Secret': secret,
+          'X-LibreChat-Firebase-Uid': record.mcpProxy.firebaseUid,
+          'X-LibreChat-User-Provider': 'lessoncaddie',
+          Accept: 'application/json, text/event-stream',
+          ...(body ? { 'Content-Type': 'application/json' } : {}),
+          ...(req.headers['mcp-session-id']
+            ? { 'Mcp-Session-Id': clean(req.headers['mcp-session-id']) }
+            : {}),
+          ...(req.headers['mcp-protocol-version']
+            ? { 'Mcp-Protocol-Version': clean(req.headers['mcp-protocol-version']) }
+            : {}),
+          ...(req.headers['last-event-id']
+            ? { 'Last-Event-ID': clean(req.headers['last-event-id']) }
+            : {}),
+        },
+        body,
+      });
+      res.status(upstream.status);
+      for (const name of ['content-type', 'mcp-session-id', 'cache-control']) {
+        const value = upstream.headers.get(name);
+        if (value) res.set(name, value);
+      }
+      res.set('Cache-Control', 'no-store');
+      if (upstream.body) await pipeline(Readable.fromWeb(upstream.body), res);
+      else res.end();
+    } catch (_error) {
+      if (!res.headersSent) res.status(502).json({ error: 'MCP connection unavailable' });
+      else res.end();
+    } finally {
+      record.proxyRequests.delete(controller);
+    }
+  });
+  return router;
 }
 
 function destroyUserSessions(userId, reason = 'replaced') {
@@ -168,6 +247,42 @@ async function bootstrapOpenAi({ sdp, session }) {
   return answer;
 }
 
+async function bootstrapGptLive({ sdp, session }) {
+  const apiKey = resolveLiveTalkConfig().openaiApiKey;
+  if (!apiKey) {
+    throw publicError(503, 'openai_unconfigured', 'Live Talk is missing a server OpenAI key.');
+  }
+  const response = await fetch('https://api.openai.com/v1/live/sessions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      session,
+      transport: { type: 'webrtc', sdp: normalizeSdp(sdp) },
+    }),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    liveTalkLog('error', 'gpt-live.bootstrap.failed', { status: response.status });
+    throw publicError(
+      502,
+      'openai_session_failed',
+      'Could not start the voice session. Try again in a moment.',
+    );
+  }
+  const answerSdp = clean(body.transport?.sdp);
+  if (!answerSdp) {
+    throw publicError(
+      502,
+      'openai_session_failed',
+      'The voice session returned no audio connection.',
+    );
+  }
+  return { sdp: answerSdp, sessionId: clean(body.session?.id || body.id) };
+}
+
 function toOpenAiTools(mcpTools) {
   const list = Array.isArray(mcpTools) ? mcpTools : [];
   return list
@@ -191,8 +306,10 @@ function createLiveTalkRouter(deps = {}) {
   const getAgent = deps.getAgent;
   const saveMessage = deps.saveMessage;
   const listMcpTools = deps.listMcpTools;
+  const getMcpDelegation = deps.getMcpDelegation;
   const callMcpTool = deps.callMcpTool;
   const bootstrap = deps.bootstrapOpenAi || bootstrapOpenAi;
+  const bootstrapLive = deps.bootstrapGptLive || bootstrapGptLive;
   const now = deps.now || (() => Date.now());
 
   router.get('/config', (req, res) => {
@@ -209,6 +326,8 @@ function createLiveTalkRouter(deps = {}) {
       spec: pack.spec,
       displayName: pack.displayName,
       speakCoreRevision: config.speakCoreRevision,
+      provider: config.gptLiveEnabled && pack.id === 'instructor' ? 'gpt-live' : 'openai-realtime',
+      gptLiveIdleMs: config.gptLiveIdleMs,
     });
   });
 
@@ -273,10 +392,13 @@ function createLiveTalkRouter(deps = {}) {
         }
       }
       const agent = await getAgent({ id: config.agentId }).catch(() => null);
-      const mcpTools = await listMcpTools({ user: req.user, conversationId, config });
+      const gptLive = config.gptLiveEnabled && pack.id === 'instructor';
+      const mcpTools = gptLive
+        ? []
+        : await listMcpTools({ user: req.user, conversationId, config });
       const tools = toOpenAiTools(mcpTools);
       const allowedTools = liveTalkToolNames(tools);
-      if (!allowedTools.size) {
+      if (!gptLive && !allowedTools.size) {
         throw publicError(
           502,
           'mcp_tools_unavailable',
@@ -285,22 +407,114 @@ function createLiveTalkRouter(deps = {}) {
       }
       const sessionId = crypto.randomUUID();
       const sessionConfig = applyLiveVoiceToConfig(config, req.body?.liveVoice);
-      const answerSdp = await bootstrap({
-        sdp,
-        session: {
-          type: 'realtime',
-          model: sessionConfig.model,
-          instructions: liveTalkInstructions(agent?.instructions, pack),
-          tools,
-          tool_choice: 'auto',
-          audio: {
-            input: {
-              turn_detection: liveTalkTurnDetection(sessionConfig, { createResponse: false }),
+      const instructions = liveTalkInstructions(agent?.instructions, pack);
+      let answerSdp;
+      let providerSessionId = '';
+      let proxyRecord = null;
+      if (gptLive) {
+        const delegation = await getMcpDelegation?.({ user: req.user, conversationId, config });
+        if (!delegation?.serverUrl || !delegation?.firebaseUid) {
+          throw publicError(
+            503,
+            'mcp_tools_unavailable',
+            'Live Talk could not connect to LessonCaddie tools.',
+          );
+        }
+        if (clean(process.env.LESSONCADDIE_SSO_SHARED_SECRET).length < 32) {
+          throw publicError(
+            503,
+            'mcp_proxy_unconfigured',
+            'Live Talk MCP authentication is unavailable.',
+          );
+        }
+        let proxyUrl;
+        try {
+          proxyUrl = new URL(config.gptLiveMcpProxyUrl);
+        } catch {
+          throw publicError(
+            503,
+            'mcp_proxy_unconfigured',
+            'Live Talk MCP proxy URL is unavailable.',
+          );
+        }
+        if (
+          proxyUrl.protocol !== 'https:' ||
+          proxyUrl.username ||
+          proxyUrl.password ||
+          proxyUrl.search ||
+          proxyUrl.hash
+        ) {
+          throw publicError(503, 'mcp_proxy_unconfigured', 'Live Talk MCP proxy URL is invalid.');
+        }
+        const proxyToken = crypto.randomBytes(32).toString('base64url');
+        proxyRecord = {
+          id: sessionId,
+          userId,
+          closed: false,
+          idleMs: config.idleMs,
+          proxyToken,
+          mcpProxy: delegation,
+          proxyRequests: new Set(),
+        };
+        sessions.set(sessionId, proxyRecord);
+        rememberUserSession(userId, 1);
+        touchSession(proxyRecord);
+        const requestedVoice = req.body?.liveVoice?.voice;
+        const customVoiceId =
+          typeof requestedVoice === 'object' ? clean(requestedVoice.id) : clean(requestedVoice);
+        const outputVoice = /^voice_[A-Za-z0-9_-]+$/.test(customVoiceId)
+          ? { id: customVoiceId }
+          : sessionConfig.voice;
+        let live;
+        try {
+          live = await bootstrapLive({
+            sdp,
+            session: {
+              model: 'gpt-live-1',
+              instructions,
+              audio: { output: { voice: outputVoice } },
+              delegation: {
+                type: 'responses',
+                responses: {
+                  model: 'gpt-6-luna',
+                  tools: [
+                    {
+                      type: 'mcp',
+                      server_url: `${proxyUrl.toString().replace(/\/+$/, '')}/${sessionId}`,
+                      server_label: 'Instructor',
+                      authorization: `Bearer ${proxyToken}`,
+                      require_approval: 'never',
+                    },
+                  ],
+                  tool_choice: 'auto',
+                },
+              },
             },
-            output: { voice: sessionConfig.voice },
+          });
+        } catch (error) {
+          destroySession(sessionId, 'bootstrap-failed');
+          throw error;
+        }
+        answerSdp = live.sdp;
+        providerSessionId = live.sessionId;
+      } else {
+        answerSdp = await bootstrap({
+          sdp,
+          session: {
+            type: 'realtime',
+            model: sessionConfig.model,
+            instructions,
+            tools,
+            tool_choice: 'auto',
+            audio: {
+              input: {
+                turn_detection: liveTalkTurnDetection(sessionConfig, { createResponse: false }),
+              },
+              output: { voice: sessionConfig.voice },
+            },
           },
-        },
-      });
+        });
+      }
       const record = {
         id: sessionId,
         userId,
@@ -314,14 +528,22 @@ function createLiveTalkRouter(deps = {}) {
         idleMs: config.idleMs,
         parentMessageId: clean(convo.lastMessageId || convo.last_message_id),
         allowedTools,
+        ...(proxyRecord
+          ? {
+              proxyToken: proxyRecord.proxyToken,
+              mcpProxy: proxyRecord.mcpProxy,
+              proxyRequests: proxyRecord.proxyRequests,
+            }
+          : {}),
         closed: false,
       };
       record.maxTimer = setTimeout(
         () => destroySession(sessionId, 'duration'),
         config.maxSessionMs,
       );
+      if (proxyRecord) clearTimers(proxyRecord);
       sessions.set(sessionId, record);
-      rememberUserSession(userId, 1);
+      if (!proxyRecord) rememberUserSession(userId, 1);
       touchSession(record);
       liveTalkLog('info', 'session.create.ok', {
         sessionId,
@@ -335,6 +557,7 @@ function createLiveTalkRouter(deps = {}) {
       res.status(201).json({
         sessionId,
         sdp: answerSdp,
+        providerSessionId,
         conversationId,
         tools: tools.map((tool) => tool.name),
       });
@@ -485,5 +708,7 @@ module.exports = {
   destroySession,
   resetLiveTalkSessions,
   bootstrapOpenAi,
+  bootstrapGptLive,
+  createLiveTalkMcpProxy,
   toOpenAiTools,
 };

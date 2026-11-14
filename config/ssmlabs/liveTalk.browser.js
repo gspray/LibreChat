@@ -38,6 +38,7 @@
   let pendingKickTimer = 0;
   let readyTimer = 0;
   let pingTimer = 0;
+  let gptLiveIdleTimer = 0;
   let liveVoiceSettings = {
     waitForYou: 'patient',
     allowInterrupt: false,
@@ -55,16 +56,19 @@
     )
       ? String(src.waitForYou).trim().toLowerCase()
       : 'patient';
-    const voiceRaw = String(src.voice || '')
+    const customVoiceId = typeof src.voice === 'object' ? clean(src.voice.id) : clean(src.voice);
+    const voiceRaw = String(customVoiceId || '')
       .trim()
       .toLowerCase();
     const voices = ['marin', 'cedar', 'shimmer', 'verse', 'alloy'];
+    let selectedVoice = voices.includes(voiceRaw) ? voiceRaw : 'marin';
+    if (/^voice_[A-Za-z0-9_-]+$/.test(customVoiceId)) selectedVoice = { id: customVoiceId };
     return {
       waitForYou,
       allowInterrupt: src.allowInterrupt === true,
       ignoreBackgroundNoise: src.ignoreBackgroundNoise !== false,
       muteMicWhileSheTalks: src.muteMicWhileSheTalks !== false,
-      voice: voices.includes(voiceRaw) ? voiceRaw : 'marin',
+      voice: selectedVoice,
     };
   }
 
@@ -404,13 +408,15 @@
     const current = active;
     liveTalkLog('stop', { reason: String(reason || ''), sessionId: current?.sessionId || '' });
     active = null;
+    windowObject.clearTimeout(gptLiveIdleTimer);
+    gptLiveIdleTimer = 0;
     try {
       current?.session?.cancel?.(reason);
     } catch (_) {
       /* already closed */
     }
     try {
-      current?.session?.stop?.(reason);
+      await current?.session?.stop?.(reason);
     } catch (_) {
       /* already closed */
     }
@@ -764,6 +770,17 @@
     });
   }
 
+  function armGptLiveIdle(session) {
+    windowObject.clearTimeout(gptLiveIdleTimer);
+    gptLiveIdleTimer = windowObject.setTimeout(
+      () => {
+        if (active?.session !== session) return;
+        void stopCall(ensureBar(), 'idle');
+      },
+      Number(config.gptLiveIdleMs) || 120000,
+    );
+  }
+
   async function startCall(bar) {
     if (startInFlight) {
       liveTalkLog('start.ignored-in-flight', {});
@@ -812,12 +829,18 @@
       let sessionId = '';
       let bridgeInputHeld = false;
       const voice = normalizeLiveVoiceSettings(liveVoiceSettings);
+      const gptLive = config.provider === 'gpt-live';
       const session = SpeakCore.createSpeakRealtimeSession({
-        provider: 'openai-realtime',
+        provider: gptLive ? 'gpt-live' : 'openai-realtime',
+        ...(gptLive
+          ? {
+              session: { model: 'gpt-live-1', audio: { output: { voice: voice.voice } } },
+            }
+          : {}),
         holdInput: voice.muteMicWhileSheTalks,
         conversationBehavior: { interruption: voice.allowInterrupt ? 'enabled' : 'disabled' },
         createAudioElement: createLiveTalkAudioElement,
-        bootstrapCall: async ({ sdp }) => {
+        [gptLive ? 'bootstrapLiveSession' : 'bootstrapCall']: async ({ sdp }) => {
           /* The mic stream now exists; apply the startup mute before sending the offer. */
           session.setMuted?.(true);
           liveTalkLog('bootstrap.offer', {
@@ -829,7 +852,7 @@
           const created = await api(liveTalkPath('/live-talk/session'), {
             method: 'POST',
             body: JSON.stringify({ conversationId, sdp, liveVoice: voice, spec }),
-            retry: 2,
+            retry: gptLive ? 0 : 2,
           });
           sessionId = created.sessionId;
           liveTalkLog('bootstrap.answer', {
@@ -838,59 +861,69 @@
             sdpChars: String(created.sdp || '').length,
             toolCount: Array.isArray(created.tools) ? created.tools.length : 0,
           });
-          return created.sdp;
+          return gptLive ? { sdp: created.sdp, sessionId: created.providerSessionId } : created.sdp;
         },
       });
-      const bridge = SpeakCore.createOpenAIRealtimeFunctionCallBridge({
-        holdInput: voice.muteMicWhileSheTalks,
-        conversationBehavior: { interruption: voice.allowInterrupt ? 'enabled' : 'disabled' },
-        pauseInput: () => {
-          bridgeInputHeld = true;
-          session.setMuted?.(true);
-        },
-        resumeInput: () => {
-          bridgeInputHeld = false;
-          session.setMuted?.(paused);
-        },
-        invokeTool: async (call) => {
-          const startedAt = Date.now();
-          liveTalkLog('tool.invoke', { name: call.name, callId: call.callId || '', sessionId });
-          if (ui.state === 'connecting') {
-            liveTalkLog('tool.ignored-while-starting', { name: call.name });
-            return {
-              ok: false,
-              error: 'Live Talk is still connecting. Retry the tool after the greeting.',
-            };
-          }
-          if (greetingPending) finishGreeting('tool-call');
-          setStatus(bar, 'tool', `Looking up ${call.name}…`);
-          const payload = await api(liveTalkPath(`/live-talk/session/${sessionId}/tool`), {
-            method: 'POST',
-            body: JSON.stringify({
-              name: call.name,
-              arguments: call.arguments,
-              callId: call.callId,
-            }),
+      const bridge = gptLive
+        ? null
+        : SpeakCore.createOpenAIRealtimeFunctionCallBridge({
+            holdInput: voice.muteMicWhileSheTalks,
+            conversationBehavior: { interruption: voice.allowInterrupt ? 'enabled' : 'disabled' },
+            pauseInput: () => {
+              bridgeInputHeld = true;
+              session.setMuted?.(true);
+            },
+            resumeInput: () => {
+              bridgeInputHeld = false;
+              session.setMuted?.(paused);
+            },
+            invokeTool: async (call) => {
+              const startedAt = Date.now();
+              liveTalkLog('tool.invoke', { name: call.name, callId: call.callId || '', sessionId });
+              if (ui.state === 'connecting') {
+                liveTalkLog('tool.ignored-while-starting', { name: call.name });
+                return {
+                  ok: false,
+                  error: 'Live Talk is still connecting. Retry the tool after the greeting.',
+                };
+              }
+              if (greetingPending) finishGreeting('tool-call');
+              setStatus(bar, 'tool', `Looking up ${call.name}…`);
+              const payload = await api(liveTalkPath(`/live-talk/session/${sessionId}/tool`), {
+                method: 'POST',
+                body: JSON.stringify({
+                  name: call.name,
+                  arguments: call.arguments,
+                  callId: call.callId,
+                }),
+              });
+              const result = payload.result;
+              liveTalkLog('tool.returned', {
+                name: call.name,
+                ms: Date.now() - startedAt,
+              });
+              postAppDataChanged(call.name, result);
+              if (call.name === 'open_app_screen') {
+                const overlay = windowObject.LessonCaddieNavigationOverlay;
+                const opened = overlay?.onPayload?.(result);
+                liveTalkLog('tool.navigate', {
+                  opened: Boolean(opened),
+                  destination: result?.destination || result?.structuredContent?.destination || '',
+                });
+              }
+              return result;
+            },
           });
-          const result = payload.result;
-          liveTalkLog('tool.returned', {
-            name: call.name,
-            ms: Date.now() - startedAt,
-          });
-          postAppDataChanged(call.name, result);
-          if (call.name === 'open_app_screen') {
-            const overlay = windowObject.LessonCaddieNavigationOverlay;
-            const opened = overlay?.onPayload?.(result);
-            liveTalkLog('tool.navigate', {
-              opened: Boolean(opened),
-              destination: result?.destination || result?.structuredContent?.destination || '',
-            });
-          }
-          return result;
-        },
-      });
-      bridge.attach(session);
+      bridge?.attach(session);
       session.onEvent((event) => {
+        if (
+          gptLive &&
+          (event.type === SpeakCore.SpeakRealtimeEvent.USER_SPEECH_START ||
+            event.type === SpeakCore.SpeakRealtimeEvent.INPUT_TRANSCRIPT ||
+            event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_START ||
+            event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE)
+        )
+          armGptLiveIdle(session);
         const providerEvent = event.detail?.providerEvent || event.detail?.event?.type || '';
         const transcript = clean(
           event.detail?.event?.transcript || event.detail?.transcript || event.detail?.text,
@@ -906,7 +939,11 @@
             ? liveTalkError
             : liveTalkLog)('realtime.event', summarizeEvent(event));
         }
-        if (paused && event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_AUDIO_START) {
+        if (
+          !gptLive &&
+          paused &&
+          event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_AUDIO_START
+        ) {
           try {
             session.sendEvent({ type: 'output_audio_buffer.clear' });
           } catch (_) {
@@ -947,10 +984,12 @@
           });
         }
         if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_AUDIO_START) {
-          try {
-            session.setMuted?.(true);
-          } catch (_) {
-            /* holdInput still covers echo */
+          if (!(gptLive && voice.allowInterrupt && !voice.muteMicWhileSheTalks)) {
+            try {
+              session.setMuted?.(true);
+            } catch (_) {
+              /* holdInput still covers echo */
+            }
           }
           if (greetingPending) {
             if (
@@ -1019,6 +1058,9 @@
           liveTalkWarn('greeting.provider-error', summarizeEvent(event));
         }
         if (event.type === SpeakCore.SpeakRealtimeEvent.USER_SPEECH_START) {
+          if (gptLive && voice.allowInterrupt && assistantAudioPlaying) {
+            session.cancel?.('barge-in');
+          }
           if (greetingPending) finishGreeting('user-speech');
           awaitingAssistant = false;
           setStatus(bar, 'listening', 'Listening…');
@@ -1026,7 +1068,7 @@
         if (event.type === SpeakCore.SpeakRealtimeEvent.USER_SPEECH_END) {
           if (greetingPending) finishGreeting('user-speech-end');
           liveTalkLog('turn.speech-end', { awaitingAssistant, state: ui.state });
-          if (!awaitingAssistant && ui.state !== 'responding' && ui.state !== 'tool') {
+          if (!gptLive && !awaitingAssistant && ui.state !== 'responding' && ui.state !== 'tool') {
             armSpeechEndKick(session);
           }
         }
@@ -1041,7 +1083,14 @@
             'error',
             event.detail?.message || event.detail?.name || 'Could not connect Live Talk.',
           );
+          if (gptLive && active?.session === session) void stopCall(bar, 'failed');
         }
+        if (
+          gptLive &&
+          event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CLOSED &&
+          active?.session === session
+        )
+          void stopCall(bar, 'closed');
         if (event.type === SpeakCore.SpeakRealtimeEvent.INPUT_TRANSCRIPT && transcript) {
           liveTalkLog('transcript.heard', { chars: transcript.length });
         }
@@ -1049,6 +1098,7 @@
       active = {
         session,
         bridge,
+        gptLive,
         get inputHeld() {
           return bridgeInputHeld;
         },
@@ -1056,18 +1106,15 @@
           return sessionId;
         },
       };
-      greetingPending = true;
+      greetingPending = !gptLive;
       try {
         await session.start();
         if (stopRequested || active?.session !== session) {
           if (active?.session === session) await stopCall(bar, 'stop');
           return;
         }
-        try {
-          session.setMuted?.(true);
-        } catch (_) {
-          /* mute until greeting finishes */
-        }
+        session.setMuted?.(!gptLive);
+        if (gptLive) armGptLiveIdle(session);
         liveTalkLog('session.started', session.snapshot?.() || { sessionId });
         if (pingTimer) windowObject.clearInterval(pingTimer);
         pingTimer = windowObject.setInterval(() => {
@@ -1087,7 +1134,8 @@
         watchPeer(session);
         if (active?.session === session && !paused) {
           await waitForRemotePlayback(session);
-          if (!paused) await speakGreeting(session);
+          if (!paused && !gptLive) await speakGreeting(session);
+          if (!paused && gptLive) setStatus(bar, 'listening', 'Listening…');
         }
       } catch (error) {
         if (stopRequested) {
@@ -1132,10 +1180,19 @@
   async function applyShellAction(action, settings, greeting) {
     const bar = ensureBar();
     if (action === 'pause' || (action === 'toggle' && active && !paused)) {
+      if (active?.gptLive) {
+        await stopCall(bar, 'pause');
+        setStatus(bar, 'paused', 'Paused');
+        return;
+      }
       pauseCall(bar);
       return;
     }
     if (action === 'resume' || (action === 'toggle' && paused)) {
+      if (!active && config.provider === 'gpt-live') {
+        await startCall(bar);
+        return;
+      }
       resumeCall(bar);
       return;
     }
@@ -1192,6 +1249,9 @@
     windowObject.addEventListener('message', onShellMessage);
     windowObject.addEventListener('beforeunload', () => {
       if (active) void stopCall(ensureBar(), 'unload');
+    });
+    windowObject.addEventListener('pagehide', () => {
+      if (active) void stopCall(ensureBar(), 'leave');
     });
   }
 

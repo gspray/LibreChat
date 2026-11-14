@@ -5,7 +5,7 @@
  * Mounts /live-talk at listen time so api/server/index.js stays upstream.
  */
 const http = require('http');
-const { createLiveTalkRouter } = require('./liveTalkRoutes');
+const { createLiveTalkRouter, createLiveTalkMcpProxy } = require('./liveTalkRoutes');
 
 const originalListen = http.Server.prototype.listen;
 
@@ -120,6 +120,24 @@ function createBoundRouter() {
     return unwrapMcpResult(result);
   }
 
+  async function getMcpDelegation({ user, conversationId, config }) {
+    const connection = await getMCPManager().getConnection({
+      user,
+      serverName: config.serverName,
+      flowManager: getFlowStateManager(getLogStores(CacheKeys.FLOWS)),
+      tokenMethods: { findToken, createToken, updateToken, deleteTokens },
+      requestBody: { conversationId },
+    });
+    const firebaseUid = String(user?.openidId || '').trim();
+    if (user?.provider !== 'lessoncaddie' || !firebaseUid) {
+      return null;
+    }
+    const tools = await readConnectionTools(connection);
+    const serverUrl = String(connection.url || '');
+    if (!tools.length || !serverUrl.startsWith('https://')) return null;
+    return { serverUrl, firebaseUid };
+  }
+
   function unwrapMcpResult(result) {
     if (result == null) return null;
     if (typeof result === 'string') {
@@ -144,6 +162,7 @@ function createBoundRouter() {
   }
 
   const router = require('express').Router();
+  router.use('/mcp', createLiveTalkMcpProxy());
   router.use(requireJwtAuth);
   router.use(
     createLiveTalkRouter({
@@ -152,6 +171,7 @@ function createBoundRouter() {
       getAgent,
       saveMessage,
       listMcpTools,
+      getMcpDelegation,
       callMcpTool,
     }),
   );

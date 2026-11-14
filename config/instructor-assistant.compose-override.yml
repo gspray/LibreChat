@@ -19,7 +19,9 @@ services:
       CROSS_ORIGIN_RESOURCE_POLICY: same-site
       CSP_FRAME_ANCESTORS: "'self' https://lessoncaddie.ssmlabs.com http://127.0.0.1:3021"
       MCP_SANDBOX_FRAME_ANCESTORS: "https://chat.ssmlabs.com https://lessoncaddie.ssmlabs.com"
-      LIVE_TALK_SPEAK_CORE_SHA: 36581f2
+      LIVE_TALK_SPEAK_CORE_SHA: f9d52b4
+      LIVE_TALK_GPT_LIVE: "false"
+      LIVE_TALK_MCP_PROXY_URL: https://lessoncaddie.ssmlabs.com/chat/live-talk/mcp
       # inject-index-html keeps api/server/index.js upstream; attach-sso is a no-op until enabled.
       NODE_OPTIONS: --require /app/config/ssmlabs/inject-index-html.js --require /app/config/ssmlabs/attach-lessoncaddie-sso.js --require /app/config/ssmlabs/attach-live-talk.js
     volumes:

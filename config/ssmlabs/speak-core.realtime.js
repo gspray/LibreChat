@@ -1,4 +1,4 @@
-/* Pinned @spray/speak-core 0.2.21 / 36581f2 for Live Talk trial. Do not edit by hand. */
+/* Pinned @spray/speak-core 0.2.22 / f9d52b4 for Live Talk trial. Generated from package public API. */
 'use strict';
 var SpeakCore = (() => {
   var __defProp = Object.defineProperty;
@@ -21,7 +21,7 @@ var SpeakCore = (() => {
   };
   var __toCommonJS = (mod) => __copyProps(__defProp({}, '__esModule', { value: true }), mod);
 
-  // src/index.js
+  // ../speak-core/packages/speak-core/src/index.js
   var index_exports = {};
   __export(index_exports, {
     CANONICAL_SPEAK_MIC_AUDIO_CONSTRAINTS: () => CANONICAL_SPEAK_MIC_AUDIO_CONSTRAINTS,
@@ -49,6 +49,7 @@ var SpeakCore = (() => {
     VoiceTurnRejectionReason: () => VoiceTurnRejectionReason,
     VoiceTurnStatus: () => VoiceTurnStatus,
     acquireSpeakMicStream: () => acquireSpeakMicStream,
+    buildGptLiveSessionConfig: () => buildGptLiveSessionConfig,
     clampVoiceTurnConfidence: () => clampVoiceTurnConfidence,
     classifyListenEnd: () => classifyListenEnd,
     classifyVoiceTurn: () => classifyVoiceTurn,
@@ -59,6 +60,7 @@ var SpeakCore = (() => {
     createFakeSpeakMedia: () => createFakeSpeakMedia,
     createFakeTurnAdapters: () => createFakeTurnAdapters,
     createInitialSpeakState: () => createInitialSpeakState,
+    createOpenAIGptLiveWebRTCSession: () => createOpenAIGptLiveWebRTCSession,
     createOpenAIRealtimeFunctionCallBridge: () => createOpenAIRealtimeFunctionCallBridge,
     createOpenAIRealtimeWebRTCSession: () => createOpenAIRealtimeWebRTCSession,
     createRealtimeEvent: () => createRealtimeEvent,
@@ -110,7 +112,7 @@ var SpeakCore = (() => {
     voiceTurnDedupeKey: () => voiceTurnDedupeKey,
   });
 
-  // src/machine/phases.js
+  // ../speak-core/packages/speak-core/src/machine/phases.js
   var SpeakPhase = Object.freeze({
     IDLE: 'idle',
     READY: 'ready',
@@ -168,7 +170,7 @@ var SpeakCore = (() => {
     return SpeakReadyState.IDLE;
   }
 
-  // src/machine/events.js
+  // ../speak-core/packages/speak-core/src/machine/events.js
   var SpeakEvent = Object.freeze({
     START_SESSION: 'START_SESSION',
     START: 'START',
@@ -197,7 +199,7 @@ var SpeakCore = (() => {
     SET_HEAR: 'SET_HEAR',
   });
 
-  // src/machine/state.js
+  // ../speak-core/packages/speak-core/src/machine/state.js
   function createInitialSpeakState(overrides = {}) {
     return {
       phase: SpeakPhase.IDLE,
@@ -216,7 +218,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/machine/reduce.js
+  // ../speak-core/packages/speak-core/src/machine/reduce.js
   function withPhase(state, phase, patch = {}) {
     const next = { ...state, phase, ...patch };
     if (phase !== SpeakPhase.LISTENING && patch.hearingSpeech == null) {
@@ -441,7 +443,7 @@ var SpeakCore = (() => {
     }
   }
 
-  // src/playback/audioPlayer.js
+  // ../speak-core/packages/speak-core/src/playback/audioPlayer.js
   function primeMobileAudioElement(audio) {
     audio.setAttribute('playsinline', '');
     audio.setAttribute('webkit-playsinline', '');
@@ -825,7 +827,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/speech/speechDetector.js
+  // ../speak-core/packages/speak-core/src/speech/speechDetector.js
   var DEFAULTS = {
     speechRms: 0.028,
     silenceRms: 0.018,
@@ -1173,7 +1175,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/policies/listenEnd.js
+  // ../speak-core/packages/speak-core/src/policies/listenEnd.js
   function classifyListenEnd(stats = {}, policy = {}) {
     const reason = String(stats.endReason || '').trim();
     const held = Number(stats.speechHeldMs) || 0;
@@ -1265,7 +1267,7 @@ var SpeakCore = (() => {
     return { verdict: 'unknown', hint: reason || 'no end reason' };
   }
 
-  // src/policies/timeouts.js
+  // ../speak-core/packages/speak-core/src/policies/timeouts.js
   var SpeakTimeouts = Object.freeze({
     SUBMIT_MS: 9e4,
     SPEAK_UNIT_MS: 25e3,
@@ -1421,7 +1423,7 @@ var SpeakCore = (() => {
     return mergeSpeakPolicy(SpeakRecordPolicy, speakRecordPolicyOverridesFromQuery(overrides));
   }
 
-  // src/policies/bargeIn.js
+  // ../speak-core/packages/speak-core/src/policies/bargeIn.js
   var SPEAK_BARGE_IN_RMS = SpeakRecordPolicy.BARGE_IN_RMS;
   var SPEAK_BARGE_IN_ONSET_MS = SpeakRecordPolicy.BARGE_IN_ONSET_MS;
   var SPEAK_BARGE_IN_GRACE_MS = SpeakRecordPolicy.BARGE_IN_GRACE_MS;
@@ -1520,7 +1522,7 @@ var SpeakCore = (() => {
     return { stop };
   }
 
-  // src/playback/cues.js
+  // ../speak-core/packages/speak-core/src/playback/cues.js
   function prefersReducedMotion() {
     try {
       return Boolean(
@@ -1574,7 +1576,7 @@ var SpeakCore = (() => {
     } catch {}
   }
 
-  // src/media/micConstraints.js
+  // ../speak-core/packages/speak-core/src/media/micConstraints.js
   var CANONICAL_SPEAK_MIC_AUDIO_CONSTRAINTS = Object.freeze({
     echoCancellation: true,
     noiseSuppression: true,
@@ -1656,7 +1658,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/media/createSpeakMedia.js
+  // ../speak-core/packages/speak-core/src/media/createSpeakMedia.js
   var SPEAK_MAX_RECORD_MS = SpeakRecordPolicy.MAX_RECORD_MS;
   var SPEAK_NO_SPEECH_HANGUP_MS = SpeakRecordPolicy.NO_SPEECH_HANGUP_MS;
   var SPEAK_SILENCE_AFTER_SPEECH_MS = SpeakRecordPolicy.SILENCE_AFTER_SPEECH_MS;
@@ -2443,7 +2445,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/policies/transcriptQuality.js
+  // ../speak-core/packages/speak-core/src/policies/transcriptQuality.js
   var SPEAK_LISTEN_AGAIN_LINE = "Sorry, I didn't catch that. Try once more.";
   var SPEAK_GOODBYE_LINE = 'Okay, goodbye. Touch Speak to talk.';
   var SPEAK_GARBLED_GIVE_UP_LINE = SPEAK_GOODBYE_LINE;
@@ -2809,7 +2811,7 @@ var SpeakCore = (() => {
     return live.length >= stt.length ? live : stt;
   }
 
-  // src/policies/recoveryPolicy.js
+  // ../speak-core/packages/speak-core/src/policies/recoveryPolicy.js
   var SpeakRecoveryPolicy = Object.freeze({
     weakTranscriptMaxAttempts: 2,
     retryLine: SPEAK_LISTEN_AGAIN_LINE,
@@ -2874,7 +2876,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/diagnostics/types.js
+  // ../speak-core/packages/speak-core/src/diagnostics/types.js
   var SpeakDiagnosticType = Object.freeze({
     TRANSITION: 'transition',
     ERROR: 'error',
@@ -2901,7 +2903,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/controller/duplexTurn.js
+  // ../speak-core/packages/speak-core/src/controller/duplexTurn.js
   function createDuplexTurn() {
     return {
       preserveRecordingAcrossBarge: false,
@@ -2957,7 +2959,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/controller/liveSpeech.js
+  // ../speak-core/packages/speak-core/src/controller/liveSpeech.js
   function createLiveSpeech(ctx) {
     function trackLiveSpeech(handle) {
       if (!handle || typeof handle.stop !== 'function') return handle;
@@ -3053,7 +3055,7 @@ var SpeakCore = (() => {
     return { trackLiveSpeech, abortAllLiveSpeech, beginLiveSpeech };
   }
 
-  // src/controller/recovery.js
+  // ../speak-core/packages/speak-core/src/controller/recovery.js
   function createRecovery(ctx) {
     async function dispatchListenAgain(message, category) {
       ctx.emitDiag({
@@ -3178,7 +3180,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/policies/speakUnits.js
+  // ../speak-core/packages/speak-core/src/policies/speakUnits.js
   function splitSpeakUnits(text) {
     const clean2 = String(text || '')
       .replace(/\s+/g, ' ')
@@ -3206,7 +3208,7 @@ var SpeakCore = (() => {
     return units.length ? units : [clean2];
   }
 
-  // src/controller/util.js
+  // ../speak-core/packages/speak-core/src/controller/util.js
   function isAbortError(err) {
     return err?.name === 'AbortError' || err?.category === 'ended';
   }
@@ -3226,7 +3228,7 @@ var SpeakCore = (() => {
     ]);
   }
 
-  // src/controller/speaking.js
+  // ../speak-core/packages/speak-core/src/controller/speaking.js
   function createSpeaking(ctx) {
     function abortSpeechWarm() {
       try {
@@ -3589,7 +3591,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/controller/listening.js
+  // ../speak-core/packages/speak-core/src/controller/listening.js
   function createListening(ctx) {
     function emitDuplexCutoff(partial = {}) {
       const duplexTurn = ctx.duplex.turn;
@@ -4277,7 +4279,7 @@ var SpeakCore = (() => {
     return { listenAndSubmit, emitDuplexCutoff };
   }
 
-  // src/controller/createSpeakController.js
+  // ../speak-core/packages/speak-core/src/controller/createSpeakController.js
   function createSpeakController(deps) {
     if (typeof deps?.sendTurn !== 'function') {
       throw new Error('createSpeakController requires sendTurn');
@@ -5009,12 +5011,13 @@ var SpeakCore = (() => {
     return api;
   }
 
-  // src/realtime/providers.js
+  // ../speak-core/packages/speak-core/src/realtime/providers.js
   var SpeakRealtimeProvider = Object.freeze({
     FAKE: 'fake',
     LEGACY: 'legacy',
     OPENAI_REALTIME: 'openai-realtime',
     ELEVENLABS_REALTIME: 'elevenlabs-realtime',
+    GPT_LIVE: 'gpt-live',
   });
   var SpeakRealtimeSessionState = Object.freeze({
     IDLE: 'idle',
@@ -5035,7 +5038,7 @@ var SpeakCore = (() => {
     return normalizeSpeakRealtimeProvider(provider) !== SpeakRealtimeProvider.LEGACY;
   }
 
-  // src/realtime/events.js
+  // ../speak-core/packages/speak-core/src/realtime/events.js
   var SpeakRealtimeEvent = Object.freeze({
     SESSION_CONNECT_START: 'realtime.session.connect_start',
     SESSION_CONNECTED: 'realtime.session.connected',
@@ -5065,7 +5068,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/realtime/conversationBehavior.js
+  // ../speak-core/packages/speak-core/src/realtime/conversationBehavior.js
   var SpeakConversationTurnTaking = Object.freeze({
     FAST: 'fast',
     BALANCED: 'balanced',
@@ -5144,7 +5147,7 @@ var SpeakCore = (() => {
     return true;
   }
 
-  // src/realtime/fakeRealtimeSession.js
+  // ../speak-core/packages/speak-core/src/realtime/fakeRealtimeSession.js
   function defaultAssistantText(text) {
     return `Realtime heard: ${String(text || '').trim() || 'silence'}`;
   }
@@ -5383,7 +5386,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/realtime/openaiRealtimeWebRtc.js
+  // ../speak-core/packages/speak-core/src/realtime/openaiRealtimeWebRtc.js
   function safeJson(raw) {
     try {
       return JSON.parse(raw);
@@ -5408,6 +5411,15 @@ var SpeakCore = (() => {
     }
     if (eventType === 'response.done') return SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE;
     if (eventType === 'response.output_item.added' && detail.item?.type === 'function_call') {
+      return SpeakRealtimeEvent.TOOL_CALL;
+    }
+    if (
+      eventType.includes('mcp_call') &&
+      (eventType.includes('completed') || eventType.includes('done'))
+    ) {
+      return SpeakRealtimeEvent.TOOL_DONE;
+    }
+    if (eventType.includes('mcp_call') || eventType.includes('mcp_list_tools')) {
       return SpeakRealtimeEvent.TOOL_CALL;
     }
     return SpeakRealtimeEvent.PROVIDER_EVENT;
@@ -5519,9 +5531,6 @@ var SpeakCore = (() => {
         });
       }
       channel.send(JSON.stringify(event));
-      if (event?.type === 'output_audio_buffer.clear') {
-        setAssistantOutputActive(false);
-      }
     }
     function teardown(reason = 'stop') {
       closed = true;
@@ -5681,7 +5690,511 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/realtime/elevenlabsRealtime.js
+  // ../speak-core/packages/speak-core/src/realtime/openaiGptLiveWebRtc.js
+  function safeJson2(raw) {
+    try {
+      return JSON.parse(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+  function namedOrCustomVoice(voice) {
+    if (voice && typeof voice === 'object') {
+      if (voice.id) return { id: String(voice.id) };
+      return 'marin';
+    }
+    const value = String(voice || '').trim();
+    if (!value) return 'marin';
+    if (value.startsWith('voice_')) return { id: value };
+    return value;
+  }
+  function buildGptLiveSessionConfig(options = {}) {
+    const src = options.session && typeof options.session === 'object' ? options.session : {};
+    const voice = namedOrCustomVoice(
+      src.audio?.output?.voice || src.audio?.output?.voiceId || options.voice,
+    );
+    const config = {
+      model: String(src.model || options.model || 'gpt-live-1'),
+      instructions: String(
+        src.instructions || 'You are a concise Speak Lab GPT-Live voice test assistant.',
+      ),
+      audio: { output: { voice } },
+    };
+    if (Array.isArray(src.input) && src.input.length) config.input = src.input;
+    if (src.delegation && typeof src.delegation === 'object') config.delegation = src.delegation;
+    if (src.mcp && typeof src.mcp === 'object') config.mcp = { ...src.mcp };
+    return config;
+  }
+  function normalizeGptLiveEvent(type, detail = {}) {
+    const eventType = String(type || '');
+    if (eventType === 'session.started') return SpeakRealtimeEvent.SESSION_CONNECTED;
+    if (eventType === 'session.input_transcript.delta') return SpeakRealtimeEvent.INPUT_TRANSCRIPT;
+    if (eventType === 'session.output_transcript.delta')
+      return SpeakRealtimeEvent.ASSISTANT_AUDIO_START;
+    if (eventType === 'session.closed') return SpeakRealtimeEvent.SESSION_CLOSED;
+    if (eventType === 'error' || eventType === 'session.error')
+      return SpeakRealtimeEvent.SESSION_FAILED;
+    if (eventType === 'response.event') {
+      const nested = String(detail.event?.type || '');
+      const itemType = String(detail.event?.item?.type || '');
+      if (
+        nested.includes('mcp_call') &&
+        (nested.includes('completed') || nested.includes('done'))
+      ) {
+        return SpeakRealtimeEvent.TOOL_DONE;
+      }
+      if (itemType === 'mcp_call' && nested.includes('done')) return SpeakRealtimeEvent.TOOL_DONE;
+      if (
+        nested.includes('mcp_call') ||
+        nested.includes('mcp_list') ||
+        nested.includes('mcp_approval')
+      ) {
+        return SpeakRealtimeEvent.TOOL_CALL;
+      }
+      if (nested.includes('function_call') || nested.includes('tool'))
+        return SpeakRealtimeEvent.TOOL_CALL;
+      if (nested === 'response.created') return SpeakRealtimeEvent.ASSISTANT_RESPONSE_START;
+      if (nested === 'response.completed' || nested === 'response.done') {
+        return SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE;
+      }
+    }
+    return SpeakRealtimeEvent.PROVIDER_EVENT;
+  }
+  async function waitForIceGathering(peer, timeoutMs = 1e4) {
+    if (!peer || peer.iceGatheringState !== 'gathering') return;
+    await new Promise((resolve) => {
+      const finish = () => {
+        clearTimeout(timer);
+        if (typeof peer.removeEventListener === 'function') {
+          peer.removeEventListener('icegatheringstatechange', onState);
+        } else {
+          peer.onicegatheringstatechange = null;
+        }
+        resolve();
+      };
+      const timer = setTimeout(finish, timeoutMs);
+      function onState() {
+        if (peer.iceGatheringState === 'complete') finish();
+      }
+      if (typeof peer.addEventListener === 'function') {
+        peer.addEventListener('icegatheringstatechange', onState);
+      } else {
+        peer.onicegatheringstatechange = onState;
+      }
+      onState();
+    });
+  }
+  function createOpenAIGptLiveWebRTCSession(options = {}) {
+    const bootstrapLiveSession = options.bootstrapLiveSession || options.bootstrapCall;
+    if (typeof bootstrapLiveSession !== 'function') {
+      throw new TypeError(
+        'createOpenAIGptLiveWebRTCSession requires bootstrapLiveSession({ sdp, session })',
+      );
+    }
+    const listeners = /* @__PURE__ */ new Set();
+    const RTCPeerConnectionCtor = options.RTCPeerConnection || globalThis.RTCPeerConnection;
+    const getUserMedia =
+      options.getUserMedia ||
+      globalThis.navigator?.mediaDevices?.getUserMedia?.bind(globalThis.navigator.mediaDevices);
+    const createAudioElement =
+      options.createAudioElement ||
+      (() => {
+        if (!globalThis.document?.createElement) return null;
+        const audio = document.createElement('audio');
+        audio.autoplay = true;
+        audio.playsInline = true;
+        return audio;
+      });
+    const id = String(options.sessionId || `openai-gpt-live-${Date.now()}`);
+    const iceTimeoutMs = Number(options.iceTimeoutMs) > 0 ? Number(options.iceTimeoutMs) : 1e4;
+    const startedTimeoutMs =
+      Number(options.startedTimeoutMs) > 0 ? Number(options.startedTimeoutMs) : 15e3;
+    const closeTimeoutMs =
+      Number(options.closeTimeoutMs) > 0 ? Number(options.closeTimeoutMs) : 2e3;
+    const autoApproveMcp = options.autoApproveMcp === true;
+    let state = SpeakRealtimeSessionState.IDLE;
+    let peer = null;
+    let channel = null;
+    let localStream = null;
+    let remoteAudio = null;
+    let closed = false;
+    let muted = false;
+    let providerSessionId = '';
+    let sawInputTranscript = false;
+    let sawOutputAudio = false;
+    let lastInputAt = null;
+    let startedResolver = null;
+    function emit(type, detail = {}, at) {
+      const event = createRealtimeEvent(type, {
+        provider: SpeakRealtimeProvider.GPT_LIVE,
+        sessionId: id,
+        state,
+        providerSessionId,
+        ...detail,
+      });
+      if (Number.isFinite(at)) event.timestamp = at;
+      for (const fn of [...listeners]) {
+        try {
+          fn(event);
+        } catch (_) {}
+      }
+      return event;
+    }
+    function assertActive() {
+      if (closed || state === SpeakRealtimeSessionState.FINISHED) {
+        throw Object.assign(new Error('Realtime session is closed'), {
+          code: 'SPEAK_REALTIME_CLOSED',
+        });
+      }
+    }
+    function sendEvent(event) {
+      assertActive();
+      if (!channel || channel.readyState !== 'open') {
+        throw Object.assign(new Error('GPT-Live data channel is not open'), {
+          code: 'SPEAK_REALTIME_CHANNEL_CLOSED',
+        });
+      }
+      channel.send(JSON.stringify(event));
+    }
+    function handleProviderMessage(raw) {
+      const data = safeJson2(raw) || { raw: String(raw || '') };
+      const type = String(data.type || '');
+      if (type === 'session.started') {
+        providerSessionId = String(data.session?.id || providerSessionId || '');
+        startedResolver?.();
+        return;
+      }
+      if (type === 'error' || type === 'session.error') {
+        emit(SpeakRealtimeEvent.SESSION_FAILED, {
+          event: data,
+          providerEvent: type,
+          code: data.error?.code || data.code || '',
+          message: data.error?.message || data.message || 'GPT-Live session error',
+        });
+        return;
+      }
+      if (type === 'session.input_transcript.delta') {
+        lastInputAt = Date.now();
+        if (!sawInputTranscript) {
+          sawInputTranscript = true;
+          emit(SpeakRealtimeEvent.USER_SPEECH_START, { event: data, providerEvent: type });
+        }
+        emit(SpeakRealtimeEvent.INPUT_TRANSCRIPT, {
+          event: data,
+          providerEvent: type,
+          text: String(data.delta || ''),
+        });
+        return;
+      }
+      if (type === 'session.output_transcript.delta') {
+        if (sawInputTranscript && !sawOutputAudio && lastInputAt != null) {
+          emit(
+            SpeakRealtimeEvent.USER_SPEECH_END,
+            {
+              event: data,
+              providerEvent: type,
+              source: 'last_input_transcript',
+            },
+            lastInputAt,
+          );
+        }
+        if (!sawOutputAudio) {
+          sawOutputAudio = true;
+          emit(SpeakRealtimeEvent.ASSISTANT_RESPONSE_START, { event: data, providerEvent: type });
+          emit(SpeakRealtimeEvent.ASSISTANT_AUDIO_START, {
+            event: data,
+            providerEvent: type,
+            text: String(data.delta || ''),
+          });
+        }
+        return;
+      }
+      if (
+        type === 'response.event' ||
+        String(type).includes('mcp_list') ||
+        String(type).includes('mcp_call')
+      ) {
+        const inner =
+          type === 'response.event' && data.event && typeof data.event === 'object'
+            ? data.event
+            : data;
+        const innerType = String(inner.type || type || '');
+        const item = inner.item && typeof inner.item === 'object' ? inner.item : {};
+        if (innerType.includes('mcp_list_tools') && innerType.includes('failed')) {
+          emit(SpeakRealtimeEvent.TOOL_ERROR, {
+            event: data,
+            providerEvent: innerType,
+            source: 'mcp_list',
+            message:
+              inner.error?.message || inner.message || data.message || 'MCP tool list failed',
+          });
+          return;
+        }
+        if (
+          innerType.includes('mcp_list_tools') &&
+          (innerType.includes('completed') || innerType.includes('done'))
+        ) {
+          const listed = inner.tools || item.tools || inner.mcp_tools || [];
+          const names = Array.isArray(listed)
+            ? listed.map((tool) => tool?.name || tool?.tool_name || '').filter(Boolean)
+            : [];
+          emit(SpeakRealtimeEvent.TOOL_DONE, {
+            event: data,
+            providerEvent: innerType,
+            source: 'mcp_list',
+            tools: names,
+            message: names.length
+              ? `MCP tools: ${names.join(', ')}`
+              : 'MCP connected but listed no tools',
+          });
+          return;
+        }
+        if (
+          autoApproveMcp &&
+          String(inner.type || '') === 'response.output_item.done' &&
+          item.type === 'mcp_approval_request' &&
+          item.id
+        ) {
+          emit(SpeakRealtimeEvent.TOOL_CALL, {
+            event: data,
+            providerEvent: inner.type,
+            approvalRequestId: item.id,
+          });
+          try {
+            sendEvent({
+              type: 'response.item.create',
+              item: {
+                type: 'mcp_approval_response',
+                approval_request_id: item.id,
+                approve: true,
+              },
+            });
+            sendEvent({ type: 'response.create' });
+          } catch (_) {}
+          return;
+        }
+      }
+      if (type === 'session.closed') {
+        emit(SpeakRealtimeEvent.SESSION_CLOSED, {
+          event: data,
+          providerEvent: type,
+          usage: data.usage || null,
+          reason: 'session.closed',
+        });
+        teardown('session.closed', { skipClosedEvent: true });
+        return;
+      }
+      emit(normalizeGptLiveEvent(type, data), { providerEvent: type, event: data });
+    }
+    function teardown(reason = 'stop', { skipClosedEvent = false } = {}) {
+      if (closed && state === SpeakRealtimeSessionState.FINISHED) return;
+      closed = true;
+      startedResolver?.();
+      try {
+        channel?.close?.();
+      } catch (_) {}
+      try {
+        peer?.close?.();
+      } catch (_) {}
+      for (const track of localStream?.getTracks?.() || []) {
+        try {
+          track.stop();
+        } catch (_) {}
+      }
+      if (remoteAudio) {
+        try {
+          remoteAudio.pause?.();
+        } catch (_) {}
+        try {
+          remoteAudio.srcObject = null;
+        } catch (_) {}
+      }
+      channel = null;
+      peer = null;
+      localStream = null;
+      remoteAudio = null;
+      state = SpeakRealtimeSessionState.FINISHED;
+      if (!skipClosedEvent) emit(SpeakRealtimeEvent.SESSION_CLOSED, { reason });
+      listeners.clear();
+    }
+    return {
+      id,
+      provider: SpeakRealtimeProvider.GPT_LIVE,
+      get state() {
+        return state;
+      },
+      onEvent(fn) {
+        if (typeof fn !== 'function') return () => {};
+        listeners.add(fn);
+        return () => listeners.delete(fn);
+      },
+      async start(startOptions = {}) {
+        if (state === SpeakRealtimeSessionState.ACTIVE) return;
+        if (typeof RTCPeerConnectionCtor !== 'function') {
+          throw new TypeError('RTCPeerConnection is unavailable');
+        }
+        if (typeof getUserMedia !== 'function') {
+          throw new TypeError('navigator.mediaDevices.getUserMedia is unavailable');
+        }
+        const sessionConfig = buildGptLiveSessionConfig({
+          ...options,
+          session: {
+            ...(options.session || {}),
+            ...(startOptions.firstMessage
+              ? {
+                  input: [
+                    {
+                      type: 'message',
+                      role: 'developer',
+                      content: [
+                        {
+                          type: 'input_text',
+                          text: `Greet the user by speaking this question first: ${startOptions.firstMessage}`,
+                        },
+                      ],
+                    },
+                  ],
+                }
+              : {}),
+          },
+        });
+        state = SpeakRealtimeSessionState.CONNECTING;
+        emit(SpeakRealtimeEvent.SESSION_CONNECT_START, { model: sessionConfig.model });
+        try {
+          localStream = await acquireSpeakMicStream(getUserMedia);
+          if (closed) {
+            for (const track of localStream?.getTracks?.() || []) track.stop();
+            return;
+          }
+          peer = new RTCPeerConnectionCtor(options.rtcConfig || {});
+          peer.onconnectionstatechange = () => {
+            emit(SpeakRealtimeEvent.CONNECTION_STATE, {
+              connectionState: peer?.connectionState || '',
+              iceConnectionState: peer?.iceConnectionState || '',
+            });
+          };
+          peer.ontrack = (event) => {
+            const [stream] = event.streams || [];
+            const track = event.track;
+            const remote = stream || (track ? new MediaStream([track]) : null);
+            if (!remote) return;
+            remoteAudio = remoteAudio || createAudioElement();
+            if (remoteAudio) {
+              remoteAudio.srcObject = remote;
+              try {
+                remoteAudio.play?.();
+              } catch (_) {}
+            }
+          };
+          for (const track of localStream.getTracks()) peer.addTrack(track, localStream);
+          channel = peer.createDataChannel(options.dataChannelName || 'oai-events');
+          const started = new Promise((resolve) => {
+            startedResolver = resolve;
+          });
+          channel.onmessage = (message) => handleProviderMessage(message.data);
+          channel.onopen = () =>
+            emit(SpeakRealtimeEvent.CONNECTION_STATE, { dataChannelState: 'open' });
+          channel.onclose = () =>
+            emit(SpeakRealtimeEvent.CONNECTION_STATE, { dataChannelState: 'closed' });
+          const offer = await peer.createOffer();
+          await peer.setLocalDescription(offer);
+          await waitForIceGathering(peer, iceTimeoutMs);
+          if (closed) return;
+          const offerSdp = peer.localDescription?.sdp || offer.sdp;
+          const result = await bootstrapLiveSession({
+            sdp: offerSdp,
+            session: sessionConfig,
+          });
+          if (closed) return;
+          const answerSdp = typeof result === 'string' ? result : String(result?.sdp || '');
+          providerSessionId =
+            typeof result === 'object'
+              ? String(result?.sessionId || result?.session?.id || '')
+              : '';
+          await peer.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+          let startedTimer;
+          try {
+            await Promise.race([
+              started,
+              new Promise((_, reject) => {
+                startedTimer = setTimeout(
+                  () => reject(new Error('Timed out waiting for session.started')),
+                  startedTimeoutMs,
+                );
+              }),
+            ]);
+          } finally {
+            clearTimeout(startedTimer);
+          }
+          if (closed) return;
+          state = SpeakRealtimeSessionState.ACTIVE;
+          emit(SpeakRealtimeEvent.SESSION_CONNECTED, {
+            model: sessionConfig.model,
+            connectionState: peer.connectionState || '',
+            providerSessionId,
+          });
+        } catch (err) {
+          state = SpeakRealtimeSessionState.FAILED;
+          emit(SpeakRealtimeEvent.SESSION_FAILED, {
+            message: err?.message || String(err),
+            name: err?.name || '',
+          });
+          teardown('failed');
+          throw err;
+        }
+      },
+      sendEvent,
+      sendUserText(text) {
+        sendEvent({
+          type: 'session.commentary.append',
+          text: String(text || ''),
+        });
+      },
+      cancel(reason = 'cancel') {
+        emit(SpeakRealtimeEvent.CANCEL_REQUESTED, { reason });
+        try {
+          sendEvent({ type: 'session.interrupt' });
+        } catch (_) {}
+      },
+      interrupt(text = '') {
+        this.cancel('interrupt');
+        if (text) this.sendUserText(text);
+      },
+      setMuted(nextMuted = true) {
+        muted = Boolean(nextMuted);
+        for (const track of localStream?.getAudioTracks?.() || []) {
+          track.enabled = !muted;
+        }
+        emit(SpeakRealtimeEvent.CONNECTION_STATE, { muted });
+        return muted;
+      },
+      async stop(reason = 'stop') {
+        if (closed) return;
+        if (channel?.readyState === 'open' && state === SpeakRealtimeSessionState.ACTIVE) {
+          try {
+            sendEvent({ type: 'session.close' });
+          } catch (_) {}
+          await new Promise((resolve) => setTimeout(resolve, Math.min(closeTimeoutMs, 200)));
+        }
+        teardown(reason);
+      },
+      snapshot() {
+        return {
+          id,
+          provider: SpeakRealtimeProvider.GPT_LIVE,
+          state,
+          connectionState: peer?.connectionState || '',
+          iceConnectionState: peer?.iceConnectionState || '',
+          dataChannelState: channel?.readyState || '',
+          hasLocalStream: Boolean(localStream),
+          muted,
+          providerSessionId,
+        };
+      },
+    };
+  }
+
+  // ../speak-core/packages/speak-core/src/realtime/elevenlabsRealtime.js
   function normalizeBootstrap(value) {
     if (value == null) return { token: '', providerSessionId: '' };
     if (typeof value === 'string') return { token: value, providerSessionId: '' };
@@ -6110,7 +6623,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/realtime/createRealtimeSession.js
+  // ../speak-core/packages/speak-core/src/realtime/createRealtimeSession.js
   function createSpeakRealtimeSession(options = {}) {
     const provider = normalizeSpeakRealtimeProvider(options.provider);
     if (provider === SpeakRealtimeProvider.FAKE) {
@@ -6118,6 +6631,9 @@ var SpeakCore = (() => {
     }
     if (provider === SpeakRealtimeProvider.OPENAI_REALTIME) {
       return createOpenAIRealtimeWebRTCSession(options);
+    }
+    if (provider === SpeakRealtimeProvider.GPT_LIVE) {
+      return createOpenAIGptLiveWebRTCSession(options);
     }
     if (provider === SpeakRealtimeProvider.ELEVENLABS_REALTIME) {
       return createElevenLabsRealtimeSession(options);
@@ -6130,7 +6646,7 @@ var SpeakCore = (() => {
     );
   }
 
-  // src/realtime/openaiFunctionCallBridge.js
+  // ../speak-core/packages/speak-core/src/realtime/openaiFunctionCallBridge.js
   function clean(value) {
     return String(value || '').trim();
   }
@@ -6456,7 +6972,7 @@ var SpeakCore = (() => {
     });
   }
 
-  // src/media/createFakeSpeakMedia.js
+  // ../speak-core/packages/speak-core/src/media/createFakeSpeakMedia.js
   function deferred() {
     let resolve;
     let reject;
@@ -6757,7 +7273,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/speech/browserSpeech.js
+  // ../speak-core/packages/speak-core/src/speech/browserSpeech.js
   function speechRecognitionCtor() {
     const win = globalThis.window;
     if (!win) return null;
@@ -6822,7 +7338,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/voice/voiceTurn.js
+  // ../speak-core/packages/speak-core/src/voice/voiceTurn.js
   var VoiceTurnStatus = Object.freeze({
     USABLE: 'usable',
     REJECTED: 'rejected',
@@ -6942,7 +7458,7 @@ var SpeakCore = (() => {
     );
   }
 
-  // src/policies/voiceTurnQuality.js
+  // ../speak-core/packages/speak-core/src/policies/voiceTurnQuality.js
   var FILLER_RE = /\b(?:um+|uh+|erm+|ah+|like|you know|i mean|sort of|kind of)\b/gi;
   var SHORT_CONFIRMATION_TOKENS = /* @__PURE__ */ new Set([
     'no',
@@ -7152,7 +7668,7 @@ var SpeakCore = (() => {
     return turn;
   }
 
-  // src/adapters/createFakeTurnAdapters.js
+  // ../speak-core/packages/speak-core/src/adapters/createFakeTurnAdapters.js
   var NUMBER_WORDS = [
     'One',
     'Two',
@@ -7362,7 +7878,7 @@ var SpeakCore = (() => {
     };
   }
 
-  // src/index.js
-  var SPEAK_CORE_VERSION = '0.2.21';
+  // ../speak-core/packages/speak-core/src/index.js
+  var SPEAK_CORE_VERSION = '0.2.22';
   return __toCommonJS(index_exports);
 })();
