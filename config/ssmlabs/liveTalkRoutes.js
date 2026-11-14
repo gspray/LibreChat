@@ -260,7 +260,7 @@ async function bootstrapGptLive({ sdp, session }) {
     },
     body: JSON.stringify({
       session,
-      transport: { type: 'webrtc', sdp: normalizeSdp(sdp) },
+      transport: { type: 'webrtc', sdp },
     }),
   });
   const body = await response.json().catch(() => ({}));
@@ -272,12 +272,12 @@ async function bootstrapGptLive({ sdp, session }) {
       'Could not start the voice session. Try again in a moment.',
     );
   }
-  const answerSdp = clean(body.transport?.sdp);
-  if (!answerSdp) {
+  const answerSdp = body.transport?.sdp;
+  if (typeof answerSdp !== 'string' || !/^v=0\r?\n/.test(answerSdp)) {
     throw publicError(
       502,
       'openai_session_failed',
-      'The voice session returned no audio connection.',
+      'The voice session returned an invalid audio connection.',
     );
   }
   return { sdp: answerSdp, sessionId: clean(body.session?.id || body.id) };
@@ -335,7 +335,7 @@ function createLiveTalkRouter(deps = {}) {
     try {
       const baseConfig = loadConfig();
       const userId = userIdOf(req);
-      const sdp = normalizeSdp(req.body?.sdp);
+      const sdp = typeof req.body?.sdp === 'string' ? req.body.sdp : '';
       liveTalkLog('info', 'session.create.request', {
         userId: userId ? 'set' : '',
         conversationId: clean(req.body?.conversationId),
@@ -348,7 +348,7 @@ function createLiveTalkRouter(deps = {}) {
         throw publicError(401, 'unauthorized', 'Sign in to use Live Talk.');
       }
       const requestedId = clean(req.body?.conversationId);
-      if (!sdp) {
+      if (!sdp.trim()) {
         throw publicError(400, 'invalid_session', 'Live Talk is missing a voice offer.');
       }
       if (countUserSessions(userId) > 0) {

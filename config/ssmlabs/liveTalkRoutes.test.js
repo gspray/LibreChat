@@ -8,6 +8,7 @@ const {
   createLiveTalkRouter,
   createLiveTalkMcpProxy,
   resetLiveTalkSessions,
+  bootstrapGptLive,
 } = require('./liveTalkRoutes');
 
 function liveTalkConfig() {
@@ -69,9 +70,36 @@ function createApp(overrides = {}) {
   return app;
 }
 
+test('GPT-Live forwards the exact offer and returns the raw OpenAI SDP answer', async () => {
+  const originalKey = process.env.OPENAI_API_KEY;
+  const originalFetch = global.fetch;
+  const offer = 'v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=-\r\n';
+  const answer = 'v=0\r\no=- 2 2 IN IP4 127.0.0.1\r\ns=-\r\n';
+  process.env.OPENAI_API_KEY = 'test-key';
+  let posted;
+  global.fetch = async (url, options) => {
+    assert.equal(url, 'https://api.openai.com/v1/live/sessions');
+    posted = JSON.parse(options.body);
+    return new Response(JSON.stringify({ transport: { sdp: answer }, session: { id: 'live-1' } }));
+  };
+  try {
+    const result = await bootstrapGptLive({ sdp: offer, session: { model: 'gpt-live-1' } });
+    assert.equal(posted.transport.sdp, offer);
+    assert.equal(result.sdp, answer);
+    assert.equal(result.sessionId, 'live-1');
+    global.fetch = async () => new Response(JSON.stringify({ transport: { sdp: { answer } } }));
+    await assert.rejects(bootstrapGptLive({ sdp: offer, session: {} }), /invalid audio connection/);
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = originalKey;
+  }
+});
+
 test('GPT-Live delegates through a session-scoped MCP proxy and revokes it on stop', async () => {
   const originalSecret = process.env.LESSONCADDIE_SSO_SHARED_SECRET;
   const originalFetch = global.fetch;
+  const liveAnswer = 'v=0\r\no=- 2 2 IN IP4 127.0.0.1\r\ns=-\r\n';
   process.env.LESSONCADDIE_SSO_SHARED_SECRET = 's'.repeat(32);
   let liveSession;
   let forwarded;
@@ -96,7 +124,7 @@ test('GPT-Live delegates through a session-scoped MCP proxy and revokes it on st
     }),
     bootstrapGptLive: async ({ session }) => {
       liveSession = session;
-      return { sdp: 'live-answer-sdp', sessionId: 'provider-1' };
+      return { sdp: liveAnswer, sessionId: 'provider-1' };
     },
   });
   app.use('/live-talk/mcp', createLiveTalkMcpProxy());
@@ -114,7 +142,7 @@ test('GPT-Live delegates through a session-scoped MCP proxy and revokes it on st
     });
     assert.equal(created.status, 201);
     const { sessionId, sdp } = await created.json();
-    assert.equal(sdp, 'live-answer-sdp');
+    assert.equal(sdp, liveAnswer);
     assert.equal(liveSession.model, 'gpt-live-1');
     assert.equal(liveSession.delegation.type, 'responses');
     assert.equal(liveSession.delegation.responses.model, 'gpt-6-luna');
