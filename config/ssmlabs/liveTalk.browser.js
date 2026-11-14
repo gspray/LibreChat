@@ -1411,6 +1411,15 @@
             event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE ||
             event.type === SpeakCore.SpeakRealtimeEvent.TOOL_CALL;
           noteGptLiveActivity(useful ? 'useful' : 'speech');
+          if (event.type === SpeakCore.SpeakRealtimeEvent.TOOL_CALL) {
+            const toolName = clean(
+              event.detail?.name ||
+                event.detail?.event?.item?.name ||
+                event.detail?.event?.name ||
+                event.detail?.toolName,
+            );
+            setStatus(bar, 'tool', toolName ? `Looking up ${toolName}…` : 'Looking up…');
+          }
           if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_START) {
             flushLiveTranscript('user');
             markUserHangupIfDone();
