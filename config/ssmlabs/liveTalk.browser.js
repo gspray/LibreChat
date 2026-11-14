@@ -366,8 +366,14 @@
             applyHostToolResult(action?.name, action?.result);
           }
         })
-        .catch(() => {
-          /* poll is best-effort; ping handles expired sessions */
+        .catch((error) => {
+          if (
+            active?.session === session &&
+            (error?.status === 401 || error?.status === 403 || error?.status === 404)
+          ) {
+            stopGptLiveClientActionPoll();
+            void stopCall(ensureBar(), 'expired');
+          }
         });
     }, 400);
   }
