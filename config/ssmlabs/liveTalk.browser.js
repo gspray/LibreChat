@@ -938,10 +938,16 @@
           event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CLOSED ||
           event.type === SpeakCore.SpeakRealtimeEvent.CONNECTION_STATE ||
           event.type === SpeakCore.SpeakRealtimeEvent.TOOL_ERROR;
+        const recoverableLiveError =
+          gptLive &&
+          event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED &&
+          event.detail?.code === 'responses_validation_failed';
         if (interesting || event.detail?.message) {
-          (event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED
-            ? liveTalkError
-            : liveTalkLog)('realtime.event', summarizeEvent(event));
+          let logEvent = liveTalkLog;
+          if (recoverableLiveError) logEvent = liveTalkWarn;
+          else if (event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED)
+            logEvent = liveTalkError;
+          logEvent('realtime.event', summarizeEvent(event));
         }
         if (
           !gptLive &&
@@ -988,7 +994,7 @@
           });
         }
         if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_AUDIO_START) {
-          if (!(gptLive && voice.allowInterrupt && !voice.muteMicWhileSheTalks)) {
+          if (!gptLive) {
             try {
               session.setMuted?.(true);
             } catch (_) {
@@ -1078,6 +1084,11 @@
             { message: event.detail?.message, name: event.detail?.name, code: event.detail?.code },
             summarizeEvent(event),
           );
+          if (recoverableLiveError) {
+            liveTalkWarn('session.failed', failed);
+            setStatus(bar, 'listening', 'Lesson tools unavailable; voice is still connected.');
+            return;
+          }
           liveTalkError('session.failed', failed);
           setStatus(
             bar,

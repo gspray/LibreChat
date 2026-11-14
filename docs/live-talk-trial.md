@@ -14,7 +14,7 @@ Live Talk is on whenever this overlay is loaded. There is no env flag to disable
 4. Test in **LessonCaddie Ask** (`https://lessoncaddie.ssmlabs.com/app` → Ask). Chat is mounted at `/chat`, so Live Talk config is `/chat/live-talk/config`.
 5. Open **Ask**. Live Talk should appear on a new chat and on an existing thread. Hard-refresh the app so the Assistant iframe reloads.
 
-For GPT-Live, set `LIVE_TALK_MCP_PROXY_URL` to the public HTTPS `/chat/live-talk/mcp` URL. The Chat server issues a random bearer credential per voice session. The proxy forwards MCP traffic with the existing LessonCaddie SSO headers; it never sends the SSO secret or OpenAI key to the browser or OpenAI MCP. Stopping Live Talk revokes the proxy credential. GPT-Live also stops after two minutes without speech or a reply (`LIVE_TALK_GPT_LIVE_IDLE_MS`).
+For GPT-Live, set `LIVE_TALK_MCP_PROXY_URL` to the public HTTPS `/chat/live-talk/mcp` URL. The Chat server issues a random bearer credential per voice session. The proxy forwards MCP traffic with the existing LessonCaddie SSO headers; it never sends the SSO secret or OpenAI key to the browser or OpenAI MCP. Proxy hops log method/status without secrets. Stopping Live Talk revokes the proxy credential. GPT-Live also stops after two minutes without speech or a reply (`LIVE_TALK_GPT_LIVE_IDLE_MS`). GPT-Live keeps the mic open while she talks (full duplex); Realtime still mutes on assistant audio unless the user allows interrupt.
 
 Leaving this branch (or dropping the overlay attach) is the off switch. Existing typed Chat is unchanged.
 
@@ -22,6 +22,7 @@ Leaving this branch (or dropping the overlay attach) is the off switch. Existing
 
 - Native mic in / spoken reply out; interrupt during playback.
 - Ask a directory or lesson question; the spoken answer uses a read tool.
+- If GPT-Live reports `responses_validation_failed`, talk stays up and the bar says lesson tools are unavailable; do not treat that as a dead session.
 - Ask to schedule or message; Live Talk can call the same write tools as typed Ask after spoken confirmation. LessonCaddie still authorizes the mutation.
 - Stop, then type in the same thread. Voice transcripts remain.
 - Leave the thread or reload: microphone and provider session stop.

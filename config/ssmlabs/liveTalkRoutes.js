@@ -95,6 +95,14 @@ function createLiveTalkMcpProxy() {
       expected &&
       Buffer.byteLength(bearer) === Buffer.byteLength(expected) &&
       crypto.timingSafeEqual(Buffer.from(bearer), Buffer.from(expected));
+    if (record || req.headers.authorization) {
+      liveTalkLog('info', 'mcp.proxy.request', {
+        method: req.method,
+        sessionKnown: Boolean(record),
+        authorized: Boolean(authorized),
+        bearerHeader: /^Bearer\s+\S+$/i.test(clean(req.headers.authorization)),
+      });
+    }
     if (!authorized || record.closed || !record.mcpProxy) {
       res.status(401).json({ error: 'Authentication required' });
       return;
@@ -141,6 +149,11 @@ function createLiveTalkMcpProxy() {
         },
         body,
       });
+      liveTalkLog('info', 'mcp.proxy.upstream', {
+        method: req.method,
+        status: upstream.status,
+        contentType: String(upstream.headers.get('content-type') || '').split(';')[0],
+      });
       res.status(upstream.status);
       for (const name of ['content-type', 'mcp-session-id', 'cache-control']) {
         const value = upstream.headers.get(name);
@@ -149,7 +162,8 @@ function createLiveTalkMcpProxy() {
       res.set('Cache-Control', 'no-store');
       if (upstream.body) await pipeline(Readable.fromWeb(upstream.body), res);
       else res.end();
-    } catch (_error) {
+    } catch (error) {
+      liveTalkLog('warn', 'mcp.proxy.failed', { method: req.method, name: error?.name || '' });
       if (!res.headersSent) res.status(502).json({ error: 'MCP connection unavailable' });
       else res.end();
     } finally {
