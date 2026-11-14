@@ -45,6 +45,7 @@
     ignoreBackgroundNoise: true,
     muteMicWhileSheTalks: true,
     voice: 'marin',
+    provider: 'openai-realtime',
   };
 
   function normalizeLiveVoiceSettings(raw) {
@@ -69,6 +70,7 @@
       ignoreBackgroundNoise: src.ignoreBackgroundNoise !== false,
       muteMicWhileSheTalks: src.muteMicWhileSheTalks !== false,
       voice: selectedVoice,
+      provider: src.provider === 'gpt-live' ? 'gpt-live' : 'openai-realtime',
     };
   }
 
@@ -829,7 +831,7 @@
       let sessionId = '';
       let bridgeInputHeld = false;
       const voice = normalizeLiveVoiceSettings(liveVoiceSettings);
-      const gptLive = config.provider === 'gpt-live';
+      const gptLive = voice.provider === 'gpt-live' && config.spec === 'instructor-assistant';
       const session = SpeakCore.createSpeakRealtimeSession({
         provider: gptLive ? 'gpt-live' : 'openai-realtime',
         ...(gptLive
@@ -1179,6 +1181,9 @@
 
   async function applyShellAction(action, settings, greeting) {
     const bar = ensureBar();
+    if (settings) {
+      liveVoiceSettings = normalizeLiveVoiceSettings(settings);
+    }
     if (action === 'pause' || (action === 'toggle' && active && !paused)) {
       if (active?.gptLive) {
         await stopCall(bar, 'pause');
@@ -1189,15 +1194,12 @@
       return;
     }
     if (action === 'resume' || (action === 'toggle' && paused)) {
-      if (!active && config.provider === 'gpt-live') {
+      if (!active && liveVoiceSettings.provider === 'gpt-live') {
         await startCall(bar);
         return;
       }
       resumeCall(bar);
       return;
-    }
-    if (settings) {
-      liveVoiceSettings = normalizeLiveVoiceSettings(settings);
     }
     const line = clean(greeting);
     if (line) greetingLine = line;

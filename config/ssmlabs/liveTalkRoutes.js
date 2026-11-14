@@ -392,7 +392,11 @@ function createLiveTalkRouter(deps = {}) {
         }
       }
       const agent = await getAgent({ id: config.agentId }).catch(() => null);
-      const gptLive = config.gptLiveEnabled && pack.id === 'instructor';
+      const requestedProvider = req.body?.liveVoice?.provider;
+      const gptLive =
+        pack.id === 'instructor' &&
+        (requestedProvider === 'gpt-live' ||
+          (requestedProvider !== 'openai-realtime' && config.gptLiveEnabled));
       const mcpTools = gptLive
         ? []
         : await listMcpTools({ user: req.user, conversationId, config });

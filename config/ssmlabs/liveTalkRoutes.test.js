@@ -87,7 +87,7 @@ test('GPT-Live delegates through a session-scoped MCP proxy and revokes it on st
   const app = createApp({
     resolveLiveTalkConfig: () => ({
       ...liveTalkConfig(),
-      gptLiveEnabled: true,
+      gptLiveEnabled: false,
       gptLiveMcpProxyUrl: 'https://chat.example.test/chat/live-talk/mcp',
     }),
     getMcpDelegation: async () => ({
@@ -106,7 +106,11 @@ test('GPT-Live delegates through a session-scoped MCP proxy and revokes it on st
     const created = await originalFetch(`${base}/session`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ conversationId: 'convo-1', sdp: 'offer' }),
+      body: JSON.stringify({
+        conversationId: 'convo-1',
+        sdp: 'offer',
+        liveVoice: { provider: 'gpt-live' },
+      }),
     });
     assert.equal(created.status, 201);
     const { sessionId, sdp } = await created.json();
@@ -156,13 +160,19 @@ test('GPT-Live delegates through a session-scoped MCP proxy and revokes it on st
 });
 
 test('Live Talk bootstraps a session with the live MCP catalog including writes', async () => {
-  const app = createApp();
+  const app = createApp({
+    resolveLiveTalkConfig: () => ({ ...liveTalkConfig(), gptLiveEnabled: true }),
+  });
   const server = await listen(app);
   try {
     const created = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ conversationId: 'convo-1', sdp: 'offer' }),
+      body: JSON.stringify({
+        conversationId: 'convo-1',
+        sdp: 'offer',
+        liveVoice: { provider: 'openai-realtime' },
+      }),
     });
     assert.equal(created.status, 201);
     const session = await created.json();

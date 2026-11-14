@@ -2,7 +2,7 @@
 
 Overlay on this Chat branch. Related umbrella: LessonCaddie [#443](https://github.com/gspray/lessoncaddie/pull/443).
 
-OpenAI Realtime remains the default. Set `LIVE_TALK_GPT_LIVE=true` in the Chat API environment to opt Instructor Live Talk into GPT-Live. The pinned Speak Core IIFE is built from `@spray/speak-core` public entry at `f9d52b4` (0.2.22). Student Live Talk remains on Realtime. LessonCaddie still authorizes MCP calls, including writes.
+OpenAI Realtime remains the default. In LessonCaddie **Live Voice Settings**, choose **GPT-Live** to use it on the next Instructor Live Talk start; choose **Realtime** to switch back. The choice is saved to the user's profile and requires no Chat restart. `LIVE_TALK_GPT_LIVE=true` remains a fallback for older clients that do not send a provider choice. The pinned Speak Core IIFE is built from `@spray/speak-core` public entry at `f9d52b4` (0.2.22). Student Live Talk remains on Realtime. LessonCaddie still authorizes MCP calls, including writes.
 
 Live Talk is on whenever this overlay is loaded. There is no env flag to disable it.
 
