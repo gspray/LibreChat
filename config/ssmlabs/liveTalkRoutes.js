@@ -173,8 +173,58 @@ function destroySession(sessionId, reason = 'stop') {
   rememberUserSession(record.userId, -1);
   record.closed = true;
   record.closedReason = reason;
+  if (record.gptLive && record.mcpProxy) {
+    void saveSessionUsage(record, reason);
+  }
   liveTalkLog('info', 'session.destroyed', { sessionId, reason });
   return record;
+}
+
+function disconnectReason(reason) {
+  if (['idle', 'silence', 'noise'].includes(reason)) return 'silence';
+  if (reason === 'duration') return 'hard_stop';
+  if (
+    [
+      'stop',
+      'done',
+      'farewell',
+      'leave',
+      'unload',
+      'restart',
+      'replaced',
+      'pause',
+      'disabled',
+    ].includes(reason)
+  )
+    return 'user';
+  return 'error';
+}
+
+async function saveSessionUsage(record, reason) {
+  try {
+    const secret = clean(process.env.LESSONCADDIE_SSO_SHARED_SECRET);
+    const url = new URL('/api/user/live-talk-sessions', record.mcpProxy.serverUrl);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-LessonCaddie-Sso-Secret': secret,
+        'X-LibreChat-Firebase-Uid': record.mcpProxy.firebaseUid,
+        'X-LibreChat-User-Provider': 'lessoncaddie',
+      },
+      body: JSON.stringify({
+        sessionId: record.id,
+        startedAt: record.createdAt,
+        endedAt: Date.now(),
+        turns: record.turnCount || 0,
+        disconnectReason: disconnectReason(reason),
+      }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) throw new Error(`Usage write returned ${response.status}`);
+  } catch (error) {
+    liveTalkLog('warn', 'session.usage-failed', { sessionId: record.id, message: error.message });
+  }
 }
 
 function createLiveTalkMcpProxy() {
@@ -673,6 +723,8 @@ function createLiveTalkRouter(deps = {}) {
         packId: pack.id,
         displayName: pack.displayName,
         createdAt: now(),
+        gptLive,
+        turnCount: 0,
         lastActivityAt: now(),
         idleMs: config.idleMs,
         parentMessageId: clean(convo.lastMessageId || convo.last_message_id),
@@ -805,6 +857,7 @@ function createLiveTalkRouter(deps = {}) {
         { context: 'POST /live-talk/session/:id/transcript' },
       );
       record.parentMessageId = saved?.messageId || messageId;
+      if (role === 'user') record.turnCount = (record.turnCount || 0) + 1;
       res.status(201).json({ ok: true, messageId: record.parentMessageId });
     } catch (error) {
       next(error);
