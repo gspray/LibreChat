@@ -4,6 +4,22 @@
  * GPT-Live hangup policy helpers. Shared by Live Talk overlay tests.
  * Keep the phrase matcher in sync with liveTalk.browser.js.
  */
+function liveTalkDeltaText(raw) {
+  if (raw == null) return '';
+  return String(raw);
+}
+
+function appendLiveTalkDelta(buffer, piece) {
+  const next = liveTalkDeltaText(piece);
+  if (!next) return buffer || '';
+  const prev = buffer || '';
+  if (!prev) return next;
+  if (/^\s/.test(next) || /\s$/.test(prev)) return `${prev}${next}`;
+  if (/[A-Za-z0-9']$/.test(prev) && /^[A-Za-z0-9']/.test(next)) return `${prev} ${next}`;
+  if (/[.,!?;:]$/.test(prev) && /^[A-Za-z0-9']/.test(next)) return `${prev} ${next}`;
+  return `${prev}${next}`;
+}
+
 function normalizeHeard(text) {
   return String(text || '')
     .toLowerCase()
@@ -64,6 +80,8 @@ function gptLiveHangupCopy(kind, options = {}) {
 }
 
 module.exports = {
+  liveTalkDeltaText,
+  appendLiveTalkDelta,
   normalizeHeard,
   isLiveTalkDonePhrase,
   isLiveTalkFarewellPhrase,

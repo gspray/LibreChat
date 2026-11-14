@@ -48,6 +48,11 @@
   let liveTalkConversationId = '';
   let liveTalkUserHeard = '';
   let liveTalkAssistantHeard = '';
+  let liveTalkUserDraftId = '';
+  let liveTalkAssistantDraftId = '';
+  let liveTalkPreviewTimer = 0;
+  let liveTalkPreviewRoles = new Set();
+  let liveTalkQueryClient = null;
   let gptLiveLastEventAt = 0;
   let gptLiveLastUsefulAt = 0;
   let gptLiveLastTranscriptAt = 0;
@@ -90,6 +95,17 @@
 
   function clean(value) {
     return String(value || '').trim();
+  }
+
+  function appendLiveTalkDelta(buffer, piece) {
+    const next = piece == null ? '' : String(piece);
+    if (!next) return buffer || '';
+    const prev = buffer || '';
+    if (!prev) return next;
+    if (/^\s/.test(next) || /\s$/.test(prev)) return `${prev}${next}`;
+    if (/[A-Za-z0-9']$/.test(prev) && /^[A-Za-z0-9']/.test(next)) return `${prev} ${next}`;
+    if (/[.,!?;:]$/.test(prev) && /^[A-Za-z0-9']/.test(next)) return `${prev} ${next}`;
+    return `${prev}${next}`;
   }
 
   function normalizeHeard(text) {
@@ -405,31 +421,129 @@
     return id;
   }
 
+  function isQueryClient(value) {
+    return Boolean(
+      value && typeof value.setQueryData === 'function' && typeof value.getQueryData === 'function',
+    );
+  }
+
+  function queryClientFromFiber(fiber) {
+    const props = fiber?.memoizedProps || fiber?.pendingProps || {};
+    if (isQueryClient(props.client)) return props.client;
+    if (isQueryClient(props.value)) return props.value;
+    const queued = fiber?.memoizedState;
+    if (isQueryClient(queued)) return queued;
+    if (isQueryClient(queued?.client)) return queued.client;
+    let dep = fiber?.dependencies?.firstContext || fiber?.dependencies?.first;
+    while (dep) {
+      const value = dep.memoizedValue || dep._currentValue;
+      if (isQueryClient(value)) return value;
+      if (isQueryClient(value?.client)) return value.client;
+      dep = dep.next;
+    }
+    return null;
+  }
+
   function findQueryClient() {
+    if (isQueryClient(liveTalkQueryClient)) return liveTalkQueryClient;
     const rootEl = root.getElementById?.('root');
     if (!rootEl) return null;
     const fiberKey = Object.keys(rootEl).find(
       (key) => key.startsWith('__reactFiber') || key.startsWith('__reactContainer'),
     );
     if (!fiberKey) return null;
-    let fiber = rootEl[fiberKey];
+    const queue = [rootEl[fiberKey]];
     const seen = new Set();
-    for (let i = 0; i < 500 && fiber && !seen.has(fiber); i += 1) {
+    for (let i = 0; i < 8000 && queue.length; i += 1) {
+      const fiber = queue.shift();
+      if (!fiber || seen.has(fiber)) continue;
       seen.add(fiber);
-      const contexts = fiber.dependencies?.firstContext || fiber.dependencies?.first;
-      let dep = contexts;
-      while (dep) {
-        const value = dep.memoizedValue || dep._currentValue;
-        if (value && typeof value.invalidateQueries === 'function') return value;
-        if (value?.client && typeof value.client.invalidateQueries === 'function')
-          return value.client;
-        dep = dep.next;
+      const client = queryClientFromFiber(fiber);
+      if (client) {
+        liveTalkQueryClient = client;
+        return client;
       }
-      const queued = fiber.memoizedState;
-      if (queued && typeof queued.invalidateQueries === 'function') return queued;
-      fiber = fiber.return || fiber.child || fiber.alternate?.return;
+      if (fiber.child) queue.push(fiber.child);
+      if (fiber.sibling) queue.push(fiber.sibling);
+      if (fiber.alternate && !seen.has(fiber.alternate)) queue.push(fiber.alternate);
     }
     return null;
+  }
+
+  function liveTalkCacheKeys() {
+    const id = clean(liveTalkConversationId);
+    const viewId = conversationIdFromLocation() || 'new';
+    return [...new Set([id, viewId].filter(Boolean))];
+  }
+
+  function newLiveTalkDraftId(role) {
+    const rand =
+      typeof windowObject.crypto?.randomUUID === 'function'
+        ? windowObject.crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`;
+    return `live-${role}-${rand}`;
+  }
+
+  function upsertLivePreview(role, text) {
+    const spoken = String(text || '');
+    if (!spoken.trim() || !['user', 'assistant'].includes(role)) return;
+    const client = findQueryClient();
+    if (!client) return;
+    const convoId = clean(liveTalkConversationId) || conversationIdFromLocation() || 'new';
+    const isUser = role === 'user';
+    if (isUser && !liveTalkUserDraftId) liveTalkUserDraftId = newLiveTalkDraftId('user');
+    if (!isUser && !liveTalkAssistantDraftId)
+      liveTalkAssistantDraftId = newLiveTalkDraftId('assistant');
+    const messageId = isUser ? liveTalkUserDraftId : liveTalkAssistantDraftId;
+    const now = new Date().toISOString();
+    for (const key of liveTalkCacheKeys()) {
+      const prev = client.getQueryData(['messages', key]);
+      const list = Array.isArray(prev) ? prev.slice() : [];
+      const idx = list.findIndex((message) => message && message.messageId === messageId);
+      if (idx >= 0) {
+        list[idx] = { ...list[idx], text: spoken, unfinished: true, updatedAt: now };
+      } else {
+        const last = list[list.length - 1];
+        list.push({
+          messageId,
+          conversationId: convoId,
+          parentMessageId: last?.messageId || null,
+          sender: isUser ? 'User' : 'Instructor Assistant',
+          text: spoken,
+          isCreatedByUser: isUser,
+          endpoint: 'agents',
+          unfinished: true,
+          error: false,
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+      client.setQueryData(['messages', key], list);
+    }
+  }
+
+  function scheduleLivePreview(role) {
+    liveTalkPreviewRoles.add(role);
+    if (liveTalkPreviewTimer) return;
+    const run = () => {
+      liveTalkPreviewTimer = 0;
+      const roles = liveTalkPreviewRoles;
+      liveTalkPreviewRoles = new Set();
+      if (roles.has('user') || roles.has('both')) upsertLivePreview('user', liveTalkUserHeard);
+      if (roles.has('assistant') || roles.has('both')) {
+        upsertLivePreview('assistant', liveTalkAssistantHeard);
+      }
+    };
+    if (typeof windowObject.requestAnimationFrame === 'function') {
+      liveTalkPreviewTimer = windowObject.requestAnimationFrame(run);
+      return;
+    }
+    liveTalkPreviewTimer = windowObject.setTimeout(run, 32);
+  }
+
+  function clearLivePreviewDraft(role) {
+    if (role === 'user') liveTalkUserDraftId = '';
+    else liveTalkAssistantDraftId = '';
   }
 
   async function refreshAskConversation(conversationId) {
@@ -456,13 +570,17 @@
     }
     const client = findQueryClient();
     if (!client || !Array.isArray(messages)) return;
-    const viewId = conversationIdFromLocation() || 'new';
-    for (const key of new Set([id, viewId])) {
+    for (const key of liveTalkCacheKeys()) {
       try {
         client.setQueryData(['messages', key], messages);
       } catch (_) {
         /* Recoil QueryClient shape can differ */
       }
+    }
+    try {
+      client.invalidateQueries(['allConversations']);
+    } catch (_) {
+      /* conversation list refresh is best-effort */
     }
   }
 
@@ -477,6 +595,7 @@
         quiet: true,
       });
       liveTalkLog('transcript.saved', { role, chars: spoken.length });
+      clearLivePreviewDraft(role);
       await refreshAskConversation(liveTalkConversationId);
     } catch (error) {
       liveTalkWarn('transcript.save-failed', summarizeError(error, { role }));
@@ -487,6 +606,7 @@
     const spoken = role === 'user' ? liveTalkUserHeard : liveTalkAssistantHeard;
     if (role === 'user') liveTalkUserHeard = '';
     else liveTalkAssistantHeard = '';
+    upsertLivePreview(role, spoken);
     if (!clean(spoken)) return null;
     return saveLiveTranscript(role, spoken);
   }
@@ -622,6 +742,13 @@
     gptLiveHangupKind = '';
     gptLiveHeard = '';
     gptLiveUserWantsHangup = false;
+    liveTalkUserDraftId = '';
+    liveTalkAssistantDraftId = '';
+    if (liveTalkPreviewTimer) {
+      windowObject.cancelAnimationFrame?.(liveTalkPreviewTimer);
+      windowObject.clearTimeout(liveTalkPreviewTimer);
+      liveTalkPreviewTimer = 0;
+    }
     stopGptLiveClientActionPoll();
     stopGptLivePlaybackMeter();
     if (!current?.gptLive) {
@@ -1302,9 +1429,14 @@
           if (useful && !gptLiveUserWantsHangup && !gptLiveHangupInFlight) resetGptLiveHeard();
         }
         const providerEvent = event.detail?.providerEvent || event.detail?.event?.type || '';
-        const transcript = clean(
-          event.detail?.event?.transcript || event.detail?.transcript || event.detail?.text,
+        const deltaText = String(
+          event.detail?.event?.delta ??
+            event.detail?.text ??
+            event.detail?.event?.transcript ??
+            event.detail?.transcript ??
+            '',
         );
+        const transcript = clean(deltaText);
         const interesting =
           event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED ||
           event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CONNECTED ||
@@ -1488,18 +1620,21 @@
           gptLive &&
           event.type === SpeakCore.SpeakRealtimeEvent.PROVIDER_EVENT &&
           providerEvent === 'session.output_transcript.delta' &&
-          transcript
+          deltaText
         ) {
-          liveTalkAssistantHeard = `${liveTalkAssistantHeard}${transcript}`;
+          liveTalkAssistantHeard = appendLiveTalkDelta(liveTalkAssistantHeard, deltaText);
+          scheduleLivePreview('assistant');
         }
-        if (event.type === SpeakCore.SpeakRealtimeEvent.INPUT_TRANSCRIPT && transcript) {
-          liveTalkLog('transcript.heard', { chars: transcript.length });
+        if (event.type === SpeakCore.SpeakRealtimeEvent.INPUT_TRANSCRIPT && deltaText) {
+          liveTalkLog('transcript.heard', { chars: deltaText.length });
           if (!gptLive) {
-            void saveLiveTranscript('user', transcript);
+            void saveLiveTranscript('user', transcript || deltaText);
+            upsertLivePreview('user', transcript || deltaText);
           } else if (!gptLiveHangupInFlight) {
-            liveTalkUserHeard = `${liveTalkUserHeard} ${transcript}`.replace(/\s+/g, ' ').trim();
-            gptLiveHeard = `${gptLiveHeard} ${transcript}`.replace(/\s+/g, ' ').trim();
+            liveTalkUserHeard = appendLiveTalkDelta(liveTalkUserHeard, deltaText);
+            gptLiveHeard = appendLiveTalkDelta(gptLiveHeard, deltaText);
             if (gptLiveHeard.length > 240) gptLiveHeard = gptLiveHeard.slice(-240);
+            scheduleLivePreview('user');
             noteGptLiveActivity('transcript');
             markUserHangupIfDone();
             windowObject.clearTimeout(gptLiveHeardTimer);
