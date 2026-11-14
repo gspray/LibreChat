@@ -39,6 +39,7 @@
   let readyTimer = 0;
   let pingTimer = 0;
   let gptLiveIdleTimer = 0;
+  let gptLivePlaybackMeter = null;
   let liveVoiceSettings = {
     waitForYou: 'patient',
     allowInterrupt: false,
@@ -412,6 +413,7 @@
     active = null;
     windowObject.clearTimeout(gptLiveIdleTimer);
     gptLiveIdleTimer = 0;
+    stopGptLivePlaybackMeter();
     if (!current?.gptLive) {
       try {
         current?.session?.cancel?.(reason);
@@ -683,6 +685,57 @@
     return Array.from(root.querySelectorAll('audio[data-lc-live-talk="true"]'));
   }
 
+  function stopGptLivePlaybackMeter() {
+    const meter = gptLivePlaybackMeter;
+    gptLivePlaybackMeter = null;
+    if (!meter) return;
+    windowObject.clearInterval(meter.timer);
+    meter.source.disconnect();
+    void meter.context.close().catch(() => {});
+  }
+
+  function startGptLivePlaybackMeter(session, audio) {
+    if (gptLivePlaybackMeter || !audio.srcObject) return;
+    const AudioContext = windowObject.AudioContext || windowObject.webkitAudioContext;
+    if (!AudioContext) {
+      liveTalkWarn('playback.meter-unavailable', {});
+      return;
+    }
+    let context;
+    try {
+      context = new AudioContext();
+      const source = context.createMediaStreamSource(audio.srcObject);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+      const samples = new Float32Array(analyser.fftSize);
+      const meter = { context, source, timer: 0, lastAudibleAt: Date.now() };
+      gptLivePlaybackMeter = meter;
+      void context.resume().then(
+        () => liveTalkLog('playback.meter-ready', { state: context.state }),
+        (error) => liveTalkWarn('playback.meter-resume-failed', summarizeError(error)),
+      );
+      meter.timer = windowObject.setInterval(() => {
+        if (active?.session !== session || paused || context.state !== 'running') return;
+        analyser.getFloatTimeDomainData(samples);
+        let energy = 0;
+        for (const sample of samples) energy += sample * sample;
+        const audible = Math.sqrt(energy / samples.length) > 0.01;
+        if (audible) {
+          meter.lastAudibleAt = Date.now();
+          if (ui.state !== 'responding') setStatus(ensureBar(), 'responding', 'Responding…');
+        } else if (Date.now() - meter.lastAudibleAt > 700 && ui.state === 'responding') {
+          assistantAudioPlaying = false;
+          setStatus(ensureBar(), 'listening', 'Listening…');
+        }
+      }, 100);
+    } catch (error) {
+      liveTalkWarn('playback.meter-failed', summarizeError(error));
+      if (gptLivePlaybackMeter) stopGptLivePlaybackMeter();
+      else if (context) void context.close().catch(() => {});
+    }
+  }
+
   function createLiveTalkAudioElement() {
     const audio = root.createElement('audio');
     audio.autoplay = true;
@@ -691,6 +744,9 @@
     audio.setAttribute('data-lc-live-talk', 'true');
     audio.hidden = true;
     (root.body || root.documentElement).appendChild(audio);
+    audio.addEventListener('playing', () => {
+      if (active?.gptLive) startGptLivePlaybackMeter(active.session, audio);
+    });
     audio.addEventListener('pause', () => {
       liveTalkWarn('playback.paused', {
         paused: audio.paused,
@@ -750,6 +806,7 @@
         }
         if (!audio.paused) {
           liveTalkLog('playback.remote-ready', { readyState: audio.readyState });
+          if (active?.gptLive) startGptLivePlaybackMeter(session, audio);
           return true;
         }
       }
