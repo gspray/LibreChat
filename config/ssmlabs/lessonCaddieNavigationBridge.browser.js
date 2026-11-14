@@ -395,6 +395,7 @@
       appNavigationBridge: false,
       processedIds: new Set(),
       lastResult: null,
+      pendingNavigation: null,
       lastRecovery: null,
       fallbackTimers: {},
       helpOverview: false,
@@ -666,6 +667,11 @@
     state.parentOrigin = event.origin;
     if (event.data.capabilities && event.data.capabilities.appNavigationBridge === true) {
       state.appNavigationBridge = true;
+      if (state.pendingNavigation) {
+        const pending = state.pendingNavigation;
+        state.pendingNavigation = null;
+        postNavigate(windowObject, state, pending);
+      }
     }
     if (event.data.type === 'page-help') {
       state.pageHelp = event.data;
@@ -845,13 +851,6 @@
       return Boolean(recovery);
     }
     state.lastResult = result;
-    if (state.helpOverview) {
-      logNav('overview_link_deferred', {
-        requestId: result.requestId,
-        destination: result.destination,
-      });
-      return true;
-    }
     if (!isFramed(windowObject)) {
       if (openStudentDetailFallback(windowObject, state, result, 'standalone')) return true;
       logNav('external_client', { requestId: result.requestId, destination: result.destination });
@@ -859,12 +858,17 @@
     }
     ensureEmbeddedBridge(windowObject, state);
     if (state.appNavigationBridge === true) {
+      state.pendingNavigation = null;
       return postNavigate(windowObject, state, result);
     }
+    state.pendingNavigation = result;
     windowObject.setTimeout(() => {
       if (state.lastResult && state.lastResult.requestId === result.requestId) {
         if (state.appNavigationBridge === true) {
-          postNavigate(windowObject, state, result);
+          if (state.pendingNavigation?.requestId === result.requestId) {
+            state.pendingNavigation = null;
+            postNavigate(windowObject, state, result);
+          }
           return;
         }
         if (openStudentDetailFallback(windowObject, state, result, 'unknown_client')) return;
