@@ -50,7 +50,7 @@ function createBoundRouter() {
     updateToken,
     deleteTokens,
   } = require('~/models');
-  const { getMCPManager, getFlowStateManager } = require('~/config');
+  const { getMCPManager, getMCPServersRegistry, getFlowStateManager } = require('~/config');
   const { getLogStores } = require('~/cache');
   const { CacheKeys } = require('librechat-data-provider');
 
@@ -120,21 +120,24 @@ function createBoundRouter() {
     return unwrapMcpResult(result);
   }
 
-  async function getMcpDelegation({ user, conversationId, config }) {
-    const connection = await getMCPManager().getConnection({
-      user,
-      serverName: config.serverName,
-      flowManager: getFlowStateManager(getLogStores(CacheKeys.FLOWS)),
-      tokenMethods: { findToken, createToken, updateToken, deleteTokens },
-      requestBody: { conversationId },
-    });
+  async function getMcpDelegation({ user, config }) {
     const firebaseUid = String(user?.openidId || '').trim();
     if (user?.provider !== 'lessoncaddie' || !firebaseUid) {
       return null;
     }
-    const tools = await readConnectionTools(connection);
-    const serverUrl = String(connection.url || '');
-    if (!tools.length || !serverUrl.startsWith('https://')) return null;
+    const registry = getMCPServersRegistry();
+    const serverConfig = await registry.getServerConfig(
+      config.serverName,
+      user.id,
+      undefined,
+      user.role,
+      { idOnTheSource: user.idOnTheSource },
+    );
+    if (!serverConfig || !(await registry.isAppServerConfig(config.serverName, serverConfig))) {
+      return null;
+    }
+    const serverUrl = String(serverConfig.url || '');
+    if (!serverUrl.startsWith('https://')) return null;
     return { serverUrl, firebaseUid };
   }
 

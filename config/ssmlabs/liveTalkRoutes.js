@@ -346,6 +346,16 @@ function createLiveTalkRouter(deps = {}) {
   });
 
   router.post('/session', async (req, res, next) => {
+    const startedAt = Date.now();
+    const timings = {};
+    const timed = async (name, operation) => {
+      const beganAt = Date.now();
+      try {
+        return await operation();
+      } finally {
+        timings[name] = Date.now() - beganAt;
+      }
+    };
     try {
       const baseConfig = loadConfig();
       const userId = userIdOf(req);
@@ -372,7 +382,7 @@ function createLiveTalkRouter(deps = {}) {
       let convo = null;
       let convoAgentId = '';
       if (conversationId && conversationId !== 'new') {
-        convo = await getConvo(userId, conversationId);
+        convo = await timed('getConvoMs', () => getConvo(userId, conversationId));
         if (!convo) {
           throw publicError(404, 'conversation_not_found', 'That conversation was not found.');
         }
@@ -390,6 +400,9 @@ function createLiveTalkRouter(deps = {}) {
         );
       }
       const config = applyLiveTalkPack(baseConfig, pack);
+      const agentPromise = timed('getAgentMs', () =>
+        getAgent({ id: config.agentId }).catch(() => null),
+      );
       if (!conversationId || conversationId === 'new') {
         conversationId = crypto.randomUUID();
         convo = {
@@ -399,13 +412,15 @@ function createLiveTalkRouter(deps = {}) {
           title: 'New chat',
         };
         if (saveConvo) {
-          await saveConvo({ userId }, convo, {
-            context: 'ssmlabs-live-talk#session',
-            initialAgentId: config.agentId,
-          });
+          await timed('saveConvoMs', () =>
+            saveConvo({ userId }, convo, {
+              context: 'ssmlabs-live-talk#session',
+              initialAgentId: config.agentId,
+            }),
+          );
         }
       }
-      const agent = await getAgent({ id: config.agentId }).catch(() => null);
+      const agent = await agentPromise;
       const requestedProvider = req.body?.liveVoice?.provider;
       const gptLive =
         pack.id === 'instructor' &&
@@ -430,7 +445,9 @@ function createLiveTalkRouter(deps = {}) {
       let providerSessionId = '';
       let proxyRecord = null;
       if (gptLive) {
-        const delegation = await getMcpDelegation?.({ user: req.user, conversationId, config });
+        const delegation = await timed('mcpConfigMs', () =>
+          getMcpDelegation?.({ user: req.user, conversationId, config }),
+        );
         if (!delegation?.serverUrl || !delegation?.firebaseUid) {
           throw publicError(
             503,
@@ -485,30 +502,32 @@ function createLiveTalkRouter(deps = {}) {
           : sessionConfig.voice;
         let live;
         try {
-          live = await bootstrapLive({
-            sdp,
-            session: {
-              model: 'gpt-live-1',
-              instructions,
-              audio: { output: { voice: outputVoice } },
-              delegation: {
-                type: 'responses',
-                responses: {
-                  model: 'gpt-6-luna',
-                  tools: [
-                    {
-                      type: 'mcp',
-                      server_url: `${proxyUrl.toString().replace(/\/+$/, '')}/${sessionId}`,
-                      server_label: 'Instructor',
-                      authorization: proxyToken,
-                      require_approval: 'never',
-                    },
-                  ],
-                  tool_choice: 'auto',
+          live = await timed('openAiMs', () =>
+            bootstrapLive({
+              sdp,
+              session: {
+                model: 'gpt-live-1',
+                instructions,
+                audio: { output: { voice: outputVoice } },
+                delegation: {
+                  type: 'responses',
+                  responses: {
+                    model: 'gpt-6-luna',
+                    tools: [
+                      {
+                        type: 'mcp',
+                        server_url: `${proxyUrl.toString().replace(/\/+$/, '')}/${sessionId}`,
+                        server_label: 'Instructor',
+                        authorization: proxyToken,
+                        require_approval: 'never',
+                      },
+                    ],
+                    tool_choice: 'auto',
+                  },
                 },
               },
-            },
-          });
+            }),
+          );
         } catch (error) {
           destroySession(sessionId, 'bootstrap-failed');
           throw error;
@@ -567,6 +586,8 @@ function createLiveTalkRouter(deps = {}) {
         sessionId,
         conversationId,
         packId: pack.id,
+        totalMs: Date.now() - startedAt,
+        timings,
         agentId: config.agentId,
         serverName: config.serverName,
         toolCount: tools.length,
@@ -580,6 +601,12 @@ function createLiveTalkRouter(deps = {}) {
         tools: tools.map((tool) => tool.name),
       });
     } catch (error) {
+      liveTalkLog('warn', 'session.create.failed', {
+        totalMs: Date.now() - startedAt,
+        timings,
+        code: error?.code || '',
+        status: error?.status || '',
+      });
       next(error);
     }
   });
