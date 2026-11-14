@@ -841,6 +841,23 @@
   }
 
   function consumePayload(windowObject, state, payload) {
+    if (payload?.event === 'on_token_usage' && isFramed(windowObject)) {
+      const origin = resolveParentOrigin(windowObject, state);
+      if (origin) {
+        try {
+          windowObject.parent.postMessage(
+            {
+              source: ASSISTANT_MESSAGE_SOURCE,
+              type: 'typed-chat-usage',
+              version: NAVIGATION_VERSION,
+            },
+            origin,
+          );
+        } catch (error) {
+          console.warn('LessonCaddie typed Chat usage refresh failed', error);
+        }
+      }
+    }
     const recovery = extractRecoveryFromPayload(payload);
     if (recovery) {
       state.lastRecovery = recovery;
