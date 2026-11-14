@@ -339,6 +339,7 @@
     ui.state = String(state || 'idle');
     ui.text = String(text || '');
     postStatus();
+    paintComposerTalk();
   }
 
   async function api(path, options) {
@@ -403,7 +404,91 @@
     return payload;
   }
 
+  let composerTalkObserver = null;
+
+  function setComposerChrome(surface) {
+    const chrome = surface === 'assistant' ? 'full' : 'composer-only';
+    try {
+      root.documentElement.dataset.lcChrome = chrome;
+      root.body.dataset.lcChrome = chrome;
+    } catch (_) {
+      /* embed document may be missing */
+    }
+    paintComposerTalk();
+  }
+
+  function paintComposerTalk() {
+    composerTalkObserver?.disconnect();
+    try {
+      paintComposerTalkNow();
+    } finally {
+      if (root.body && composerTalkObserver) {
+        composerTalkObserver.observe(root.body, { childList: true, subtree: true });
+      }
+    }
+  }
+
+  function paintComposerTalkNow() {
+    const surface = root.querySelector?.('[data-testid="composer-surface"]');
+    if (!surface || !config.enabled) return;
+    let btn = root.getElementById('lc-live-talk-composer-btn');
+    let end = root.getElementById('lc-live-talk-composer-end');
+    if (btn && !btn.isConnected) btn = null;
+    if (end && !end.isConnected) end = null;
+    const send = surface.querySelector('button[type="submit"]');
+    const host = send?.parentElement || surface;
+    if (!btn) {
+      btn = root.createElement('button');
+      btn.type = 'button';
+      btn.id = 'lc-live-talk-composer-btn';
+      btn.className = 'lc-live-talk-composer-btn';
+      btn.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const state = String(ui.state || 'idle');
+        let action = 'start';
+        if (state === 'paused') action = 'resume';
+        else if (isTalkingState(state)) action = 'pause';
+        void applyShellAction(action);
+      });
+      host.insertBefore(btn, send || null);
+    }
+    if (!end) {
+      end = root.createElement('button');
+      end.type = 'button';
+      end.id = 'lc-live-talk-composer-end';
+      end.className = 'lc-live-talk-composer-end';
+      end.setAttribute('aria-label', 'End Live Talk session');
+      end.title = 'End Live Talk session';
+      end.textContent = '×';
+      end.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void applyShellAction('stop');
+      });
+      host.insertBefore(end, send || null);
+    }
+    const state = String(ui.state || 'idle');
+    const on = isTalkingState(state);
+    btn.dataset.state = state;
+    btn.setAttribute('aria-pressed', on && state !== 'paused' ? 'true' : 'false');
+    let label = 'Talk to Assistant';
+    let icon = '◉';
+    if (state === 'paused') {
+      label = 'Resume Live Talk';
+      icon = '▶';
+    } else if (on) {
+      label = 'Pause Live Talk';
+      icon = '❚❚';
+    }
+    btn.setAttribute('aria-label', label);
+    btn.title = label;
+    btn.textContent = icon;
+    end.hidden = !on;
+  }
+
   function ensureBar() {
+    paintComposerTalk();
     return { dataset: ui };
   }
 
@@ -1301,6 +1386,7 @@
     if (!data || data.source !== SHELL_MESSAGE_SOURCE) return;
     if (data.type === 'surface') {
       rememberLiveTalkSpec(data.spec);
+      setComposerChrome(data.surface);
       return;
     }
     if (data.type !== 'live-talk') return;
@@ -1342,6 +1428,10 @@
     }
     watchThreadChanges();
     patchAuthCapture();
+    if (root.body && windowObject.MutationObserver) {
+      composerTalkObserver = new windowObject.MutationObserver(() => paintComposerTalk());
+      composerTalkObserver.observe(root.body, { childList: true, subtree: true });
+    }
     try {
       const bootSpec = resolveLiveTalkSpec();
       config = await api(
@@ -1365,7 +1455,8 @@
     }
     overlayReady = true;
     syncBar();
-    liveTalkLog('overlay.chrome', { host: 'shell-fab' });
+    liveTalkLog('overlay.chrome', { host: 'composer' });
+    paintComposerTalk();
     if (pendingShellAction) {
       void applyShellAction(pendingShellAction, pendingLiveVoice, pendingGreeting);
     }
