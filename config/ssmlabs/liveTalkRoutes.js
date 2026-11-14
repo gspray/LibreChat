@@ -12,6 +12,8 @@ const {
   applyLiveTalkPack,
   liveTalkTurnDetection,
   applyLiveVoiceToConfig,
+  normalizeLiveVoiceSettings,
+  gptLiveVoiceInstructions,
   liveTalkToolNames,
   isAllowedLiveTalkTool,
   liveTalkInstructions,
@@ -542,6 +544,7 @@ function createLiveTalkRouter(deps = {}) {
       }
       const sessionId = crypto.randomUUID();
       const sessionConfig = applyLiveVoiceToConfig(config, req.body?.liveVoice);
+      const voiceSettings = normalizeLiveVoiceSettings(req.body?.liveVoice);
       const instructions = liveTalkInstructions(agent?.instructions, pack);
       let answerSdp;
       let providerSessionId = '';
@@ -597,12 +600,7 @@ function createLiveTalkRouter(deps = {}) {
         sessions.set(sessionId, proxyRecord);
         rememberUserSession(userId, 1);
         touchSession(proxyRecord);
-        const requestedVoice = req.body?.liveVoice?.voice;
-        const customVoiceId =
-          typeof requestedVoice === 'object' ? clean(requestedVoice.id) : clean(requestedVoice);
-        const outputVoice = /^voice_[A-Za-z0-9_-]+$/.test(customVoiceId)
-          ? { id: customVoiceId }
-          : sessionConfig.voice;
+        const outputVoice = voiceSettings.voice || sessionConfig.voice;
         let live;
         try {
           live = await timed('openAiMs', () =>
@@ -610,12 +608,16 @@ function createLiveTalkRouter(deps = {}) {
               sdp,
               session: {
                 model: 'gpt-live-1',
-                instructions,
+                instructions: `${instructions}\n\n${gptLiveVoiceInstructions(voiceSettings)}`,
                 audio: { output: { voice: outputVoice } },
                 delegation: {
                   type: 'responses',
                   responses: {
                     model: 'gpt-6-luna',
+                    text: {
+                      verbosity:
+                        voiceSettings.verboseLevel === 'none' ? 'low' : voiceSettings.verboseLevel,
+                    },
                     tools: [
                       {
                         type: 'mcp',

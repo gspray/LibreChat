@@ -71,6 +71,7 @@
     muteMicWhileSheTalks: true,
     voice: 'marin',
     provider: 'openai-realtime',
+    verboseLevel: 'medium',
   };
 
   function normalizeLiveVoiceSettings(raw) {
@@ -96,6 +97,9 @@
       muteMicWhileSheTalks: src.muteMicWhileSheTalks !== false,
       voice: selectedVoice,
       provider: src.provider === 'gpt-live' ? 'gpt-live' : 'openai-realtime',
+      verboseLevel: ['high', 'medium', 'low', 'none'].includes(src.verboseLevel)
+        ? src.verboseLevel
+        : 'medium',
     };
   }
 
@@ -1240,9 +1244,12 @@
         if (audible) {
           meter.lastAudibleAt = Date.now();
           if (ui.state !== 'responding') setStatus(ensureBar(), 'responding', 'Responding…');
-        } else if (Date.now() - meter.lastAudibleAt > 700 && ui.state === 'responding') {
+        } else if (Date.now() - meter.lastAudibleAt > 700 && assistantAudioPlaying) {
           assistantAudioPlaying = false;
-          setStatus(ensureBar(), 'listening', 'Listening…');
+          if (active?.gptLive && liveVoiceSettings.muteMicWhileSheTalks) {
+            active.session.setMuted?.(durationDraining);
+          }
+          if (ui.state === 'responding') setStatus(ensureBar(), 'listening', 'Listening…');
         }
       }, 100);
     } catch (error) {
@@ -1255,6 +1262,8 @@
   function createLiveTalkAudioElement() {
     const audio = root.createElement('audio');
     audio.autoplay = true;
+    audio.muted =
+      liveVoiceSettings.provider === 'gpt-live' && liveVoiceSettings.verboseLevel === 'none';
     audio.playsInline = true;
     audio.setAttribute('playsinline', 'true');
     audio.setAttribute('data-lc-live-talk', 'true');
@@ -1398,6 +1407,9 @@
     gptLiveAssistantDoneTimer = windowObject.setTimeout(() => {
       awaitingAssistant = false;
       assistantAudioPlaying = false;
+      if (!gptLivePlaybackMeter && liveVoiceSettings.muteMicWhileSheTalks) {
+        session.setMuted?.(durationDraining);
+      }
       maybeHangupAfterAssistantTurn(session);
     }, 900);
   }
@@ -1699,7 +1711,7 @@
           });
         }
         if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_AUDIO_START) {
-          if (!gptLive) {
+          if (!gptLive || (voice.muteMicWhileSheTalks && voice.verboseLevel !== 'none')) {
             try {
               session.setMuted?.(true);
             } catch (_) {
@@ -1824,6 +1836,7 @@
           providerEvent === 'session.output_transcript.delta' &&
           deltaText
         ) {
+          if (voice.muteMicWhileSheTalks && voice.verboseLevel !== 'none') session.setMuted?.(true);
           noteGptLiveActivity('assistant');
           liveTalkAssistantHeard = appendLiveTalkDelta(liveTalkAssistantHeard, deltaText);
           scheduleLivePreview('assistant');

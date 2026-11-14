@@ -149,16 +149,47 @@ function normalizeLiveVoiceSettings(raw) {
   )
     ? String(src.waitForYou).trim().toLowerCase()
     : 'patient';
-  const voiceRaw = String(src.voice || '')
-    .trim()
-    .toLowerCase();
+  const voiceValue =
+    typeof src.voice === 'object'
+      ? String(src.voice?.id || '').trim()
+      : String(src.voice || '').trim();
+  const voiceRaw = voiceValue.toLowerCase();
+  const verboseLevel = ['high', 'medium', 'low', 'none'].includes(src.verboseLevel)
+    ? src.verboseLevel
+    : 'medium';
+  let voice = '';
+  if (/^voice_[A-Za-z0-9_-]+$/.test(voiceValue)) voice = { id: voiceValue };
+  else if (VOICES.includes(voiceRaw)) voice = voiceRaw;
   return {
     waitForYou,
     allowInterrupt: src.allowInterrupt === true,
     ignoreBackgroundNoise: src.ignoreBackgroundNoise !== false,
     muteMicWhileSheTalks: src.muteMicWhileSheTalks !== false,
-    voice: VOICES.includes(voiceRaw) ? voiceRaw : '',
+    voice,
+    verboseLevel,
   };
+}
+
+function gptLiveVoiceInstructions(settings) {
+  const wait = {
+    patient:
+      'Wait through thoughtful pauses. Do not finish the user’s sentences or respond until they clearly finish.',
+    balanced: 'Allow a natural conversational pause before responding.',
+    fast: 'Respond promptly when the user appears to have finished speaking.',
+  }[settings.waitForYou];
+  const noise = settings.ignoreBackgroundNoise
+    ? 'Ignore keyboard clicks, HVAC, and other background noise; respond to the user’s words.'
+    : '';
+  const interrupt = settings.allowInterrupt
+    ? 'When the user interrupts you, stop speaking and listen to their latest request.'
+    : 'Finish your current thought when incidental sounds occur. Yield when the user clearly asks you to stop or changes the request.';
+  const detail = {
+    high: 'Give full spoken explanations when useful, while staying conversational.',
+    medium: 'Use a natural amount of spoken detail.',
+    low: 'Keep spoken replies brief and direct.',
+    none: 'Do not speak, backchannel, acknowledge, or generate spoken audio. Keep listening and use the backend tools for requested actions. Do not announce tool results.',
+  }[settings.verboseLevel];
+  return `${wait} ${noise} ${interrupt} ${detail}`;
 }
 
 function applyLiveVoiceToConfig(config, liveVoice) {
@@ -250,6 +281,7 @@ module.exports = {
   applyLiveTalkPack,
   resolveLiveTalkConfig,
   normalizeLiveVoiceSettings,
+  gptLiveVoiceInstructions,
   applyLiveVoiceToConfig,
   liveTalkTurnDetection,
   liveTalkToolNames,
