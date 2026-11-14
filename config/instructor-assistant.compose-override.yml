@@ -21,6 +21,7 @@ services:
       MCP_SANDBOX_FRAME_ANCESTORS: "https://chat.ssmlabs.com https://lessoncaddie.ssmlabs.com"
       LIVE_TALK_SPEAK_CORE_SHA: f9d52b4
       LIVE_TALK_GPT_LIVE: "false"
+      # GPT-Live only (OpenAI fetches this). Typed Chat uses librechat.yaml LessonCaddie MCP.
       # Public HTTPS 443 URL of /live-talk/mcp. Never Tailscale Funnel on 443 (breaks PWAs).
       # See docs/ssmlabs-gpt-live-public-mcp.md
       LIVE_TALK_MCP_PROXY_URL: https://ssmlabs.tail1ad636.ts.net:8443/live-talk/mcp

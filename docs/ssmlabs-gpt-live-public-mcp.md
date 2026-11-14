@@ -6,10 +6,13 @@ Read this before changing Tailscale Funnel, Caddy port 443, or `LIVE_TALK_MCP_PR
 
 LessonCaddie tools live on **our** machines, not at OpenAI. GPT-Live is different from Realtime in **who dials those tools**:
 
-| Mode | Who calls MCP | Needs a public URL? |
-| --- | --- | --- |
-| **Realtime** (default Live Talk) | Chat on the NUC | No. Tailscale is enough. |
-| **GPT-Live** | OpenAI’s cloud | **Yes.** OpenAI cannot see Tailscale `100.x`. |
+| Mode | Who calls MCP | Config | Needs a public URL? |
+| --- | --- | --- | --- |
+| **Typed Chat** | Chat on the NUC, with SSO | `librechat.yaml` `lessoncaddie-instructor` / `lessoncaddie-student` (`startup: false`) | No. Tailscale/`*.ssmlabs.com` is enough. |
+| **Realtime** (default Live Talk) | Chat on the NUC | Same YAML servers as typed Chat | No. Tailscale is enough. |
+| **GPT-Live** | OpenAI’s cloud | `LIVE_TALK_MCP_PROXY_URL` only | **Yes.** OpenAI cannot see Tailscale `100.x`. |
+
+Do not point the YAML LessonCaddie servers at `LIVE_TALK_MCP_PROXY_URL`. That URL is for OpenAI. Typed Chat must keep `/api/instructor-mcp` and `/api/student-mcp`.
 
 GPT-Live without a reachable MCP URL is voice-only. That is not a useful Instructor Assistant.
 

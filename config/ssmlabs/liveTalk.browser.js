@@ -501,7 +501,7 @@
       const list = Array.isArray(prev) ? prev.slice() : [];
       const idx = list.findIndex((message) => message && message.messageId === messageId);
       if (idx >= 0) {
-        list[idx] = { ...list[idx], text: spoken, unfinished: true, updatedAt: now };
+        list[idx] = { ...list[idx], text: spoken, unfinished: false, updatedAt: now };
       } else {
         const last = list[list.length - 1];
         list.push({
@@ -512,7 +512,7 @@
           text: spoken,
           isCreatedByUser: isUser,
           endpoint: 'agents',
-          unfinished: true,
+          unfinished: false,
           error: false,
           createdAt: now,
           updatedAt: now,
