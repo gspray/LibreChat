@@ -1539,7 +1539,7 @@
       return;
     }
     if (!active) {
-      setStatus(bar, 'idle', 'Live Talk is available.');
+      setStatus(bar, 'idle', 'Chat or Talk Live');
       return;
     }
     setStatus(bar, ui.state || 'listening', ui.text || 'Listening…');
