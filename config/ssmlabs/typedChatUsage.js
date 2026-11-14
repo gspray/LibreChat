@@ -23,6 +23,7 @@ async function saveTypedChatUsage({ user, responseMessageId, jobCreatedAt, usage
     .createHash('sha256')
     .update(`${responseMessageId}:${jobCreatedAt ?? ''}`)
     .digest('hex');
+  const startedAt = Number(jobCreatedAt);
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -33,7 +34,7 @@ async function saveTypedChatUsage({ user, responseMessageId, jobCreatedAt, usage
     },
     body: JSON.stringify({
       turnId,
-      createdAt: Date.now(),
+      createdAt: Number.isSafeInteger(startedAt) && startedAt > 0 ? startedAt : Date.now(),
       inputTokens,
       outputTokens,
       cachedTokens,
