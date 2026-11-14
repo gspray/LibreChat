@@ -486,7 +486,7 @@ function createLiveTalkRouter(deps = {}) {
                       type: 'mcp',
                       server_url: `${proxyUrl.toString().replace(/\/+$/, '')}/${sessionId}`,
                       server_label: 'Instructor',
-                      authorization: `Bearer ${proxyToken}`,
+                      authorization: proxyToken,
                       require_approval: 'never',
                     },
                   ],

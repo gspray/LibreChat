@@ -149,6 +149,7 @@ test('GPT-Live delegates through a session-scoped MCP proxy and revokes it on st
     const [tool] = liveSession.delegation.responses.tools;
     assert.equal(tool.type, 'mcp');
     assert.equal(tool.server_url, `https://chat.example.test/chat/live-talk/mcp/${sessionId}`);
+    assert.match(tool.authorization, /^[A-Za-z0-9_-]+$/);
     assert.equal(tool.require_approval, 'never');
     assert.equal(
       JSON.stringify(liveSession).includes(process.env.LESSONCADDIE_SSO_SHARED_SECRET),
@@ -164,7 +165,10 @@ test('GPT-Live delegates through a session-scoped MCP proxy and revokes it on st
     assert.equal(denied.status, 401);
     const proxied = await originalFetch(proxyUrl, {
       method: 'POST',
-      headers: { authorization: tool.authorization, 'content-type': 'application/json' },
+      headers: {
+        authorization: `Bearer ${tool.authorization}`,
+        'content-type': 'application/json',
+      },
       body: JSON.stringify(request),
     });
     assert.equal(proxied.status, 200);
@@ -174,7 +178,10 @@ test('GPT-Live delegates through a session-scoped MCP proxy and revokes it on st
     await originalFetch(`${base}/session/${sessionId}/stop`, { method: 'POST' });
     const revoked = await originalFetch(proxyUrl, {
       method: 'POST',
-      headers: { authorization: tool.authorization, 'content-type': 'application/json' },
+      headers: {
+        authorization: `Bearer ${tool.authorization}`,
+        'content-type': 'application/json',
+      },
       body: JSON.stringify(request),
     });
     assert.equal(revoked.status, 401);

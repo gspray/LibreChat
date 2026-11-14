@@ -412,10 +412,12 @@
     active = null;
     windowObject.clearTimeout(gptLiveIdleTimer);
     gptLiveIdleTimer = 0;
-    try {
-      current?.session?.cancel?.(reason);
-    } catch (_) {
-      /* already closed */
+    if (!current?.gptLive) {
+      try {
+        current?.session?.cancel?.(reason);
+      } catch (_) {
+        /* already closed */
+      }
     }
     try {
       await current?.session?.stop?.(reason);
@@ -1060,9 +1062,6 @@
           liveTalkWarn('greeting.provider-error', summarizeEvent(event));
         }
         if (event.type === SpeakCore.SpeakRealtimeEvent.USER_SPEECH_START) {
-          if (gptLive && voice.allowInterrupt && assistantAudioPlaying) {
-            session.cancel?.('barge-in');
-          }
           if (greetingPending) finishGreeting('user-speech');
           awaitingAssistant = false;
           setStatus(bar, 'listening', 'Listening…');
