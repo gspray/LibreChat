@@ -249,13 +249,20 @@ function isAllowedLiveTalkTool(name, allowedNames) {
 function liveTalkInstructions(agentInstructions, pack, voice) {
   const base = String(agentInstructions || '').trim();
   const isStudent = pack?.id === 'student';
+  let languageInstruction =
+    'Always speak American English. Do not switch languages, even briefly, unless the user clearly speaks another language first; then match that language. Never start or continue in Chinese, Japanese, Korean, or any other language on your own.';
+  if (voice?.id === CADDIE_VOICE_ID) {
+    languageInstruction =
+      'Use the Caddie voice: an older caddie from Scotland with a moderate Scottish accent. Speak English with that Scottish accent. Do not switch languages unless the user clearly speaks another language first; then match that language.';
+  } else if (voice?.id) {
+    languageInstruction =
+      'Speak English in the accent and delivery of the selected custom voice. Do not switch languages unless the user clearly speaks another language first; then match that language.';
+  }
   const extra = [
     isStudent
       ? 'You are in LessonCaddie Live Talk, the spoken form of Student Caddie.'
       : 'You are in LessonCaddie Live Talk, the spoken form of Instructor Assistant.',
-    voice?.id === CADDIE_VOICE_ID
-      ? 'Use the Caddie voice: an older caddie from Scotland with a moderate Scottish accent. Speak English with that Scottish accent. Do not switch languages unless the user clearly speaks another language first; then match that language.'
-      : 'Always speak American English. Do not switch languages, even briefly, unless the user clearly speaks another language first; then match that language. Never start or continue in Chinese, Japanese, Korean, or any other language on your own.',
+    languageInstruction,
     'Do not introduce yourself, greet the user, or say you are Student Caddie or Instructor Assistant unless the user asks who you are. The only allowed opening line is the exact greeting from a greeting turn. After that greeting, wait silently until the user speaks. Do not call tools or ask a question until the user speaks.',
     isStudent
       ? 'You have the same student LessonCaddie tools as typed Ask. LessonCaddie authorizes each call.'

@@ -3,7 +3,11 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
-const { CADDIE_VOICE_ID, resolveLiveTalkConfig } = require('./liveTalkConfig');
+const {
+  CADDIE_VOICE_ID,
+  liveTalkInstructions,
+  resolveLiveTalkConfig,
+} = require('./liveTalkConfig');
 const {
   createLiveTalkRouter,
   createLiveTalkMcpProxy,
@@ -94,6 +98,12 @@ test('GPT-Live forwards the exact offer and returns the raw OpenAI SDP answer', 
     if (originalKey === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = originalKey;
   }
+});
+
+test('custom GPT-Live voices do not inherit the American accent instruction', () => {
+  const instructions = liveTalkInstructions('', { id: 'instructor' }, { id: 'voice_custom' });
+  assert.match(instructions, /selected custom voice/);
+  assert.doesNotMatch(instructions, /Always speak American English/);
 });
 
 test('GPT-Live delegates through a session-scoped MCP proxy and revokes it on stop', async () => {

@@ -6,7 +6,6 @@ const { Readable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const express = require('express');
 const {
-  CADDIE_VOICE_ID,
   LIVE_TALK_PACKS,
   resolveLiveTalkConfig,
   resolveLiveTalkPack,
@@ -551,7 +550,7 @@ function createLiveTalkRouter(deps = {}) {
       const instructions = liveTalkInstructions(
         agent?.instructions,
         pack,
-        gptLive && voiceSettings.voice?.id === CADDIE_VOICE_ID ? voiceSettings.voice : null,
+        gptLive && voiceSettings.voice?.id ? voiceSettings.voice : null,
       );
       let answerSdp;
       let providerSessionId = '';
