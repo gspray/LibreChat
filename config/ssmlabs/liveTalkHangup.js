@@ -80,7 +80,7 @@ function gptLiveHangupCopy(kind, options = {}) {
   if (kind === 'done') {
     return {
       say: 'Okay, hanging up.',
-      status: 'Hung up because you said you were done.',
+      status: 'Goodbye - Disconnected.',
     };
   }
   if (kind === 'farewell') {

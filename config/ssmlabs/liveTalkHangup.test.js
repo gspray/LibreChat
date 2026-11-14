@@ -62,6 +62,6 @@ test('noise filler is not a useful turn', () => {
 test('hangup copy names the reason', () => {
   assert.match(gptLiveHangupCopy('silence', { silenceSec: 20 }).status, /20 seconds of silence/);
   assert.match(gptLiveHangupCopy('noise', { noiseSec: 60 }).status, /60 seconds of noise/);
-  assert.match(gptLiveHangupCopy('done').status, /you said you were done/);
+  assert.equal(gptLiveHangupCopy('done').status, 'Goodbye - Disconnected.');
   assert.match(gptLiveHangupCopy('farewell').status, /after goodbye/);
 });

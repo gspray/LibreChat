@@ -168,7 +168,7 @@
     const silenceSec = Math.round(gptLiveSilenceMs() / 1000);
     const noiseSec = Math.round(gptLiveNoiseMs() / 1000);
     if (kind === 'done') {
-      return { say: 'Okay, hanging up.', status: 'Hung up because you said you were done.' };
+      return { say: 'Okay, hanging up.', status: 'Goodbye - Disconnected.' };
     }
     if (kind === 'farewell') {
       return { say: '', status: 'Hung up after goodbye.' };
