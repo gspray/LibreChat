@@ -62,13 +62,13 @@ test('dev checks its reviewed roles and provisions the agent', () => {
   assert.equal(result.status, 0, result.stderr);
   assert.equal(calls[0], 'compose config --format json');
   assert.match(calls.join('\n'), /exec LibreChat node -e/);
-  assert.equal(calls.at(-4), 'compose up -d --force-recreate api');
+  assert.equal(calls.at(-4), 'compose up -d api');
   assert.equal(calls.at(-3), 'compose exec -T api node config/provision-instructor-assistant.js');
+  assert.equal(calls.at(-2), 'compose exec -T api node config/ssmlabs/provision-student-caddie.js');
   assert.equal(
-    calls.at(-2),
+    calls.at(-1),
     'compose exec -T api node config/ssmlabs/ensure-student-caddie-spec.js',
   );
-  assert.equal(calls.at(-1), 'compose restart api');
   assert.doesNotMatch(calls.join('\n'), /role-permissions.js apply/);
 });
 
@@ -77,10 +77,10 @@ test('stage reconciles roles and provisions the same agent', () => {
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(calls, [
     'compose config --format json',
-    'compose up -d --force-recreate api',
+    'compose up -d api',
     'compose exec -T api node config/ssmlabs/role-permissions.js check stage',
     'compose exec -T api node config/provision-instructor-assistant.js',
+    'compose exec -T api node config/ssmlabs/provision-student-caddie.js',
     'compose exec -T api node config/ssmlabs/ensure-student-caddie-spec.js',
-    'compose restart api',
   ]);
 });

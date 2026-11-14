@@ -64,6 +64,8 @@ modelSpecs:
         - Show my recent lessons
         - Help me schedule a lesson
         - Review a student’s practice plan
+      mcpServers:
+        - lessoncaddie-instructor
       preset:
         endpoint: agents
         agent_id: agent_instructor_assistant
@@ -71,10 +73,14 @@ modelSpecs:
       label: Student Caddie
       iconURL: https://chat.ssmlabs.com/assets/student-caddie.png
       description: 'Ask Caddie about your lessons, practices, and notifications.'
-      showOnLanding: false
+      showOnLanding: true
       hideBadgeRow: true
+      conversation_starters:
+        - "What's on my schedule?"
+        - Show my recent lessons
+        - What should I practice?
       mcpServers:
         - lessoncaddie-student
       preset:
-        endpoint: openAI
-        model: gpt-4o-mini
+        endpoint: agents
+        agent_id: agent_student_caddie

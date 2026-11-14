@@ -97,6 +97,10 @@ class FakeElement {
   closest(selector) {
     return this.closestMatch?.(selector) || null;
   }
+
+  click() {
+    this.clicked = true;
+  }
 }
 
 function buildThemeDocument() {
@@ -172,6 +176,8 @@ test('starterKind recognizes every Instructor Assistant quick action', () => {
   assert.equal(theme.starterKind('Show my recent lessons'), 'lessons');
   assert.equal(theme.starterKind('Help me schedule a lesson'), 'schedule');
   assert.equal(theme.starterKind("Review a student's practice plan"), 'practice');
+  assert.equal(theme.starterKind("What's on my schedule?"), 'schedule');
+  assert.equal(theme.starterKind('What should I practice?'), 'practice');
   assert.equal(theme.starterKind('Unrelated action'), '');
 });
 
@@ -209,9 +215,43 @@ test('decorate waits for the agent title before applying landing layout', () => 
   const originalAll = documentObject.querySelectorAll.bind(documentObject);
   documentObject.querySelectorAll = (selector) =>
     selector === 'h1,h2,h3,[role="heading"],span,div' ? [welcome] : originalAll(selector);
+  documentObject.querySelector = (selector) =>
+    selector === '[data-testid="composer-surface"]' ? null : null;
   assert.deepEqual(theme.decorate(documentObject), { landing: false });
   assert.equal(documentObject.body.classList.contains('lc-chat-landing'), false);
   assert.equal(documentObject.body.classList.contains('lc-chat-landing-pending'), true);
+});
+
+test('decorate does not hide a new chat once the sidebar chrome is present', () => {
+  const documentObject = buildThemeDocument();
+  const header = new FakeElement();
+  const originalAll = documentObject.querySelectorAll.bind(documentObject);
+  const originalQuery = documentObject.querySelector.bind(documentObject);
+  documentObject.querySelectorAll = (selector) => {
+    if (selector === 'button') return [];
+    if (selector === 'h1,h2,h3,[role="heading"],span,div') return [];
+    return originalAll(selector);
+  };
+  documentObject.querySelector = (selector) => {
+    if (selector === '[data-testid="composer-surface"]') return null;
+    if (selector === '[data-testid="header-open-sidebar-button"]') return header;
+    return originalQuery(selector);
+  };
+  assert.deepEqual(theme.decorate(documentObject), { landing: false });
+  assert.equal(documentObject.body.classList.contains('lc-chat-landing-pending'), false);
+});
+
+test('decorate does not hide Student Caddie once the composer is present', () => {
+  const documentObject = buildThemeDocument();
+  const originalAll = documentObject.querySelectorAll.bind(documentObject);
+  documentObject.querySelectorAll = (selector) => {
+    if (selector === 'button') return [];
+    if (selector === 'h1,h2,h3,[role="heading"],span,div') return [];
+    return originalAll(selector);
+  };
+  assert.deepEqual(theme.decorate(documentObject), { landing: false });
+  assert.equal(documentObject.body.classList.contains('lc-chat-landing'), false);
+  assert.equal(documentObject.body.classList.contains('lc-chat-landing-pending'), false);
 });
 
 test('decorate treats Student Caddie as a named landing title', () => {
@@ -224,7 +264,7 @@ test('decorate treats Student Caddie as a named landing title', () => {
     return originalAll(selector);
   };
   assert.deepEqual(theme.decorate(documentObject), { landing: true });
-  assert.equal(title.classList.contains('lc-assistant-title'), false);
+  assert.equal(title.classList.contains('lc-assistant-title'), true);
   assert.equal(documentObject.body.classList.contains('lc-chat-landing'), true);
   assert.equal(documentObject.body.classList.contains('lc-chat-landing-pending'), false);
 });
@@ -363,6 +403,26 @@ test('decorate injects I approve on the latest confirmation message', () => {
   assert.equal(body.children[0].textContent, 'I approve');
   assert.equal(body.children[0].href, '#lc-approve');
   assert.equal(body.children[0].classList.contains('lc-approve-link'), true);
+});
+
+test('theme CSS hides the MCP Servers sidebar for every Chat user', () => {
+  assert.match(themeCss, /\[data-testid="nav-panel-mcp-builder"\]/);
+  assert.match(themeCss, /nav:has\(#mcp-filter\)/);
+});
+
+test('decorate does not click Chat nav buttons to hide MCP Servers', () => {
+  const documentObject = buildThemeDocument();
+  const mcp = new FakeElement();
+  mcp.setAttribute('aria-pressed', 'true');
+  const conversations = new FakeElement();
+  const originalQuery = documentObject.querySelector.bind(documentObject);
+  documentObject.querySelector = (selector) => {
+    if (selector === '[data-testid="nav-panel-mcp-builder"]') return mcp;
+    if (selector === '[data-testid="nav-panel-conversations"]') return conversations;
+    return originalQuery(selector);
+  };
+  theme.decorate(documentObject);
+  assert.equal(conversations.clicked, undefined);
 });
 
 test('message avatars use the Caddie mark instead of the default robot glyph', () => {

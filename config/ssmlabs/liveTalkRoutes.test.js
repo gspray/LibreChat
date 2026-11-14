@@ -47,14 +47,16 @@ function createApp(overrides = {}) {
       bootstrapOpenAi: async ({ session }) => {
         assert.equal(
           session.tools.some((tool) => tool.name === 'create_lesson'),
-          false,
+          true,
         );
         assert.equal(
           session.tools.some((tool) => tool.name === 'search_directory'),
           true,
         );
-        assert.equal(session.audio?.input?.turn_detection?.type, 'server_vad');
-        assert.equal(session.audio?.input?.turn_detection?.create_response, true);
+        assert.equal(session.audio?.input?.turn_detection?.type, 'semantic_vad');
+        assert.equal(session.audio?.input?.turn_detection?.eagerness, 'medium');
+        assert.equal(session.audio?.input?.turn_detection?.create_response, false);
+        assert.equal(session.audio?.input?.turn_detection?.interrupt_response, false);
         return 'answer-sdp';
       },
       ...overrides,
@@ -63,7 +65,7 @@ function createApp(overrides = {}) {
   return app;
 }
 
-test('Live Talk bootstraps a session and denies write tools', async () => {
+test('Live Talk bootstraps a session with the live MCP catalog including writes', async () => {
   const app = createApp();
   const server = await listen(app);
   try {
@@ -75,7 +77,8 @@ test('Live Talk bootstraps a session and denies write tools', async () => {
     assert.equal(created.status, 201);
     const session = await created.json();
     assert.equal(session.sdp, 'answer-sdp');
-    const denied = await fetch(
+    assert.deepEqual(session.tools, ['search_directory', 'create_lesson']);
+    const write = await fetch(
       `http://127.0.0.1:${server.address().port}/live-talk/session/${session.sessionId}/tool`,
       {
         method: 'POST',
@@ -83,7 +86,7 @@ test('Live Talk bootstraps a session and denies write tools', async () => {
         body: JSON.stringify({ name: 'create_lesson', arguments: {} }),
       },
     );
-    assert.equal(denied.status, 403);
+    assert.equal(write.status, 200);
     const allowed = await fetch(
       `http://127.0.0.1:${server.address().port}/live-talk/session/${session.sessionId}/tool`,
       {
@@ -93,6 +96,63 @@ test('Live Talk bootstraps a session and denies write tools', async () => {
       },
     );
     assert.equal(allowed.status, 200);
+    const unknown = await fetch(
+      `http://127.0.0.1:${server.address().port}/live-talk/session/${session.sessionId}/tool`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'not_a_catalog_tool', arguments: {} }),
+      },
+    );
+    assert.equal(unknown.status, 403);
+  } finally {
+    resetLiveTalkSessions();
+    server.close();
+  }
+});
+
+test('Live Talk fails closed when the MCP catalog is empty', async () => {
+  const app = createApp({
+    listMcpTools: async () => [],
+  });
+  const server = await listen(app);
+  try {
+    const created = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ conversationId: 'convo-1', sdp: 'offer' }),
+    });
+    assert.equal(created.status, 502);
+    const body = await created.json();
+    assert.equal(body.error, 'mcp_tools_unavailable');
+  } finally {
+    resetLiveTalkSessions();
+    server.close();
+  }
+});
+
+test('a new Live Talk start replaces a leftover session for the same user', async () => {
+  const app = createApp();
+  const server = await listen(app);
+  try {
+    const first = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ conversationId: 'convo-1', sdp: 'offer-1' }),
+    });
+    assert.equal(first.status, 201);
+    const firstSession = await first.json();
+    const second = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ conversationId: 'convo-1', sdp: 'offer-2' }),
+    });
+    assert.equal(second.status, 201);
+    const ping = await fetch(
+      `http://127.0.0.1:${server.address().port}/live-talk/session/${firstSession.sessionId}/ping`,
+      { method: 'POST' },
+    );
+    assert.equal(ping.status, 404);
   } finally {
     resetLiveTalkSessions();
     server.close();
@@ -120,6 +180,142 @@ test('Live Talk can start from a new Instructor Assistant thread', async () => {
     assert.notEqual(session.conversationId, 'new');
     assert.equal(saved.length, 1);
     assert.equal(saved[0].conversationId, session.conversationId);
+  } finally {
+    resetLiveTalkSessions();
+    server.close();
+  }
+});
+
+test('student spec starts Live Talk against student MCP', async () => {
+  const saved = [];
+  const listed = [];
+  const called = [];
+  const app = createApp({
+    getAgent: async ({ id }) => ({
+      instructions: id === 'agent_student_caddie' ? 'You are Student Caddie.' : 'Instructor',
+    }),
+    saveConvo: async (_ctx, convo) => {
+      saved.push(convo);
+      return convo;
+    },
+    listMcpTools: async ({ config }) => {
+      listed.push(config.serverName);
+      return [
+        { name: 'get_student_briefing', description: 'Briefing', inputSchema: { type: 'object' } },
+        { name: 'open_app_screen', description: 'Open a page', inputSchema: { type: 'object' } },
+      ];
+    },
+    callMcpTool: async ({ serverName, toolName }) => {
+      called.push({ serverName, toolName });
+      return { ok: true, toolName };
+    },
+    bootstrapOpenAi: async ({ session }) => {
+      assert.match(session.instructions, /Student Caddie/);
+      assert.equal(
+        session.tools.some((tool) => tool.name === 'get_student_briefing'),
+        true,
+      );
+      return 'answer-sdp';
+    },
+  });
+  const server = await listen(app);
+  try {
+    const created = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ conversationId: 'new', spec: 'student-caddie', sdp: 'offer' }),
+    });
+    assert.equal(created.status, 201);
+    const session = await created.json();
+    assert.deepEqual(listed, ['lessoncaddie-student']);
+    assert.equal(saved[0].agent_id, 'agent_student_caddie');
+    const tool = await fetch(
+      `http://127.0.0.1:${server.address().port}/live-talk/session/${session.sessionId}/tool`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'get_student_briefing', arguments: {} }),
+      },
+    );
+    assert.equal(tool.status, 200);
+    assert.deepEqual(called, [
+      { serverName: 'lessoncaddie-student', toolName: 'get_student_briefing' },
+    ]);
+  } finally {
+    resetLiveTalkSessions();
+    server.close();
+  }
+});
+
+test('instructor spec keeps instructor MCP even on a leftover student thread', async () => {
+  const listed = [];
+  const app = createApp({
+    getConvo: async (userId, conversationId) => ({
+      conversationId,
+      agent_id: 'agent_student_caddie',
+      lastMessageId: 'msg-root',
+    }),
+    listMcpTools: async ({ config }) => {
+      listed.push(config.serverName);
+      return [{ name: 'search_directory', description: 'Search', inputSchema: { type: 'object' } }];
+    },
+    bootstrapOpenAi: async () => 'answer-sdp',
+  });
+  const server = await listen(app);
+  try {
+    const created = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        conversationId: 'student-thread',
+        spec: 'instructor-assistant',
+        sdp: 'offer',
+      }),
+    });
+    assert.equal(created.status, 201);
+    assert.deepEqual(listed, ['lessoncaddie-instructor']);
+    const config = await fetch(
+      `http://127.0.0.1:${server.address().port}/live-talk/config?spec=instructor-assistant`,
+    );
+    assert.equal(config.status, 200);
+    const body = await config.json();
+    assert.equal(body.mcpServer, 'lessoncaddie-instructor');
+    assert.equal(body.spec, 'instructor-assistant');
+  } finally {
+    resetLiveTalkSessions();
+    server.close();
+  }
+});
+
+test('student conversation threads keep student MCP even without spec', async () => {
+  const listed = [];
+  const app = createApp({
+    getConvo: async (userId, conversationId) => ({
+      conversationId,
+      agent_id: 'agent_student_caddie',
+      lastMessageId: 'msg-root',
+    }),
+    listMcpTools: async ({ config }) => {
+      listed.push(config.serverName);
+      return [
+        {
+          name: 'find_activities',
+          description: 'Find activities',
+          inputSchema: { type: 'object' },
+        },
+      ];
+    },
+    bootstrapOpenAi: async () => 'answer-sdp',
+  });
+  const server = await listen(app);
+  try {
+    const created = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ conversationId: 'student-thread', sdp: 'offer' }),
+    });
+    assert.equal(created.status, 201);
+    assert.deepEqual(listed, ['lessoncaddie-student']);
   } finally {
     resetLiveTalkSessions();
     server.close();

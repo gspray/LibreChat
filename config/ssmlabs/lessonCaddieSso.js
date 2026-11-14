@@ -127,6 +127,34 @@ function mapIdentityError(code) {
   return { status: 401, message: 'LibreChat sign-in failed.' };
 }
 
+function ssoScopedEmail(firebaseUid) {
+  const id = trimString(firebaseUid)
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, '')
+    .slice(0, 48);
+  return `lc-${id || 'user'}@sso.lessoncaddie.invalid`;
+}
+
+function ssoUsername(firebaseUid, suffix = '') {
+  const id = trimString(firebaseUid)
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .slice(0, suffix ? 16 : 20);
+  return `lc_${id || 'user'}${suffix}`;
+}
+
+function buildSsoUserRecord(identity, firebaseUid, email, username) {
+  return {
+    email,
+    emailVerified: identity.emailVerified === true && !email.endsWith('@sso.lessoncaddie.invalid'),
+    name: trimString(identity.name) || String(email).split('@')[0],
+    username,
+    provider: PROVIDER,
+    openidId: firebaseUid,
+    openidIssuer: ISSUER_NAME,
+    role: 'USER',
+  };
+}
+
 async function resolveLibreChatUser(identity, models) {
   const { findUser, updateUser, createUserIfAbsent } = models;
   const firebaseUid = trimString(identity.firebaseUid);
@@ -164,16 +192,9 @@ async function resolveLibreChatUser(identity, models) {
     return findUser({ _id: linked._id });
   }
 
-  const created = await createUserIfAbsent({
-    email,
-    emailVerified: identity.emailVerified === true,
-    name: trimString(identity.name) || email.split('@')[0],
-    username: `lc_${firebaseUid.slice(0, 20)}`,
-    provider: PROVIDER,
-    openidId: firebaseUid,
-    openidIssuer: ISSUER_NAME,
-    role: 'USER',
-  });
+  const created = await createUserIfAbsent(
+    buildSsoUserRecord(identity, firebaseUid, email, ssoUsername(firebaseUid)),
+  );
   if (created.ok) {
     return created.value;
   }
@@ -182,6 +203,21 @@ async function resolveLibreChatUser(identity, models) {
   if (byEmail?.provider === PROVIDER && byEmail.openidId === firebaseUid) {
     return byEmail;
   }
+
+  const scopedEmail = ssoScopedEmail(firebaseUid);
+  if (scopedEmail !== email) {
+    const scoped = await createUserIfAbsent(
+      buildSsoUserRecord(identity, firebaseUid, scopedEmail, ssoUsername(firebaseUid, '_sso')),
+    );
+    if (scoped.ok) {
+      return scoped.value;
+    }
+    const byScoped = await findUser({ email: scopedEmail });
+    if (byScoped?.provider === PROVIDER && byScoped.openidId === firebaseUid) {
+      return byScoped;
+    }
+  }
+
   const error = new Error('LibreChat account exists and is not linked');
   error.code = 'LINK_REQUIRED';
   throw error;
@@ -236,6 +272,7 @@ module.exports = {
   buildLessonCaddieStartUrl,
   ssoBrowserStateAllowsCallback,
   mapIdentityError,
+  ssoScopedEmail,
   resolveLibreChatUser,
   redeemWithLessonCaddie,
   introspectWithLessonCaddie,

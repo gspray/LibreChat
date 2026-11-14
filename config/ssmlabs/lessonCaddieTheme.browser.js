@@ -10,6 +10,8 @@
     'help me schedule a lesson': 'schedule',
     'review a student’s practice plan': 'practice',
     "review a student's practice plan": 'practice',
+    "what's on my schedule?": 'schedule',
+    'what should i practice?': 'practice',
   });
 
   function normalizeText(value) {
@@ -38,6 +40,14 @@
     )[0];
   }
 
+  function caddieSpecFromLocation(windowLike) {
+    try {
+      return String(new URL(windowLike.location.href).searchParams.get('spec') || '').trim();
+    } catch {
+      return '';
+    }
+  }
+
   function decorateTitleCharacters(title) {
     const leaves = Array.from(title?.querySelectorAll?.('span') || []).filter(
       (element) => !element.children?.length && normalizeText(element.textContent),
@@ -45,15 +55,15 @@
     if (!leaves.length) {
       return;
     }
+    const label = normalizeText(title?.textContent);
+    const prefixLength = label.startsWith('Student ') ? 'Student '.length : 'Instructor '.length;
     let characterOffset = 0;
     for (const leaf of leaves) {
       const text = String(leaf.textContent || '');
       const nextOffset = characterOffset + text.length;
       addClass(
         leaf,
-        nextOffset > 'Instructor '.length
-          ? 'lc-assistant-title--accent'
-          : 'lc-assistant-title--base',
+        nextOffset > prefixLength ? 'lc-assistant-title--accent' : 'lc-assistant-title--base',
       );
       characterOffset = nextOffset;
     }
@@ -69,9 +79,10 @@
   function findHeroRow(title) {
     let current = title?.parentElement || null;
     for (let depth = 0; current && depth < 6; depth += 1) {
+      const text = normalizeText(current.textContent);
       if (
         current.querySelector?.('img, .avatar-stroke') &&
-        normalizeText(current.textContent).includes('Instructor Assistant')
+        (text.includes('Instructor Assistant') || text.includes('Student Caddie'))
       ) {
         return current;
       }
@@ -81,7 +92,7 @@
   }
 
   function decorateHero(documentObject) {
-    const title = findExactTextElement(documentObject, 'Instructor Assistant');
+    const title = findNamedLandingTitle(documentObject);
     if (!title) {
       return false;
     }
@@ -357,6 +368,11 @@
     const lessonCaddieDefault = readAppearanceMode() === LESSON_CADDIE_DEFAULT_APPEARANCE;
     root.dataset.lessonCaddieEmbed = 'true';
     body.dataset.lessonCaddieEmbed = 'true';
+    const spec = caddieSpecFromLocation(globalObject);
+    if (spec === 'student-caddie' || spec === 'instructor-assistant') {
+      root.dataset.lcCaddieSpec = spec;
+      body.dataset.lcCaddieSpec = spec;
+    }
     if (typeof root.toggleAttribute === 'function') {
       root.toggleAttribute('data-lesson-caddie-color-theme', lessonCaddieDefault);
       body.toggleAttribute('data-lesson-caddie-color-theme', lessonCaddieDefault);
@@ -394,8 +410,15 @@
     if (newChat) {
       decorateHero(documentObject);
     }
+    const composer = Boolean(documentObject.querySelector?.('[data-testid="composer-surface"]'));
+    decorateComposer(documentObject);
+    decorateHeader(documentObject);
+    const chrome = Boolean(
+      documentObject.querySelector?.('[data-testid="header-open-sidebar-button"]') ||
+        documentObject.querySelector?.('.lc-chat-header'),
+    );
     const landingActive = Boolean(newChat && namedTitle);
-    const landingPending = Boolean(newChat && !namedTitle);
+    const landingPending = Boolean(newChat && !namedTitle && !composer && !chrome);
     documentObject.body.classList.toggle('lc-chat-landing', landingActive);
     documentObject.body.classList.toggle('lc-chat-landing-pending', landingPending);
     const pane = documentObject.querySelector?.('[data-chat-pane]');
@@ -404,13 +427,12 @@
     } else {
       pane?.classList?.remove?.('lc-chat-pane-landing');
     }
-    decorateComposer(documentObject);
-    decorateHeader(documentObject);
     decorateApproveLinks(documentObject);
     notifyShellIfReady({
       landing: landingActive,
       pending: landingPending,
-      composer: Boolean(documentObject.querySelector?.('[data-testid="composer-surface"]')),
+      composer,
+      chrome,
     });
     return { landing: landingActive };
   }
@@ -423,7 +445,9 @@
     if (!(globalObject.parent && globalObject.parent !== globalObject)) {
       return;
     }
-    const ready = state?.landing === true || (state?.composer && state?.pending !== true);
+    const ready =
+      state?.landing === true ||
+      (state?.pending !== true && Boolean(state?.composer || state?.chrome));
     if (!ready) {
       return;
     }

@@ -4,7 +4,13 @@
 const crypto = require('node:crypto');
 const express = require('express');
 const {
+  LIVE_TALK_PACKS,
   resolveLiveTalkConfig,
+  resolveLiveTalkPack,
+  applyLiveTalkPack,
+  liveTalkTurnDetection,
+  applyLiveVoiceToConfig,
+  liveTalkToolNames,
   isAllowedLiveTalkTool,
   liveTalkInstructions,
 } = require('./liveTalkConfig');
@@ -70,7 +76,14 @@ function destroySession(sessionId, reason = 'stop') {
   rememberUserSession(record.userId, -1);
   record.closed = true;
   record.closedReason = reason;
+  liveTalkLog('info', 'session.destroyed', { sessionId, reason });
   return record;
+}
+
+function destroyUserSessions(userId, reason = 'replaced') {
+  for (const record of [...sessions.values()]) {
+    if (record.userId === userId) destroySession(record.id, reason);
+  }
 }
 
 function touchSession(record) {
@@ -155,13 +168,13 @@ async function bootstrapOpenAi({ sdp, session }) {
   return answer;
 }
 
-function toOpenAiTools(mcpTools, config) {
+function toOpenAiTools(mcpTools) {
   const list = Array.isArray(mcpTools) ? mcpTools : [];
   return list
-    .filter((tool) => isAllowedLiveTalkTool(tool?.name, config))
+    .filter((tool) => String(tool?.name || '').trim())
     .map((tool) => ({
       type: 'function',
-      name: tool.name,
+      name: String(tool.name).trim(),
       description: String(tool.description || '').slice(0, 800),
       parameters:
         tool.inputSchema && typeof tool.inputSchema === 'object'
@@ -183,24 +196,32 @@ function createLiveTalkRouter(deps = {}) {
   const now = deps.now || (() => Date.now());
 
   router.get('/config', (req, res) => {
-    const config = loadConfig();
+    const baseConfig = loadConfig();
+    const pack =
+      resolveLiveTalkPack({ spec: clean(req.query?.spec), agentId: clean(req.query?.agentId) }) ||
+      LIVE_TALK_PACKS.instructor;
+    const config = applyLiveTalkPack(baseConfig, pack);
     res.set('Cache-Control', 'no-store');
     res.json({
       enabled: config.enabled,
       agentId: config.agentId,
-      allowlist: config.allowlist,
+      mcpServer: config.serverName,
+      spec: pack.spec,
+      displayName: pack.displayName,
       speakCoreRevision: config.speakCoreRevision,
     });
   });
 
   router.post('/session', async (req, res, next) => {
     try {
-      const config = loadConfig();
+      const baseConfig = loadConfig();
       const userId = userIdOf(req);
       const sdp = normalizeSdp(req.body?.sdp);
       liveTalkLog('info', 'session.create.request', {
         userId: userId ? 'set' : '',
         conversationId: clean(req.body?.conversationId),
+        spec: clean(req.body?.spec),
+        agentId: clean(req.body?.agentId),
         sdpChars: sdp.length,
         sdpEndsWithNewline: sdp.endsWith('\n'),
       });
@@ -211,29 +232,32 @@ function createLiveTalkRouter(deps = {}) {
       if (!sdp) {
         throw publicError(400, 'invalid_session', 'Live Talk is missing a voice offer.');
       }
-      if (countUserSessions(userId) >= config.maxSessionsPerUser) {
-        throw publicError(
-          409,
-          'session_limit',
-          'A Live Talk session is already active. Stop it before starting another.',
-        );
+      if (countUserSessions(userId) > 0) {
+        destroyUserSessions(userId, 'replaced');
       }
       let conversationId = requestedId;
       let convo = null;
+      let convoAgentId = '';
       if (conversationId && conversationId !== 'new') {
         convo = await getConvo(userId, conversationId);
         if (!convo) {
           throw publicError(404, 'conversation_not_found', 'That conversation was not found.');
         }
-        const agentId = clean(convo.agent_id || convo.agentId);
-        if (agentId && agentId !== config.agentId) {
-          throw publicError(
-            403,
-            'agent_not_allowed',
-            'Live Talk is only available on Instructor Assistant threads.',
-          );
-        }
-      } else {
+        convoAgentId = clean(convo.agent_id || convo.agentId);
+      }
+      const pack = resolveLiveTalkPack({
+        spec: clean(req.body?.spec),
+        agentId: clean(req.body?.spec) ? '' : convoAgentId || clean(req.body?.agentId),
+      });
+      if (!pack) {
+        throw publicError(
+          403,
+          'agent_not_allowed',
+          'Live Talk is only available on LessonCaddie Caddie threads.',
+        );
+      }
+      const config = applyLiveTalkPack(baseConfig, pack);
+      if (!conversationId || conversationId === 'new') {
         conversationId = crypto.randomUUID();
         convo = {
           conversationId,
@@ -250,28 +274,30 @@ function createLiveTalkRouter(deps = {}) {
       }
       const agent = await getAgent({ id: config.agentId }).catch(() => null);
       const mcpTools = await listMcpTools({ user: req.user, conversationId, config });
-      const tools = toOpenAiTools(mcpTools, config);
+      const tools = toOpenAiTools(mcpTools);
+      const allowedTools = liveTalkToolNames(tools);
+      if (!allowedTools.size) {
+        throw publicError(
+          502,
+          'mcp_tools_unavailable',
+          'Live Talk could not load LessonCaddie tools. Try typed Chat, then try voice again.',
+        );
+      }
       const sessionId = crypto.randomUUID();
+      const sessionConfig = applyLiveVoiceToConfig(config, req.body?.liveVoice);
       const answerSdp = await bootstrap({
         sdp,
         session: {
           type: 'realtime',
-          model: config.model,
-          instructions: liveTalkInstructions(agent?.instructions),
+          model: sessionConfig.model,
+          instructions: liveTalkInstructions(agent?.instructions, pack),
           tools,
           tool_choice: 'auto',
           audio: {
             input: {
-              turn_detection: {
-                type: 'server_vad',
-                threshold: 0.5,
-                prefix_padding_ms: 300,
-                silence_duration_ms: 500,
-                create_response: true,
-                interrupt_response: false,
-              },
+              turn_detection: liveTalkTurnDetection(sessionConfig, { createResponse: false }),
             },
-            output: { voice: config.voice },
+            output: { voice: sessionConfig.voice },
           },
         },
       });
@@ -280,10 +306,14 @@ function createLiveTalkRouter(deps = {}) {
         userId,
         conversationId,
         agentId: config.agentId,
+        serverName: config.serverName,
+        packId: pack.id,
+        displayName: pack.displayName,
         createdAt: now(),
         lastActivityAt: now(),
         idleMs: config.idleMs,
         parentMessageId: clean(convo.lastMessageId || convo.last_message_id),
+        allowedTools,
         closed: false,
       };
       record.maxTimer = setTimeout(
@@ -296,6 +326,9 @@ function createLiveTalkRouter(deps = {}) {
       liveTalkLog('info', 'session.create.ok', {
         sessionId,
         conversationId,
+        packId: pack.id,
+        agentId: config.agentId,
+        serverName: config.serverName,
         toolCount: tools.length,
         tools: tools.map((tool) => tool.name),
       });
@@ -303,7 +336,7 @@ function createLiveTalkRouter(deps = {}) {
         sessionId,
         sdp: answerSdp,
         conversationId,
-        allowlist: config.allowlist,
+        tools: tools.map((tool) => tool.name),
       });
     } catch (error) {
       next(error);
@@ -323,17 +356,20 @@ function createLiveTalkRouter(deps = {}) {
             ? Object.keys(req.body.arguments)
             : [],
       });
-      if (!isAllowedLiveTalkTool(name, config)) {
-        liveTalkLog('warn', 'tool.denied', { name, allowlist: config.allowlist });
+      if (!isAllowedLiveTalkTool(name, record.allowedTools)) {
+        liveTalkLog('warn', 'tool.denied', {
+          name,
+          toolCount: record.allowedTools instanceof Set ? record.allowedTools.size : 0,
+        });
         throw publicError(
           403,
           'tool_denied',
-          'That action is not available in Live Talk. Continue in typed Chat.',
+          'That action is not in the LessonCaddie catalog for this voice session.',
         );
       }
       const result = await callMcpTool({
         user: req.user,
-        serverName: config.serverName,
+        serverName: record.serverName || config.serverName,
         toolName: name,
         toolArguments:
           req.body?.arguments && typeof req.body.arguments === 'object' ? req.body.arguments : {},
@@ -373,7 +409,7 @@ function createLiveTalkRouter(deps = {}) {
           messageId,
           conversationId: record.conversationId,
           parentMessageId: record.parentMessageId || undefined,
-          sender: role === 'user' ? 'User' : 'Instructor Assistant',
+          sender: role === 'user' ? 'User' : record.displayName || 'Instructor Assistant',
           isCreatedByUser: role === 'user',
           text: interrupted ? `${text}\n\n[Interrupted]` : text,
           endpoint: 'agents',
@@ -384,6 +420,15 @@ function createLiveTalkRouter(deps = {}) {
       );
       record.parentMessageId = saved?.messageId || messageId;
       res.status(201).json({ ok: true, messageId: record.parentMessageId });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.post('/session/:sessionId/ping', (req, res, next) => {
+    try {
+      requireSession(req);
+      res.json({ ok: true });
     } catch (error) {
       next(error);
     }
