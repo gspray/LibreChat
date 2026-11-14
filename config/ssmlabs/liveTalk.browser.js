@@ -941,7 +941,9 @@
         const recoverableLiveError =
           gptLive &&
           event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED &&
-          event.detail?.code === 'responses_validation_failed';
+          (event.detail?.code === 'responses_validation_failed' ||
+            (event.detail?.code === 'invalid_request_error' &&
+              /retrieving tool list from MCP server/i.test(event.detail?.message || '')));
         if (interesting || event.detail?.message) {
           let logEvent = liveTalkLog;
           if (recoverableLiveError) logEvent = liveTalkWarn;
