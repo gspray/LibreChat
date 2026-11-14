@@ -58,6 +58,11 @@
   let gptLiveLastUsefulAt = 0;
   let gptLiveLastTranscriptAt = 0;
   let gptLiveClientActionTimer = 0;
+  let clientActionPollInFlight = false;
+  let durationDraining = false;
+  let durationDrainStopping = false;
+  let durationProxyPending = 0;
+  const transcriptSaves = new Set();
   let gptLivePlaybackMeter = null;
   let liveVoiceSettings = {
     waitForYou: 'patient',
@@ -196,6 +201,7 @@
       return gptLiveHangupCopy(reason === 'idle' ? 'silence' : reason).status;
     }
     if (reason === 'failed') return ui.text || 'Could not connect Live Talk.';
+    if (reason === 'duration') return 'Live Talk session limit reached.';
     return 'Live Talk stopped.';
   }
 
@@ -421,16 +427,47 @@
     gptLiveClientActionTimer = 0;
   }
 
+  function noteDurationDrain(session, payload) {
+    if (active?.session !== session || !payload?.draining || durationDrainStopping) return;
+    if (!durationDraining) setStatus(ensureBar(), 'responding', 'Finishing the current response…');
+    durationDraining = true;
+    durationProxyPending = Number(payload.pendingProxyRequests) || 0;
+    try {
+      session.setMuted?.(true);
+    } catch (_) {
+      /* closing the current turn remains possible */
+    }
+    maybeFinishDurationDrain(session);
+  }
+
+  function maybeFinishDurationDrain(session) {
+    if (
+      !durationDraining ||
+      durationDrainStopping ||
+      active?.session !== session ||
+      clientActionPollInFlight
+    )
+      return;
+    if (durationProxyPending || awaitingAssistant || assistantAudioPlaying || greetingPending)
+      return;
+    if (active.gptLive && Date.now() - gptLiveLastEventAt < 3000) return;
+    if (active.gptLive && Date.now() - (gptLivePlaybackMeter?.lastAudibleAt || 0) < 3000) return;
+    durationDrainStopping = true;
+    void stopCall(ensureBar(), 'duration');
+  }
+
   function startGptLiveClientActionPoll(session, sessionId) {
     stopGptLiveClientActionPoll();
     gptLiveClientActionTimer = windowObject.setInterval(() => {
-      if (active?.session !== session || !sessionId) return;
+      if (active?.session !== session || !sessionId || clientActionPollInFlight) return;
+      clientActionPollInFlight = true;
       void api(liveTalkPath(`/live-talk/session/${sessionId}/client-actions`), { quiet: true })
         .then((payload) => {
           const actions = Array.isArray(payload?.actions) ? payload.actions : [];
           for (const action of actions) {
             applyHostToolResult(action?.name, action?.result);
           }
+          noteDurationDrain(session, payload);
         })
         .catch((error) => {
           if (
@@ -440,6 +477,10 @@
             stopGptLiveClientActionPoll();
             void stopCall(ensureBar(), 'expired');
           }
+        })
+        .finally(() => {
+          clientActionPollInFlight = false;
+          maybeFinishDurationDrain(session);
         });
     }, 400);
   }
@@ -691,7 +732,10 @@
     else liveTalkAssistantHeard = '';
     upsertLivePreview(role, spoken);
     if (!clean(spoken)) return null;
-    return saveLiveTranscript(role, spoken);
+    const saving = saveLiveTranscript(role, spoken);
+    transcriptSaves.add(saving);
+    void saving.finally(() => transcriptSaves.delete(saving));
+    return saving;
   }
 
   function liveTalkSpecFromLocation() {
@@ -863,7 +907,11 @@
     await Promise.all(
       [flushLiveTranscript('user'), flushLiveTranscript('assistant')].filter(Boolean),
     );
+    await Promise.all([...transcriptSaves]);
     active = null;
+    durationDraining = false;
+    durationDrainStopping = false;
+    durationProxyPending = 0;
     stopGptLiveHangupWatch();
     windowObject.clearTimeout(gptLiveHangupSpeechTimer);
     gptLiveHangupSpeechTimer = 0;
@@ -979,7 +1027,7 @@
       /* audio may already be clear */
     }
     try {
-      active.session?.setMuted?.(false);
+      active.session?.setMuted?.(durationDraining);
     } catch (_) {
       /* reconnect can still fail later */
     }
@@ -1080,7 +1128,7 @@
     }
     enableTurnResponses(active?.session);
     try {
-      active?.session?.setMuted?.(false);
+      active?.session?.setMuted?.(durationDraining);
     } catch (_) {
       /* user must be able to speak after the greeting */
     }
@@ -1507,7 +1555,7 @@
             },
             resumeInput: () => {
               bridgeInputHeld = false;
-              session.setMuted?.(paused);
+              session.setMuted?.(paused || durationDraining);
             },
             invokeTool: async (call) => {
               const startedAt = Date.now();
@@ -1692,7 +1740,7 @@
           }
           if (!greetingPending && !assistantAudioPlaying) {
             try {
-              session.setMuted?.(false);
+              session.setMuted?.(durationDraining);
             } catch (_) {
               /* keep listening even if mute release throws */
             }
@@ -1723,7 +1771,7 @@
             if (gptLiveHangupInFlight) return;
           }
           try {
-            session.setMuted?.(false);
+            session.setMuted?.(durationDraining);
           } catch (_) {
             /* keep listening even if mute release throws */
           }
@@ -1841,12 +1889,16 @@
             method: 'POST',
             body: '{}',
             quiet: true,
-          }).catch((error) => {
-            if (error?.status !== 404 || active?.session !== session) return;
-            void stopCall(bar, 'expired').then(() => {
-              setStatus(bar, 'error', 'Session ended. Start Live Talk again.');
+          })
+            .then((payload) => {
+              noteDurationDrain(session, payload);
+            })
+            .catch((error) => {
+              if (error?.status !== 404 || active?.session !== session) return;
+              void stopCall(bar, 'expired').then(() => {
+                setStatus(bar, 'error', 'Session ended. Start Live Talk again.');
+              });
             });
-          });
         }, 20000);
         watchPeer(session);
         if (active?.session === session && !paused) {

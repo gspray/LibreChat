@@ -66,8 +66,10 @@ function rememberUserSession(userId, delta) {
 function clearTimers(record) {
   if (record.maxTimer) clearTimeout(record.maxTimer);
   if (record.idleTimer) clearTimeout(record.idleTimer);
+  if (record.drainTimer) clearTimeout(record.drainTimer);
   record.maxTimer = null;
   record.idleTimer = null;
+  record.drainTimer = null;
 }
 
 function parseJsonSafe(text) {
@@ -676,10 +678,11 @@ function createLiveTalkRouter(deps = {}) {
           : {}),
         closed: false,
       };
-      record.maxTimer = setTimeout(
-        () => destroySession(sessionId, 'duration'),
-        config.maxSessionMs,
-      );
+      record.maxTimer = setTimeout(() => {
+        record.draining = true;
+        /* Keep the current response and MCP actions alive while the browser flushes them. */
+        record.drainTimer = setTimeout(() => destroySession(sessionId, 'duration'), 120000);
+      }, config.maxSessionMs);
       if (proxyRecord) clearTimers(proxyRecord);
       sessions.set(sessionId, record);
       if (!proxyRecord) rememberUserSession(userId, 1);
@@ -803,7 +806,12 @@ function createLiveTalkRouter(deps = {}) {
     try {
       const record = requireSession(req);
       const actions = Array.isArray(record.clientActions) ? record.clientActions.splice(0) : [];
-      res.json({ ok: true, actions });
+      res.json({
+        ok: true,
+        actions,
+        draining: record.draining === true,
+        pendingProxyRequests: record.proxyRequests?.size || 0,
+      });
     } catch (error) {
       next(error);
     }
@@ -811,8 +819,12 @@ function createLiveTalkRouter(deps = {}) {
 
   router.post('/session/:sessionId/ping', (req, res, next) => {
     try {
-      requireSession(req);
-      res.json({ ok: true });
+      const record = requireSession(req);
+      res.json({
+        ok: true,
+        draining: record.draining === true,
+        pendingProxyRequests: record.proxyRequests?.size || 0,
+      });
     } catch (error) {
       next(error);
     }
