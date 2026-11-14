@@ -3,7 +3,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
-const { resolveLiveTalkConfig } = require('./liveTalkConfig');
+const { CADDIE_VOICE_ID, resolveLiveTalkConfig } = require('./liveTalkConfig');
 const {
   createLiveTalkRouter,
   createLiveTalkMcpProxy,
@@ -137,13 +137,16 @@ test('GPT-Live delegates through a session-scoped MCP proxy and revokes it on st
       body: JSON.stringify({
         conversationId: 'convo-1',
         sdp: 'offer',
-        liveVoice: { provider: 'gpt-live' },
+        liveVoice: { provider: 'openai-realtime', voice: CADDIE_VOICE_ID },
       }),
     });
     assert.equal(created.status, 201);
     const { sessionId, sdp } = await created.json();
     assert.equal(sdp, liveAnswer);
     assert.equal(liveSession.model, 'gpt-live-1');
+    assert.deepEqual(liveSession.audio.output.voice, { id: CADDIE_VOICE_ID });
+    assert.match(liveSession.instructions, /moderate Scottish accent/);
+    assert.doesNotMatch(liveSession.instructions, /Always speak American English/);
     assert.equal(liveSession.delegation.type, 'responses');
     assert.equal(liveSession.delegation.responses.model, 'gpt-6-luna');
     const [tool] = liveSession.delegation.responses.tools;

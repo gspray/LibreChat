@@ -96,7 +96,10 @@
       ignoreBackgroundNoise: src.ignoreBackgroundNoise !== false,
       muteMicWhileSheTalks: src.muteMicWhileSheTalks !== false,
       voice: selectedVoice,
-      provider: src.provider === 'gpt-live' ? 'gpt-live' : 'openai-realtime',
+      provider:
+        typeof selectedVoice === 'object' || src.provider === 'gpt-live'
+          ? 'gpt-live'
+          : 'openai-realtime',
       verboseLevel: ['high', 'medium', 'low', 'none'].includes(src.verboseLevel)
         ? src.verboseLevel
         : 'medium',

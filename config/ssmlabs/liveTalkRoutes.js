@@ -6,6 +6,7 @@ const { Readable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const express = require('express');
 const {
+  CADDIE_VOICE_ID,
   LIVE_TALK_PACKS,
   resolveLiveTalkConfig,
   resolveLiveTalkPack,
@@ -526,9 +527,11 @@ function createLiveTalkRouter(deps = {}) {
       }
       const agent = await agentPromise;
       const requestedProvider = req.body?.liveVoice?.provider;
+      const voiceSettings = normalizeLiveVoiceSettings(req.body?.liveVoice);
       const gptLive =
         pack.id === 'instructor' &&
-        (requestedProvider === 'gpt-live' ||
+        (typeof voiceSettings.voice === 'object' ||
+          requestedProvider === 'gpt-live' ||
           (requestedProvider !== 'openai-realtime' && config.gptLiveEnabled));
       const mcpTools = gptLive
         ? []
@@ -544,8 +547,11 @@ function createLiveTalkRouter(deps = {}) {
       }
       const sessionId = crypto.randomUUID();
       const sessionConfig = applyLiveVoiceToConfig(config, req.body?.liveVoice);
-      const voiceSettings = normalizeLiveVoiceSettings(req.body?.liveVoice);
-      const instructions = liveTalkInstructions(agent?.instructions, pack);
+      const instructions = liveTalkInstructions(
+        agent?.instructions,
+        pack,
+        gptLive && voiceSettings.voice?.id === CADDIE_VOICE_ID ? voiceSettings.voice : null,
+      );
       let answerSdp;
       let providerSessionId = '';
       let proxyRecord = null;
