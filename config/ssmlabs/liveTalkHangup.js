@@ -10,14 +10,18 @@ function liveTalkDeltaText(raw) {
 }
 
 function appendLiveTalkDelta(buffer, piece) {
-  const next = liveTalkDeltaText(piece);
-  if (!next) return buffer || '';
-  const prev = buffer || '';
-  if (!prev) return next;
-  if (/^\s/.test(next) || /\s$/.test(prev)) return `${prev}${next}`;
-  if (/[A-Za-z0-9']$/.test(prev) && /^[A-Za-z0-9']/.test(next)) return `${prev} ${next}`;
-  if (/[.,!?;:]$/.test(prev) && /^[A-Za-z0-9']/.test(next)) return `${prev} ${next}`;
-  return `${prev}${next}`;
+  return `${buffer || ''}${liveTalkDeltaText(piece)}`;
+}
+
+function formatLiveTalkUtterance(text) {
+  let next = String(text || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!next) return '';
+  next = next.replace(/\s+([.,!?;:])/g, '$1');
+  next = next.replace(/([.!?])(\s*)([A-Za-z])/g, '$1 $3');
+  next = next.replace(/,([^\s])/g, ', $1');
+  return next;
 }
 
 function normalizeHeard(text) {
@@ -82,6 +86,7 @@ function gptLiveHangupCopy(kind, options = {}) {
 module.exports = {
   liveTalkDeltaText,
   appendLiveTalkDelta,
+  formatLiveTalkUtterance,
   normalizeHeard,
   isLiveTalkDonePhrase,
   isLiveTalkFarewellPhrase,

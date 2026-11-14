@@ -384,8 +384,13 @@ test('Live Talk transcripts save onto the Ask conversation', async () => {
     assert.equal(saved[0].isCreatedByUser, true);
     assert.equal(saved[0].text, 'Open my calendar');
     assert.equal(saved[0].conversationId, 'convo-1');
+    assert.equal(saved[0].unfinished, false);
+    assert.equal(saved[0].error, false);
+    assert.equal(saved[0].finish_reason, 'stop');
+    assert.deepEqual(saved[0].content, [{ type: 'text', text: 'Open my calendar' }]);
     assert.equal(saved[1].isCreatedByUser, false);
     assert.equal(saved[1].text, 'Opening Calendar.');
+    assert.equal(saved[1].unfinished, false);
   } finally {
     resetLiveTalkSessions();
     server.close();

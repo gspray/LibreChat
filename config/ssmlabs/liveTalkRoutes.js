@@ -772,6 +772,7 @@ function createLiveTalkRouter(deps = {}) {
       }
       record.transcripts.add(dedupeKey);
       const interrupted = Boolean(req.body?.interrupted);
+      const spoken = interrupted ? `${text}\n\n[Interrupted]` : text;
       const messageId = crypto.randomUUID();
       const saved = await saveMessage(
         { userId: record.userId },
@@ -781,10 +782,13 @@ function createLiveTalkRouter(deps = {}) {
           parentMessageId: record.parentMessageId || undefined,
           sender: role === 'user' ? 'User' : record.displayName || 'Instructor Assistant',
           isCreatedByUser: role === 'user',
-          text: interrupted ? `${text}\n\n[Interrupted]` : text,
+          text: spoken,
+          content: [{ type: 'text', text: spoken }],
           endpoint: 'agents',
           model: loadConfig().model,
+          unfinished: false,
           error: false,
+          finish_reason: 'stop',
         },
         { context: 'POST /live-talk/session/:id/transcript' },
       );

@@ -4,6 +4,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const {
   appendLiveTalkDelta,
+  formatLiveTalkUtterance,
   isLiveTalkDonePhrase,
   isLiveTalkFarewellPhrase,
   isSubstantialHeard,
@@ -17,10 +18,17 @@ test('transcript deltas keep provider spaces', () => {
   heard = appendLiveTalkDelta(heard, ' Saturday');
   assert.equal(heard, 'Today is Saturday');
   heard = '';
-  heard = appendLiveTalkDelta(heard, 'Today');
-  heard = appendLiveTalkDelta(heard, 'is');
-  heard = appendLiveTalkDelta(heard, 'Saturday');
-  assert.equal(heard, 'Today is Saturday');
+  heard = appendLiveTalkDelta(heard, 'Cadd');
+  heard = appendLiveTalkDelta(heard, 'ie');
+  assert.equal(heard, 'Caddie');
+  assert.equal(
+    formatLiveTalkUtterance('Morning. How can Lesson Caddie Chat help today?'),
+    'Morning. How can Lesson Caddie Chat help today?',
+  );
+  assert.equal(
+    formatLiveTalkUtterance('Today is Saturday,November 14th,2026.'),
+    'Today is Saturday, November 14th, 2026.',
+  );
 });
 
 test('done phrases hang up, longer requests do not', () => {

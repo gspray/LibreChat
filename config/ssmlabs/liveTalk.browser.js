@@ -98,14 +98,18 @@
   }
 
   function appendLiveTalkDelta(buffer, piece) {
-    const next = piece == null ? '' : String(piece);
-    if (!next) return buffer || '';
-    const prev = buffer || '';
-    if (!prev) return next;
-    if (/^\s/.test(next) || /\s$/.test(prev)) return `${prev}${next}`;
-    if (/[A-Za-z0-9']$/.test(prev) && /^[A-Za-z0-9']/.test(next)) return `${prev} ${next}`;
-    if (/[.,!?;:]$/.test(prev) && /^[A-Za-z0-9']/.test(next)) return `${prev} ${next}`;
-    return `${prev}${next}`;
+    return `${buffer || ''}${piece == null ? '' : String(piece)}`;
+  }
+
+  function formatLiveTalkUtterance(text) {
+    let next = String(text || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!next) return '';
+    next = next.replace(/\s+([.,!?;:])/g, '$1');
+    next = next.replace(/([.!?])(\s*)([A-Za-z])/g, '$1 $3');
+    next = next.replace(/,([^\s])/g, ', $1');
+    return next;
   }
 
   function normalizeHeard(text) {
@@ -338,11 +342,54 @@
     };
   }
 
+  function navigationFromToolResult(result) {
+    let src = {};
+    if (result?.structuredContent && typeof result.structuredContent === 'object') {
+      src = result.structuredContent;
+    } else if (result && typeof result === 'object') {
+      src = result;
+    }
+    const destination = clean(src.destination);
+    if (!destination) return null;
+    const params =
+      src.params && typeof src.params === 'object' && !Array.isArray(src.params) ? src.params : {};
+    return {
+      destination,
+      params,
+      requestId: clean(src.requestId) || `live-nav-${Date.now()}`,
+    };
+  }
+
+  function postParentNavigate(result) {
+    const overlay = windowObject.LessonCaddieNavigationOverlay;
+    if (overlay?.onPayload?.(result)) return true;
+    if (windowObject.parent === windowObject) return false;
+    const nav = navigationFromToolResult(result);
+    if (!nav) return false;
+    try {
+      windowObject.parent.postMessage(
+        {
+          source: ASSISTANT_MESSAGE_SOURCE,
+          type: 'navigate',
+          version: 1,
+          requestId: nav.requestId,
+          destination: nav.destination,
+          params: nav.params,
+          surface: 'app',
+        },
+        '*',
+      );
+      liveTalkLog('tool.navigate.fallback', { destination: nav.destination });
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   function applyHostToolResult(name, result) {
     postAppDataChanged(name, result);
     if (clean(name) !== 'open_app_screen') return false;
-    const overlay = windowObject.LessonCaddieNavigationOverlay;
-    const opened = overlay?.onPayload?.(result);
+    const opened = postParentNavigate(result);
     liveTalkLog('tool.navigate', {
       opened: Boolean(opened),
       destination: result?.destination || result?.structuredContent?.destination || '',
@@ -491,8 +538,8 @@
   }
 
   function upsertLivePreview(role, text) {
-    const spoken = String(text || '');
-    if (!spoken.trim() || !['user', 'assistant'].includes(role)) return;
+    const spoken = formatLiveTalkUtterance(text);
+    if (!spoken || !['user', 'assistant'].includes(role)) return;
     const client = findQueryClient();
     if (!client) return;
     const convoId = clean(liveTalkConversationId) || conversationIdFromLocation() || 'new';
@@ -506,8 +553,17 @@
       const prev = client.getQueryData(['messages', key]);
       const list = Array.isArray(prev) ? prev.slice() : [];
       const idx = list.findIndex((message) => message && message.messageId === messageId);
+      const part = { type: 'text', text: spoken };
       if (idx >= 0) {
-        list[idx] = { ...list[idx], text: spoken, unfinished: false, updatedAt: now };
+        list[idx] = {
+          ...list[idx],
+          text: spoken,
+          content: [part],
+          unfinished: false,
+          error: false,
+          finish_reason: 'stop',
+          updatedAt: now,
+        };
       } else {
         const last = list[list.length - 1];
         list.push({
@@ -516,10 +572,12 @@
           parentMessageId: last?.messageId || null,
           sender: isUser ? 'User' : 'Instructor Assistant',
           text: spoken,
+          content: [part],
           isCreatedByUser: isUser,
           endpoint: 'agents',
           unfinished: false,
           error: false,
+          finish_reason: 'stop',
           createdAt: now,
           updatedAt: now,
         });
@@ -592,12 +650,12 @@
 
   async function saveLiveTranscript(role, text) {
     const sessionId = active?.sessionId;
-    const spoken = clean(text);
+    const spoken = formatLiveTalkUtterance(text);
     if (!sessionId || !spoken || !['user', 'assistant'].includes(role)) return;
     try {
       await api(liveTalkPath(`/live-talk/session/${sessionId}/transcript`), {
         method: 'POST',
-        body: JSON.stringify({ role, text: spoken }),
+        body: JSON.stringify({ role, text: spoken, unfinished: false }),
         quiet: true,
       });
       liveTalkLog('transcript.saved', { role, chars: spoken.length });
@@ -657,6 +715,51 @@
     );
   }
 
+  function lockTypedComposer(on) {
+    try {
+      root.documentElement.setAttribute('data-ssmlabs-live-talk', on ? 'on' : 'off');
+    } catch (_) {
+      /* document may be unavailable */
+    }
+  }
+
+  function installComposerLock() {
+    if (!root || root.__ssmlabsLiveTalkComposerLock) return;
+    root.__ssmlabsLiveTalkComposerLock = true;
+    if (root.head && !root.getElementById('ssmlabs-live-talk-composer-lock')) {
+      const style = root.createElement('style');
+      style.id = 'ssmlabs-live-talk-composer-lock';
+      style.textContent =
+        'html[data-ssmlabs-live-talk="on"] form:has(textarea) textarea,' +
+        'html[data-ssmlabs-live-talk="on"] form:has(textarea) button[type="submit"]' +
+        '{pointer-events:none!important;opacity:.55}';
+      root.head.appendChild(style);
+    }
+    const block = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    root.addEventListener(
+      'submit',
+      (event) => {
+        if (isTalkingState(ui.state)) block(event);
+      },
+      true,
+    );
+    root.addEventListener(
+      'keydown',
+      (event) => {
+        if (!isTalkingState(ui.state)) return;
+        if (event.key !== 'Enter' || event.shiftKey) return;
+        const target = event.target;
+        if (!target || typeof target.closest !== 'function') return;
+        if (target.tagName !== 'TEXTAREA' && !target.closest('form')) return;
+        block(event);
+      },
+      true,
+    );
+  }
+
   function sleep(ms) {
     return new Promise((resolve) => windowObject.setTimeout(resolve, ms));
   }
@@ -665,6 +768,7 @@
     if (paused && !['paused', 'idle', 'error'].includes(state)) return;
     ui.state = String(state || 'idle');
     ui.text = String(text || '');
+    lockTypedComposer(isTalkingState(ui.state));
     postStatus();
   }
 
@@ -1863,6 +1967,7 @@
       config = { enabled: false };
     }
     overlayReady = true;
+    installComposerLock();
     syncBar();
     liveTalkLog('overlay.chrome', { host: 'shell-fab' });
     if (pendingShellAction) {
