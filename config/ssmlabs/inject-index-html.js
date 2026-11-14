@@ -1,17 +1,47 @@
 'use strict';
 
+/**
+ * SSM Labs overlay — docs/ssmlabs-fork-patches.md
+ * Hooks fs.readFileSync so api/server/index.js stays upstream while we still inject
+ * branding, <base href="/"> for nested /c/... routes, and overlay scripts.
+ */
 const fs = require('fs');
 const path = require('path');
+const { createHash } = require('crypto');
 
 const { resolveLessonCaddieConfig } = require('./lessonCaddieReturn');
 
-const SELECTOR_SENTINEL = 'data-ssmlabs-hide-model-selector="true"';
+const OWNER_CONTACT_SENTINEL = 'data-ssmlabs-hide-agent-owner-contact="true"';
 const BRANDING_SENTINEL = 'data-ssmlabs-branding="true"';
 const EMBED_SW_SENTINEL = 'data-ssmlabs-embed-sw="true"';
 const NAV_CONFIG_SENTINEL = 'data-ssmlabs-nav-config="true"';
 const NAV_BRIDGE_SENTINEL = 'data-ssmlabs-nav-bridge="true"';
-const SELECTOR_SCRIPT = `<script src="/ssmlabs/hide-model-selector.js?v=3" defer ${SELECTOR_SENTINEL}></script>`;
-const NAV_BRIDGE_SCRIPT = `<script src="/ssmlabs/lesson-caddie-navigation-bridge.js?v=2" ${NAV_BRIDGE_SENTINEL}></script>`;
+const LOGIN_FALLBACK_SENTINEL = 'data-ssmlabs-login-fallback="true"';
+const CHAT_THEME_STYLE_SENTINEL = 'data-ssmlabs-chat-theme-style="true"';
+const CHAT_THEME_SCRIPT_SENTINEL = 'data-ssmlabs-chat-theme-script="true"';
+const CONVERSATION_STARTERS_SENTINEL = 'data-ssmlabs-conversation-starters="true"';
+const LIVE_TALK_STYLE_SENTINEL = 'data-ssmlabs-live-talk-style="true"';
+const LIVE_TALK_CORE_SENTINEL = 'data-ssmlabs-live-talk-core="true"';
+const LIVE_TALK_SCRIPT_SENTINEL = 'data-ssmlabs-live-talk-script="true"';
+const LIVE_TALK_SCRIPT_HASH = createHash('sha256')
+  .update(fs.readFileSync(path.join(__dirname, 'liveTalk.browser.js')))
+  .digest('hex')
+  .slice(0, 12);
+const CHAT_THEME_SEED_SENTINEL = 'data-ssmlabs-chat-theme-seed="true"';
+const LESSON_CADDIE_DEFAULT_APPEARANCE = 'lesson-caddie-default';
+const CHAT_THEME_APPEARANCE_SEED_SCRIPT = `<script ${CHAT_THEME_SEED_SENTINEL}>
+(function seedLessonCaddieDefaultAppearance() {
+  try {
+    if (localStorage.getItem('color-theme')) {
+      return;
+    }
+    localStorage.setItem('color-theme', ${JSON.stringify(LESSON_CADDIE_DEFAULT_APPEARANCE)});
+  } catch (_) {}
+})();
+</script>`;
+const CHAT_THEME_EMBED_SENTINEL = 'data-ssmlabs-chat-theme-embed="true"';
+const OWNER_CONTACT_SCRIPT = `<script src="ssmlabs/hide-agent-owner-contact.js?v=1" defer ${OWNER_CONTACT_SENTINEL}></script>`;
+const NAV_BRIDGE_SCRIPT = `<script src="ssmlabs/lesson-caddie-navigation-bridge.js?v=10" ${NAV_BRIDGE_SENTINEL}></script>`;
 const EMBED_SW_SCRIPT = `<script ${EMBED_SW_SENTINEL}>
 (function clearFramedChatWorker() {
   if (window.parent === window) return;
@@ -110,10 +140,82 @@ function buildNavConfigScript() {
   return `<script ${NAV_CONFIG_SENTINEL}>window.__LESSONCADDIE_NAV__=${payload};</script>`;
 }
 
+function buildLoginFallbackScript() {
+  if (process.env.LESSONCADDIE_SSO_ENABLED !== 'true') {
+    return '';
+  }
+  const basePath = new URL(
+    process.env.DOMAIN_CLIENT || 'https://chat.ssmlabs.com',
+  ).pathname.replace(/\/$/, '');
+  return `<script ${LOGIN_FALLBACK_SENTINEL}>
+(function () {
+  var basePath = ${JSON.stringify(basePath)};
+  var loginPath = basePath + '/login';
+  var originalReplaceState = history.replaceState;
+  var originalPushState = history.pushState;
+  function redirectIfChatLogin(url) {
+    if (url == null || location.pathname === loginPath) return false;
+    var target;
+    try { target = new URL(url, location.href); } catch (_) { return false; }
+    if (target.origin !== location.origin || target.pathname !== loginPath || target.searchParams.get('local') === '1') return false;
+    var returnTo = location.pathname + location.search;
+    location.assign(basePath + '/sso/lessoncaddie/start?returnTo=' + encodeURIComponent(returnTo));
+    return true;
+  }
+  history.replaceState = function (state, title, url) {
+    if (!redirectIfChatLogin(url)) return originalReplaceState.apply(this, arguments);
+  };
+  history.pushState = function (state, title, url) {
+    if (!redirectIfChatLogin(url)) return originalPushState.apply(this, arguments);
+  };
+})();
+</script>`;
+}
+
+function buildChatThemeTags() {
+  const version = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '12').trim() || '12';
+  return {
+    style: `<link rel="stylesheet" href="ssmlabs/lesson-caddie-theme.css?v=${escapeHtml(version)}" ${CHAT_THEME_STYLE_SENTINEL} />`,
+    script: `<script src="ssmlabs/lesson-caddie-theme.js?v=${escapeHtml(version)}" defer ${CHAT_THEME_SCRIPT_SENTINEL}></script>`,
+  };
+}
+
+function applyLessonCaddieEmbedRoot(html) {
+  let next = html;
+  if (!next.includes('data-lesson-caddie-embed=')) {
+    next = next.replace(/<html\b([^>]*)>/i, '<html$1 data-lesson-caddie-embed="true">');
+    next = next.replace(/<body\b([^>]*)>/i, '<body$1 data-lesson-caddie-embed="true">');
+  }
+  if (!next.includes(CHAT_THEME_SEED_SENTINEL)) {
+    next = next.replace(
+      /<head\b[^>]*>/i,
+      (match) => `${match}\n${CHAT_THEME_APPEARANCE_SEED_SCRIPT}`,
+    );
+  }
+  if (!next.includes(CHAT_THEME_EMBED_SENTINEL)) {
+    next = next.replace('</head>', `    <!-- ${CHAT_THEME_EMBED_SENTINEL} -->\n</head>`);
+  }
+  return next;
+}
+
 function injectOverlayScripts(html) {
   let next = html;
-  if (!next.includes(SELECTOR_SENTINEL)) {
-    next = next.replace('</head>', `${SELECTOR_SCRIPT}\n</head>`);
+  const chatTheme = buildChatThemeTags();
+  if (!next.includes(CHAT_THEME_STYLE_SENTINEL)) {
+    next = next.replace('</head>', `${chatTheme.style}\n</head>`);
+  }
+  if (!next.includes(CHAT_THEME_SCRIPT_SENTINEL)) {
+    next = next.replace('</head>', `${chatTheme.script}\n</head>`);
+  }
+  if (!next.includes(CONVERSATION_STARTERS_SENTINEL)) {
+    const startersVersion = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '10').trim() || '10';
+    next = next.replace(
+      '</head>',
+      `<script src="ssmlabs/lesson-caddie-conversation-starters.js?v=${escapeHtml(startersVersion)}" defer ${CONVERSATION_STARTERS_SENTINEL}></script>\n</head>`,
+    );
+  }
+  if (!next.includes(OWNER_CONTACT_SENTINEL)) {
+    next = next.replace('</head>', `${OWNER_CONTACT_SCRIPT}\n</head>`);
   }
   if (!next.includes(EMBED_SW_SENTINEL)) {
     next = next.replace('</head>', `${EMBED_SW_SCRIPT}\n</head>`);
@@ -124,11 +226,34 @@ function injectOverlayScripts(html) {
   if (!next.includes(NAV_BRIDGE_SENTINEL)) {
     next = next.replace('</head>', `${NAV_BRIDGE_SCRIPT}\n</head>`);
   }
+  if (!next.includes(LOGIN_FALLBACK_SENTINEL)) {
+    next = next.replace('</head>', `${buildLoginFallbackScript()}\n</head>`);
+  }
+  const liveTalkVersion = (process.env.SSMLABS_CHAT_THEME_ASSET_VERSION || '51').trim() || '51';
+  const liveTalkScriptVersion = `${liveTalkVersion}-${LIVE_TALK_SCRIPT_HASH}`;
+  if (!next.includes(LIVE_TALK_STYLE_SENTINEL)) {
+    next = next.replace(
+      '</head>',
+      `<link rel="stylesheet" href="ssmlabs/lesson-caddie-live-talk.css?v=${escapeHtml(liveTalkVersion)}" ${LIVE_TALK_STYLE_SENTINEL} />\n</head>`,
+    );
+  }
+  if (!next.includes(LIVE_TALK_CORE_SENTINEL)) {
+    next = next.replace(
+      '</head>',
+      `<script src="ssmlabs/speak-core.realtime.js?v=${escapeHtml(liveTalkVersion)}" defer ${LIVE_TALK_CORE_SENTINEL}></script>\n</head>`,
+    );
+  }
+  if (!next.includes(LIVE_TALK_SCRIPT_SENTINEL)) {
+    next = next.replace(
+      '</head>',
+      `<script src="ssmlabs/lesson-caddie-live-talk.js?v=${escapeHtml(liveTalkScriptVersion)}" defer ${LIVE_TALK_SCRIPT_SENTINEL}></script>\n</head>`,
+    );
+  }
   return next;
 }
 
 function injectIndexHtml(html) {
-  return injectOverlayScripts(injectBaseHref(injectBranding(html)));
+  return applyLessonCaddieEmbedRoot(injectOverlayScripts(injectBaseHref(injectBranding(html))));
 }
 
 const originalReadFileSync = fs.readFileSync;

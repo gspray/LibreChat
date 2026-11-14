@@ -3,10 +3,21 @@ import { render, screen } from '@testing-library/react';
 import StackedToolIcons from '../ToolOutput/StackedToolIcons';
 
 jest.mock('~/hooks/MCP', () => ({
-  useMCPServerNames: () => ['weather'],
+  useMCPServerNames: () => ['weather', 'lessoncaddie-instructor'],
 }));
 
 describe('shared header glyphs', () => {
+  it('omits the Instructor Assistant image on tool groups', () => {
+    const { container } = render(
+      <StackedToolIcons
+        toolNames={[`search_directory${Constants.mcp_delimiter}lessoncaddie-instructor`]}
+        mcpIconMap={new Map([['lessoncaddie-instructor', 'https://example.com/caddie.png']])}
+      />,
+    );
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.querySelector('svg')).toBeNull();
+  });
+
   it('keeps MCP identity alongside a subagent and owned search sites', () => {
     const { container } = render(
       <StackedToolIcons

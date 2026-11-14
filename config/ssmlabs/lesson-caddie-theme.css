@@ -1,0 +1,651 @@
+:root {
+  --lc-chat-canvas: #0c1218;
+  --lc-chat-canvas-deep: #0c1218;
+  --lc-chat-surface: rgba(22, 38, 36, 0.94);
+  --lc-chat-surface-strong: rgba(30, 49, 47, 0.98);
+  --lc-chat-green: #4fd38c;
+  --lc-chat-green-soft: #8be5b4;
+  --lc-chat-gold: #e4bf62;
+  --lc-chat-gold-soft: #ffe8a3;
+  --lc-chat-sidebar: #102720;
+  --lc-chat-sidebar-active: #21483a;
+  --lc-chat-text: #f6f7f2;
+  --lc-chat-muted: #c7d0cb;
+  --lc-chat-border: rgba(79, 211, 140, 0.56);
+}
+
+html[data-lesson-caddie-color-theme="default"],
+body[data-lesson-caddie-color-theme="default"] {
+  color-scheme: dark;
+  background: var(--lc-chat-canvas-deep);
+}
+
+body[data-lesson-caddie-color-theme="default"] {
+  --presentation: 12 18 24;
+  --page-canvas: 12 18 24;
+  --text-primary: 246 247 242;
+  --text-secondary: 199 208 203;
+  --text-secondary-alt: 161 181 171;
+  --text-tertiary: 145 166 155;
+  --text-muted: 128 151 140;
+  --link: 139 229 180;
+  --link-hover: 255 232 163;
+  --link-prose: 139 229 180;
+  --surface-primary: 12 18 24;
+  --surface-primary-alt: 3 15 13;
+  --surface-primary-contrast: 7 27 23;
+  --surface-secondary: 10 34 28;
+  --surface-secondary-alt: 12 42 34;
+  --surface-tertiary: 18 59 47;
+  --surface-tertiary-alt: 20 67 53;
+  --surface-dialog: 8 29 24;
+  --surface-overlay: 12 18 24;
+  --surface-hover: 17 57 46;
+  --surface-hover-alt: 20 67 53;
+  --surface-active: 30 94 72;
+  --surface-active-alt: 25 76 60;
+  --surface-pressed: 22 70 55;
+  --surface-chat: 22 45 39;
+  --surface-code: 3 14 12;
+  --surface-code-body: 3 18 15;
+  --surface-code-inline: 18 59 47;
+  --surface-canvas: 12 18 24;
+  --surface-user-message: 20 59 47;
+  --surface-card: 10 34 28;
+  --surface-card-hover: 18 59 47;
+  --surface-nav-hover: 24 70 57;
+  --surface-nav-selected: 33 72 58;
+  --surface-tab-selected: 20 67 53;
+  --surface-menu: 5 22 18;
+  --surface-popover: 10 34 28;
+  --surface-composer: 22 45 39;
+  --surface-composer-hover: 27 62 53;
+  --surface-search: 10 34 28;
+  --surface-sidebar: 16 39 32;
+  --border-light: 24 64 52;
+  --border-medium-alt: 36 84 68;
+  --border-medium: 42 96 77;
+  --border-heavy: 72 132 105;
+  --border-xheavy: 109 174 142;
+  --border-control: 36 84 68;
+  --drawer-edge: 72 132 105;
+  --focus-control: 255 232 163;
+  color: var(--lc-chat-text);
+  font-family: "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
+  scrollbar-color: rgba(139, 229, 180, 0.34) transparent;
+}
+
+html[data-lesson-caddie-embed="true"] {
+  height: 100%;
+}
+
+body[data-lesson-caddie-embed="true"] {
+  min-height: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+body[data-lesson-caddie-color-theme="default"] #root {
+  isolation: isolate;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background:
+    radial-gradient(circle at 50% -20%, rgba(43, 105, 83, 0.2), transparent 38%),
+    linear-gradient(180deg, var(--lc-chat-canvas), var(--lc-chat-canvas-deep));
+}
+
+body[data-lesson-caddie-color-theme="default"].lc-chat-landing::before {
+  position: fixed;
+  z-index: 0;
+  inset: 3.25rem 0 0;
+  background:
+    linear-gradient(180deg, rgba(2, 11, 9, 0.08) 0%, rgba(2, 11, 9, 0.52) 58%, #020b09 100%),
+    url("../assets/instructor-assistant-bg.svg?v=1") center 8% / cover no-repeat;
+  content: "";
+  pointer-events: none;
+}
+
+body[data-lesson-caddie-color-theme="default"].lc-chat-landing #root,
+body[data-lesson-caddie-color-theme="default"].lc-chat-landing [class*="bg-surface-canvas"],
+body[data-lesson-caddie-color-theme="default"].lc-chat-landing [class*="bg-presentation"] {
+  background-color: transparent !important;
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-chat-header {
+  border-bottom: 1px solid rgba(131, 186, 158, 0.12);
+  background:
+    linear-gradient(180deg, rgba(2, 12, 10, 0.96), rgba(2, 12, 10, 0.68) 72%, transparent) !important;
+  backdrop-filter: blur(12px);
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-chat-header button {
+  color: var(--lc-chat-text);
+}
+
+body[data-lesson-caddie-color-theme="default"] [class*="bg-surface-sidebar"] {
+  border-color: rgba(139, 229, 180, 0.14) !important;
+  background-color: var(--lc-chat-sidebar) !important;
+  color: var(--lc-chat-text);
+}
+
+body[data-lesson-caddie-color-theme="default"] [class*="bg-surface-sidebar"] svg {
+  color: var(--lc-chat-green-soft) !important;
+}
+
+body[data-lesson-caddie-color-theme="default"] [class*="bg-surface-sidebar"] button:hover,
+body[data-lesson-caddie-color-theme="default"]
+  [class*="bg-surface-sidebar"]
+  [class*="bg-surface-nav-active"] {
+  background-color: var(--lc-chat-sidebar-active) !important;
+}
+
+body[data-lesson-caddie-embed="true"].lc-chat-landing-pending [data-chat-pane] {
+  visibility: hidden;
+}
+
+body[data-lesson-caddie-embed="true"].lc-chat-landing {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+body[data-lesson-caddie-embed="true"].lc-chat-landing #root {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+body[data-lesson-caddie-embed="true"] [data-chat-pane] {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  align-items: stretch !important;
+}
+
+body[data-lesson-caddie-embed="true"] .lc-chat-pane-landing {
+  justify-content: flex-start !important;
+  align-items: center !important;
+}
+
+body[data-lesson-caddie-embed="true"] .lc-composer-band,
+body[data-lesson-caddie-embed="true"]
+  [data-chat-pane]
+  > div:has([data-testid="composer-surface"]) {
+  margin-top: auto !important;
+  flex-shrink: 0;
+  width: 100%;
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+body[data-lesson-caddie-embed="true"].lc-chat-landing
+  [data-chat-pane]
+  > div.flex.h-full.transform-gpu {
+  justify-content: flex-start !important;
+  align-items: center !important;
+  padding-top: 1.75rem !important;
+  padding-bottom: 0 !important;
+  text-align: center !important;
+  overflow: visible !important;
+}
+
+/* First user/assistant turns must not inherit landing centering for a frame. */
+body[data-lesson-caddie-embed="true"]
+  [data-chat-pane]:has(.user-turn, .agent-turn, [data-testid="message-body"]) {
+  align-items: stretch !important;
+  text-align: start !important;
+}
+
+body[data-lesson-caddie-embed="true"]
+  [data-chat-pane]:has(.user-turn, .agent-turn, [data-testid="message-body"])
+  > div.flex.h-full.transform-gpu {
+  align-items: stretch !important;
+  text-align: start !important;
+  padding-top: 0 !important;
+}
+
+body[data-lesson-caddie-embed="true"]
+  .lc-assistant-landing-shell:has(.user-turn, .agent-turn, [data-testid="message-body"]),
+body[data-lesson-caddie-embed="true"]
+  .lc-assistant-landing-content:has(.user-turn, .agent-turn, [data-testid="message-body"]) {
+  max-width: none !important;
+  width: 100% !important;
+  margin-inline: 0 !important;
+  align-items: stretch !important;
+  text-align: start !important;
+}
+
+body[data-lesson-caddie-embed="true"] .lc-assistant-landing-shell {
+  height: auto !important;
+  max-height: none !important;
+  flex: 0 1 auto !important;
+  justify-content: flex-start !important;
+  margin-bottom: 0 !important;
+  overflow: visible !important;
+  padding-top: 1.75rem !important;
+  padding-bottom: 0 !important;
+}
+
+body[data-lesson-caddie-embed="true"] .lc-assistant-landing-shell,
+body[data-lesson-caddie-embed="true"] .lc-assistant-landing-content {
+  align-items: center !important;
+  text-align: center !important;
+}
+
+body[data-lesson-caddie-embed="true"] .lc-assistant-landing-content {
+  gap: 0.35rem !important;
+  padding-inline: 1.25rem;
+  width: 100%;
+  max-width: 44rem;
+  margin-inline: auto;
+  box-sizing: border-box;
+}
+
+body[data-lesson-caddie-embed="true"] .lc-assistant-hero-row {
+  position: relative;
+  z-index: 1;
+  align-items: center !important;
+  align-self: center;
+  flex-direction: column !important;
+  width: 100%;
+  gap: 0.55rem !important;
+  margin-top: 0.35rem !important;
+  text-align: center !important;
+}
+
+body[data-lesson-caddie-embed="true"] .lc-default-agent-icon {
+  display: none !important;
+}
+
+/* Message-row fallback is LibreChat's Feather/Bot glyph. Restore the Caddie mark. */
+body[data-lesson-caddie-embed="true"] .agent-turn .avatar-stroke {
+  background: url("../assets/caddie.png?v=1") center / cover no-repeat !important;
+  overflow: hidden;
+}
+
+body[data-lesson-caddie-embed="true"] .agent-turn .avatar-stroke svg {
+  display: none !important;
+}
+
+body[data-lesson-caddie-embed="true"] .lc-assistant-mark {
+  align-self: center;
+  width: clamp(4rem, 13vw, 5.4rem);
+  aspect-ratio: 1;
+  margin-inline: auto;
+  margin-top: 0.55rem;
+  margin-bottom: 0.55rem;
+  border-radius: 1.65rem;
+  background: url("../assets/instructor-assistant-spark.svg?v=1") center / contain no-repeat;
+  filter: drop-shadow(0 0 14px rgba(228, 191, 98, 0.33));
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-assistant-title {
+  color: var(--lc-chat-text) !important;
+  font-size: clamp(1.75rem, 6vw, 2.5rem) !important;
+  font-weight: 750 !important;
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+  text-align: center !important;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.34);
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-assistant-title *,
+body[data-lesson-caddie-color-theme="default"] .lc-assistant-title--base {
+  color: inherit !important;
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-assistant-title--accent {
+  color: var(--lc-chat-gold-soft) !important;
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-assistant-title-wrap {
+  position: relative;
+  align-self: center;
+  width: max-content;
+  max-width: 100%;
+  padding-bottom: 1.75rem !important;
+  text-align: center;
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-assistant-title-wrap::after {
+  position: absolute;
+  left: 50%;
+  bottom: 0.35rem;
+  width: min(19rem, 72vw);
+  height: 1px;
+  transform: translateX(-50%);
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0 5%,
+      var(--lc-chat-green) 5% 43%,
+      transparent 43% 57%,
+      var(--lc-chat-green) 57% 95%,
+      transparent 95%
+    );
+  box-shadow: 0 0 9px rgba(79, 211, 140, 0.34);
+  content: "";
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-assistant-title-wrap::before {
+  position: absolute;
+  z-index: 1;
+  left: 50%;
+  bottom: -0.05rem;
+  width: 1rem;
+  height: 1rem;
+  transform: translateX(-50%);
+  border: 1px solid var(--lc-chat-green-soft);
+  border-radius: 50%;
+  background: var(--lc-chat-canvas);
+  box-shadow: 0 0 8px rgba(79, 211, 140, 0.45);
+  content: "";
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-assistant-description {
+  z-index: 1;
+  max-width: 34rem !important;
+  margin: 0.65rem auto 0 !important;
+  color: var(--lc-chat-muted) !important;
+  font-size: clamp(0.9rem, 3vw, 1.05rem) !important;
+  line-height: 1.55;
+  text-align: center;
+  text-wrap: pretty;
+}
+
+.lc-conversation-starters {
+  position: relative;
+  z-index: 1;
+  display: grid !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: min(44rem, calc(100% - 2rem));
+  margin: 1.35rem auto 1.5rem !important;
+  gap: 0.8rem !important;
+  padding: 0 !important;
+}
+
+.lc-conversation-starter {
+  min-height: 3rem;
+  max-width: none !important;
+  border: 1px solid var(--lc-chat-border);
+  border-radius: 999px !important;
+  background: rgba(6, 28, 23, 0.72) !important;
+  color: var(--lc-chat-text) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+    0 8px 24px rgba(0, 0, 0, 0.22);
+  font-weight: 540;
+  backdrop-filter: blur(9px);
+}
+
+.lc-conversation-starter:nth-child(n + 3) {
+  grid-column: 1 / -1;
+  justify-self: center;
+  width: min(100%, 24rem);
+}
+
+.lc-conversation-starter[data-lc-starter-kind="schedule"] {
+  border-color: rgba(228, 191, 98, 0.76);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 235, 171, 0.08),
+    0 0 16px rgba(228, 191, 98, 0.2),
+    0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.lc-conversation-starter:hover {
+  border-color: var(--lc-chat-green-soft);
+  background: rgba(11, 49, 39, 0.9) !important;
+  color: #fff !important;
+}
+
+.lc-conversation-starter:focus-visible {
+  outline: 2px solid var(--lc-chat-gold-soft);
+  outline-offset: 3px;
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-starter-icon {
+  display: none !important;
+}
+
+.lc-conversation-starter-chip {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.lc-conversation-starter-send {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: inherit;
+  padding: 0.65rem 2.35rem 0.65rem 1rem;
+  cursor: pointer;
+  text-align: center;
+  pointer-events: auto;
+}
+
+.lc-conversation-starter-label {
+  display: block;
+  line-clamp: 2;
+  overflow: hidden;
+  text-wrap: balance;
+}
+
+.lc-conversation-starter-edit {
+  position: absolute;
+  top: 50%;
+  right: 0.45rem;
+  z-index: 2;
+  display: inline-flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  pointer-events: auto;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--lc-chat-muted);
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.lc-conversation-starter-edit:hover {
+  color: var(--lc-chat-gold-soft);
+  background: rgba(228, 191, 98, 0.12);
+}
+
+.lc-conversation-starter-edit svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.lc-conversation-starter-input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--lc-chat-text);
+  font: inherit;
+  font-weight: inherit;
+  padding: 0.65rem 2.35rem 0.65rem 1rem;
+  outline: none;
+  text-align: center;
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-composer-form {
+  position: relative;
+  z-index: 2;
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-composer-surface {
+  border: 1px solid rgba(147, 184, 166, 0.24) !important;
+  background:
+    linear-gradient(180deg, rgba(31, 51, 49, 0.98), rgba(22, 39, 37, 0.98)) !important;
+  box-shadow:
+    0 18px 44px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-composer-surface textarea {
+  color: var(--lc-chat-text) !important;
+  font-size: 1rem;
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-composer-surface textarea::placeholder {
+  color: rgba(223, 229, 225, 0.6) !important;
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-composer-surface button {
+  color: #d9e2dd;
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-composer-surface button[type="submit"] {
+  background: linear-gradient(145deg, #3fc47f, #176f52) !important;
+  color: #fff !important;
+  box-shadow: 0 5px 18px rgba(45, 184, 119, 0.32);
+}
+
+body[data-lesson-caddie-color-theme="default"] .lc-composer-surface button[type="submit"]:disabled {
+  opacity: 0.52;
+}
+
+body[data-lesson-caddie-color-theme="default"] a.lc-approve-link,
+body[data-lesson-caddie-color-theme="default"] a[href="#lc-approve"],
+body[data-lesson-caddie-color-theme="default"] a[href$="#lc-approve"] {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.35rem;
+  padding: 0.4rem 0.95rem;
+  border: 1px solid var(--lc-chat-green);
+  border-radius: 999px;
+  background: linear-gradient(145deg, #3fc47f, #176f52);
+  color: #fff !important;
+  font-weight: 700;
+  text-decoration: none !important;
+  box-shadow: 0 5px 18px rgba(45, 184, 119, 0.32);
+}
+
+body[data-lesson-caddie-color-theme="default"] a.lc-approve-link:hover,
+body[data-lesson-caddie-color-theme="default"] a[href="#lc-approve"]:hover,
+body[data-lesson-caddie-color-theme="default"] a[href$="#lc-approve"]:hover {
+  border-color: var(--lc-chat-green-soft);
+  color: #fff !important;
+}
+
+@media (max-width: 640px) {
+  body[data-lesson-caddie-color-theme="default"].lc-chat-landing::before {
+    background-position: 58% top;
+    background-size: auto 72vh;
+  }
+
+  .lc-conversation-starters {
+    width: calc(100% - 1.5rem);
+    gap: 0.65rem !important;
+  }
+
+  .lc-conversation-starter {
+    min-height: 2.75rem;
+    padding: 0.65rem 0.8rem !important;
+    font-size: 0.83rem !important;
+  }
+
+  body[data-lesson-caddie-color-theme="default"] .lc-starter-icon {
+    width: 1.35rem;
+    height: 1.35rem;
+    margin-inline-end: 0.4rem;
+  }
+
+  body[data-lesson-caddie-color-theme="default"] .lc-composer-form {
+    padding-inline: 0 !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .lc-conversation-starters {
+    grid-template-columns: 1fr;
+  }
+
+  .lc-conversation-starter,
+  .lc-conversation-starter:nth-child(n + 3) {
+    grid-column: 1;
+    width: 100%;
+  }
+}
+
+#lessoncaddie-page-help {
+  position: fixed;
+  z-index: 30;
+  top: 72px;
+  left: 50%;
+  width: min(680px, calc(100% - 28px));
+  max-height: calc(100dvh - 168px);
+  overflow: auto;
+  transform: translateX(-50%);
+  box-sizing: border-box;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: #101820;
+  color: #e8e4dc;
+  font: 15px/1.45 "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
+}
+
+#lessoncaddie-page-help h2 {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+}
+
+#lessoncaddie-page-help ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#lessoncaddie-page-help li {
+  display: grid;
+  gap: 2px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#lessoncaddie-page-help span {
+  color: #9aa8b6;
+}
+
+#lessoncaddie-page-help a {
+  width: fit-content;
+  color: #8be5b4;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+/* MCP stays available to Caddie tools. The sidebar catalog is not a product surface. */
+body[data-lesson-caddie-embed="true"] [data-testid="nav-panel-mcp-builder"] {
+  display: none !important;
+}
+
+body[data-lesson-caddie-embed="true"] nav:has(#mcp-filter) {
+  display: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-lesson-caddie-embed="true"] *,
+  body[data-lesson-caddie-embed="true"] *::before,
+  body[data-lesson-caddie-embed="true"] *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

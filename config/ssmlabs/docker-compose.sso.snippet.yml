@@ -1,5 +1,7 @@
-# Copy these keys into the local (gitignored) docker-compose.override.yml `api.environment`
-# and `api.volumes` sections. Leave LESSONCADDIE_SSO_ENABLED=false on production chat.
+# Copy these keys into the local (gitignored) docker-compose.override.yml `api.environment`.
+# Leave LESSONCADDIE_SSO_ENABLED=false on production chat.
+# Overlay inventory: docs/ssmlabs-fork-patches.md
+# Do not inject a login auto-redirect script; SSO is the explicit LessonCaddie handoff only.
 #
 #   NODE_OPTIONS: --require /app/config/ssmlabs/inject-index-html.js --require /app/config/ssmlabs/attach-lessoncaddie-sso.js
 #   LESSONCADDIE_SSO_ENABLED: ${LESSONCADDIE_SSO_ENABLED:-false}
@@ -9,7 +11,3 @@
 #   X_FRAME_OPTIONS: "off"
 #   CROSS_ORIGIN_RESOURCE_POLICY: same-site
 #   CSP_FRAME_ANCESTORS: "'self' https://lessoncaddie.ssmlabs.com http://127.0.0.1:3021"
-#
-#   volumes:
-#     - ./config/ssmlabs/lessoncaddie-sso.browser.js:/app/client/dist/ssmlabs/lessoncaddie-sso.js:ro
-#     - ./config/ssmlabs/embed-passthrough-sw.js:/app/client/dist/sw.js:ro

@@ -1,19 +1,32 @@
+# Copy onto gitignored docker-compose.override.yml. Inventory: docs/ssmlabs-fork-patches.md
+# Do not bind-mount ./client/dist — overlays patch the published image instead.
 services:
   api:
+    dns:
+      - 100.100.100.100
     environment:
       SCHEDULES_SINGLE_PROCESS: "true"
       APP_TITLE: Ask Lesson Caddie Assistant
       APP_SHORT_NAME: Ask Caddie
       SSMLABS_BRANDING_ASSET_VERSION: "1"
+      SSMLABS_CHAT_THEME_ASSET_VERSION: "53"
       HIDE_TOOL_ACTIVITY: "true"
       INSTRUCTOR_ASSISTANT_MODEL: gpt-4o
+      LIBRECHAT_INSTANCE_ENV: ${LIBRECHAT_INSTANCE_ENV:-}
       LESSONCADDIE_HOME_URL: https://lessoncaddie.ssmlabs.com/app
       LESSONCADDIE_ALLOWED_ORIGINS: https://lessoncaddie.ssmlabs.com,http://127.0.0.1:3021,http://localhost:3021
       X_FRAME_OPTIONS: "off"
       CROSS_ORIGIN_RESOURCE_POLICY: same-site
       CSP_FRAME_ANCESTORS: "'self' https://lessoncaddie.ssmlabs.com http://127.0.0.1:3021"
-      LESSONCADDIE_HIDE_MODEL_SELECTOR: "true"
-      NODE_OPTIONS: --require /app/config/ssmlabs/inject-index-html.js
+      MCP_SANDBOX_FRAME_ANCESTORS: "https://chat.ssmlabs.com https://lessoncaddie.ssmlabs.com"
+      LIVE_TALK_SPEAK_CORE_SHA: f9d52b4
+      LIVE_TALK_GPT_LIVE: "false"
+      # GPT-Live only (OpenAI fetches this). Typed Chat uses librechat.yaml LessonCaddie MCP.
+      # Public HTTPS 443 URL of /live-talk/mcp. Never Tailscale Funnel on 443 (breaks PWAs).
+      # See docs/ssmlabs-gpt-live-public-mcp.md
+      LIVE_TALK_MCP_PROXY_URL: https://ssmlabs.tail1ad636.ts.net:8443/live-talk/mcp
+      # inject-index-html keeps api/server/index.js upstream; attach-sso is a no-op until enabled.
+      NODE_OPTIONS: --require /app/config/ssmlabs/inject-index-html.js --require /app/config/ssmlabs/attach-lessoncaddie-sso.js --require /app/config/ssmlabs/attach-live-talk.js
     volumes:
       - ./librechat.yaml:/app/librechat.yaml:ro
       - ./api/server/routes/config.js:/app/api/server/routes/config.js:ro
@@ -22,9 +35,14 @@ services:
       - ./api/server/controllers/agents/callbacks.js:/app/api/server/controllers/agents/callbacks.js:ro
       - ./config/provision-instructor-assistant.js:/app/config/provision-instructor-assistant.js:ro
       - ./config/ssmlabs:/app/config/ssmlabs:ro
-      - ./config/ssmlabs/lessonCaddieReturn.js:/app/config/ssmlabs/lessonCaddieReturn.js:ro
-      - ./config/ssmlabs/hide-model-selector.browser.js:/app/client/dist/ssmlabs/hide-model-selector.js:ro
+      - ./config/ssmlabs/hide-agent-owner-contact.browser.js:/app/client/dist/ssmlabs/hide-agent-owner-contact.js:ro
       - ./config/ssmlabs/lessonCaddieNavigationBridge.browser.js:/app/client/dist/ssmlabs/lesson-caddie-navigation-bridge.js:ro
+      - ./config/ssmlabs/lessonCaddieTheme.browser.js:/app/client/dist/ssmlabs/lesson-caddie-theme.js:ro
+      - ./config/ssmlabs/lessonCaddieConversationStarters.browser.js:/app/client/dist/ssmlabs/lesson-caddie-conversation-starters.js:ro
+      - ./config/ssmlabs/liveTalk.browser.js:/app/client/dist/ssmlabs/lesson-caddie-live-talk.js:ro
+      - ./config/ssmlabs/liveTalk.css:/app/client/dist/ssmlabs/lesson-caddie-live-talk.css:ro
+      - ./config/ssmlabs/speak-core.realtime.js:/app/client/dist/ssmlabs/speak-core.realtime.js:ro
+      - ./config/ssmlabs/lesson-caddie-theme.css:/app/client/dist/ssmlabs/lesson-caddie-theme.css:ro
       - ./config/ssmlabs/embed-passthrough-sw.js:/app/client/dist/sw.js:ro
       - ./config/ssmlabs/branding/manifest.webmanifest:/app/client/dist/manifest.webmanifest:ro
       - ./config/ssmlabs/branding/assets/favicon-16x16.png:/app/client/dist/assets/favicon-16x16.png:ro
@@ -34,3 +52,7 @@ services:
       - ./config/ssmlabs/branding/assets/icon-512x512.png:/app/client/dist/assets/icon-512x512.png:ro
       - ./config/ssmlabs/branding/assets/maskable-icon.png:/app/client/dist/assets/maskable-icon.png:ro
       - ./config/ssmlabs/branding/assets/logo.svg:/app/client/dist/assets/logo.svg:ro
+      - ./config/ssmlabs/branding/assets/caddie.png:/app/client/dist/assets/caddie.png:ro
+      - ./config/ssmlabs/branding/assets/student-caddie.png:/app/client/dist/assets/student-caddie.png:ro
+      - ./config/ssmlabs/branding/assets/instructor-assistant-bg.svg:/app/client/dist/assets/instructor-assistant-bg.svg:ro
+      - ./config/ssmlabs/branding/assets/instructor-assistant-spark.svg:/app/client/dist/assets/instructor-assistant-spark.svg:ro

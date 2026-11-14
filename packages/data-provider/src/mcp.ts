@@ -526,6 +526,12 @@ export const StreamableHTTPOptionsSchema = BaseOptionsSchema.extend({
   type: z.union([z.literal('streamable-http'), z.literal('http')]),
   headers: z.record(z.string(), z.string()).optional(),
   /**
+   * Opt into pooled user connections when BODY placeholders occur only in headers.
+   * The server must read context from each request, not bind it at initialization.
+   * Omitted/false preserves request-scoped connections for BODY placeholders.
+   */
+  reuseConnection: z.boolean().optional(),
+  /**
    * Headers resolved from the live chat request and merged over `headers`.
    * Omitted during catalog discovery, which has no request context, so a
    * `{{LIBRECHAT_BODY_*}}` placeholder here does not block tool listing.

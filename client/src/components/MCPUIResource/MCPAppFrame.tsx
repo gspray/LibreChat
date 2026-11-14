@@ -2,6 +2,7 @@ import React from 'react';
 import { Button, Spinner } from '@librechat/client';
 import type { UIResource } from 'librechat-data-provider';
 import type { MCPAppFrameState } from '~/hooks/MCP';
+import { allowsLibraryVideoFullscreen } from '~/utils/mcpApps';
 import { useLocalize } from '~/hooks';
 
 const OVERLAY_CLASS =
@@ -59,6 +60,7 @@ export function MCPAppFrame({
           ref={frame.iframeRef}
           data-sandbox-url={frame.sandboxUrl}
           sandbox="allow-scripts allow-same-origin allow-forms"
+          allowFullScreen={allowsLibraryVideoFullscreen(resource)}
           className={
             frame.status === 'ready' ? 'visible size-full border-0' : 'invisible size-full border-0'
           }

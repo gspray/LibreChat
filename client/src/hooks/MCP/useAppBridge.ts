@@ -14,6 +14,7 @@ import type { AppToolResult } from '~/utils/mcpApps';
 import type { MCPAppAction } from './approval';
 import {
   callMCPAppTool,
+  allowsLibraryVideoFullscreen,
   fetchMCPResourceHtml,
   readMCPResource,
   listMCPResources,
@@ -261,9 +262,12 @@ export function useAppBridge({
     };
 
     const applyOuterPermissions = (permissions: UIResource['permissions']) => {
-      const allowAttr = buildAllowAttribute(
+      const permissionsAllow = buildAllowAttribute(
         permissions as Parameters<typeof buildAllowAttribute>[0],
       );
+      const allowAttr = [permissionsAllow, allowsLibraryVideoFullscreen(resource) && 'fullscreen']
+        .filter(Boolean)
+        .join('; ');
       if (allowAttr) {
         iframe.setAttribute('allow', allowAttr);
       } else {
@@ -527,8 +531,16 @@ export function useAppBridge({
       };
     };
 
+    let permanentResourceFailure = false;
+    const rememberPermanentFailure = (error: unknown) => {
+      const status = (error as { status?: unknown } | null)?.status;
+      if (typeof status === 'number' && status >= 400 && status < 500 && status !== 429) {
+        permanentResourceFailure = true;
+      }
+    };
+
     const sendResource = async () => {
-      if (resourceSent || sendingResource || cancelled) {
+      if (resourceSent || sendingResource || cancelled || permanentResourceFailure) {
         return;
       }
       sendingResource = true;
@@ -558,6 +570,7 @@ export function useAppBridge({
         });
       } catch (err) {
         resourceSent = false;
+        rememberPermanentFailure(err);
         logger.error('[MCP App] Failed to send sandbox resource', err);
         if (!cancelled) {
           onFailedRef.current?.();
@@ -628,6 +641,7 @@ export function useAppBridge({
       // Both sandbox policies are built from this URL before the document loads. The content-level
       // _meta.ui.csp is authoritative, which requires resolving the resource before navigation.
       const next = await resolveResource().catch((err: unknown) => {
+        rememberPermanentFailure(err);
         logger.error('[MCP App] Failed to read app resource', err);
         if (!cancelled) {
           onFailedRef.current?.();

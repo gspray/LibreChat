@@ -42,6 +42,9 @@ export default function StackedToolIcons({
     for (const name of toolNames) {
       const type = getToolIconType(name);
       const serverName = getMCPServerName(name, mcpServerNames);
+      if (serverName === 'lessoncaddie-instructor') {
+        continue;
+      }
       const iconUrl = serverName ? mcpIconMap?.get(serverName) : undefined;
       if (type === 'web_search' && sourceDomains != null && sourceDomains.length > 0) {
         for (const domain of sourceDomains) {
@@ -66,6 +69,9 @@ export default function StackedToolIcons({
   }
   if (status === 'cancelled') {
     return <X className="text-text-warning size-4 shrink-0" aria-hidden="true" />;
+  }
+  if (uniqueIcons.length === 0) {
+    return null;
   }
 
   const visibleIcons = uniqueIcons.slice(0, maxIcons);

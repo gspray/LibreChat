@@ -130,11 +130,11 @@ function ModelSelectorContent() {
 }
 
 export default function ModelSelector({ startupConfig }: ModelSelectorProps) {
-  const interfaceConfig = startupConfig?.interface ?? defaultInterface;
-
-  // When admins disable the endpoints menu, do not show a model/agent chip even if
-  // modelSpecs remain configured for soft defaults and landing copy.
-  if (interfaceConfig.modelSelect === false) {
+  // Wait for the actual interface policy before rendering a model switcher.
+  if (
+    startupConfig == null ||
+    (startupConfig.interface ?? defaultInterface).modelSelect === false
+  ) {
     return null;
   }
 

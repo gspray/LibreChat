@@ -367,12 +367,12 @@ async function reinitMCPServer({
     if (connection && !oauthRequired) {
       publicationGeneration =
         mcpManager.getToolPublicationGeneration(connection) ?? publicationGeneration;
-      let snapshot;
-      if (typeof connection.fetchOrderedToolsSnapshot === 'function') {
+      let snapshot = connection.getCurrentToolsSnapshot?.();
+      if (!snapshot && typeof connection.fetchOrderedToolsSnapshot === 'function') {
         snapshot = await connection.fetchOrderedToolsSnapshot(undefined, signal);
-      } else if (typeof connection.fetchToolsSnapshot === 'function') {
+      } else if (!snapshot && typeof connection.fetchToolsSnapshot === 'function') {
         snapshot = await connection.fetchToolsSnapshot(undefined, signal);
-      } else {
+      } else if (!snapshot) {
         snapshot = { tools: await connection.fetchTools(), complete: true };
       }
       if (snapshot.complete) {

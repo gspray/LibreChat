@@ -134,7 +134,7 @@ function renderProviderLive() {
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
 
-  return render(
+  const tree = () => (
     <QueryClientProvider client={queryClient}>
       <RecoilRoot>
         <MemoryRouter>
@@ -143,8 +143,10 @@ function renderProviderLive() {
           </AuthContextProvider>
         </MemoryRouter>
       </RecoilRoot>
-    </QueryClientProvider>,
+    </QueryClientProvider>
   );
+  const result = render(tree());
+  return { ...result, rerenderProvider: () => result.rerender(tree()) };
 }
 
 function renderOptionalProvider() {
@@ -575,6 +577,31 @@ describe('AuthContextProvider — silentRefresh post-login redirect', () => {
   afterEach(() => {
     sessionStorage.clear();
     window.history.replaceState({}, '', '/');
+  });
+
+  it('does not start another refresh while the first response is pending', () => {
+    jest.useFakeTimers();
+    const { rerenderProvider } = renderProviderLive();
+    expect(mockRefreshMutate).toHaveBeenCalledTimes(1);
+
+    rerenderProvider();
+    expect(mockRefreshMutate).toHaveBeenCalledTimes(1);
+
+    const [, refreshOptions] = mockRefreshMutate.mock.calls[0] as [
+      unknown,
+      { onSuccess: (data: unknown) => void },
+    ];
+    act(() => {
+      refreshOptions.onSuccess({ user: { id: '1', role: 'USER' }, token: 'new-token' });
+    });
+    rerenderProvider();
+    expect(mockRefreshMutate).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      jest.advanceTimersByTime(100);
+    });
+    expect(mockRefreshMutate).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
   });
 
   it('navigates to stored sessionStorage redirect after successful token refresh', () => {

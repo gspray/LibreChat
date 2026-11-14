@@ -44,9 +44,11 @@ const { processFileCitations } = require('~/server/services/Files/Citations');
 const { processCodeOutput, runPreviewFinalize } = require('~/server/services/Files/Code/process');
 const { preflightCodeOutputBatch } = require('~/server/services/Files/Code/preflight');
 const { saveBase64Image } = require('~/server/services/Files/process');
+/** SSM Labs fork patch — docs/ssmlabs-fork-patches.md. Drop tool SSE for non-admins; keep open_app_screen for the nav overlay. Stream a live-only “Looking up …” line on the first tool for every user, including admins. */
 const {
   shouldHideToolActivityForUser,
   shouldDropToolSse,
+  buildLookupProgressEvents,
 } = require('~/server/utils/hideToolActivity');
 
 function isHostFileAuthoringArtifact(artifact) {
@@ -272,15 +274,28 @@ function checkIfLastAgent(last_agent_id, langgraph_node) {
  * @param {number} [expectedCreatedAt] - The generation epoch that produced the event
  * @returns {Promise<void>}
  */
-async function emitEvent(res, streamId, eventData, expectedCreatedAt) {
-  if (shouldHideToolActivityForUser(res?.req?.user) && shouldDropToolSse(eventData)) {
-    return;
-  }
+async function sendClientEvent(res, streamId, eventData, expectedCreatedAt) {
   if (streamId) {
     await GenerationJobManager.emitChunk(streamId, eventData, { expectedCreatedAt });
   } else {
     sendEvent(res, eventData);
   }
+}
+
+async function emitEvent(res, streamId, eventData, expectedCreatedAt) {
+  if (!res?.__lcLookupProgressSent) {
+    const progressEvents = buildLookupProgressEvents(eventData);
+    if (progressEvents.length) {
+      res.__lcLookupProgressSent = true;
+      for (const progressEvent of progressEvents) {
+        await sendClientEvent(res, streamId, progressEvent, expectedCreatedAt);
+      }
+    }
+  }
+  if (shouldHideToolActivityForUser(res?.req?.user) && shouldDropToolSse(eventData)) {
+    return;
+  }
+  await sendClientEvent(res, streamId, eventData, expectedCreatedAt);
 }
 
 /**

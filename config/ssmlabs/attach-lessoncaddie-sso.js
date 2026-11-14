@@ -1,5 +1,10 @@
 'use strict';
 
+/**
+ * SSM Labs overlay — docs/ssmlabs-fork-patches.md
+ * Mounts /sso/lessoncaddie at listen time so we do not fork api/server/index.js.
+ * No-op until LESSONCADDIE_SSO_ENABLED=true and the shared secret is set.
+ */
 const http = require('http');
 const { createLessonCaddieSsoRouter } = require('./lessonCaddieSsoRoutes');
 const { resolveSsoConfig } = require('./lessonCaddieSso');

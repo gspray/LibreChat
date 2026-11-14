@@ -2,11 +2,13 @@
 
 Dedicated LessonCaddie instructor agent for this LibreChat deployment (v0.8.9-rc1).
 
+**Fork policy:** keep LibreChat source changes to the bind-mounts listed in [ssmlabs-fork-patches.md](ssmlabs-fork-patches.md). UI branding, nested-route asset base, model-chip hiding, iframe SW cleanup, SSO routes, and MCP navigation are overlays under `config/ssmlabs/`.
+
 ## User-facing name
 
 **Ask Lesson Caddie Assistant** (`APP_TITLE`) for browser tab, PWA manifest, and login chrome. **Ask Caddie** (`APP_SHORT_NAME`) for home-screen short name. The default agent remains **Instructor Assistant**; the MCP server identifier remains `lessoncaddie-instructor`.
 
-LessonCaddie launcher icons under `config/ssmlabs/branding/assets/` are volume-mounted over `/app/client/dist/assets/` (favicons, `logo.svg`, maskable/512 icons) and `manifest.webmanifest`. `config/ssmlabs/inject-index-html.js` patches the served `index.html` title, description, apple web app title, and favicon cache-bust query. Recreate the `api` container after changing those files; a process restart alone does not remount volumes.
+LessonCaddie launcher icons and Instructor Assistant artwork under `config/ssmlabs/branding/assets/` are volume-mounted over `/app/client/dist/assets/` (favicons, `logo.svg`, theme art, maskable/512 icons) with `manifest.webmanifest`. `config/ssmlabs/inject-index-html.js` patches the served `index.html` title, description, apple web app title, favicon cache-bust query, and the scoped LessonCaddie Chat theme overlay. Recreate the `api` container after changing those files; a process restart alone does not remount volumes.
 
 ## Architecture
 
@@ -38,8 +40,10 @@ Variables:
 | `APP_TITLE` | `Ask Lesson Caddie Assistant` | Browser/app title (tab default, login logo alt). |
 | `APP_SHORT_NAME` | `Ask Caddie` | Apple web app / PWA short name. |
 | `SSMLABS_BRANDING_ASSET_VERSION` | `1` | Bumps favicon query string when icons change (PWA cache). |
+| `SSMLABS_CHAT_THEME_ASSET_VERSION` | `3` | Bumps the LessonCaddie Chat stylesheet and browser-overlay query strings. |
 | `LESSONCADDIE_HOME_URL` | `https://lessoncaddie.ssmlabs.com/app` | LessonCaddie origin used by SSO return/allow-list helpers. |
 | `LESSONCADDIE_ALLOWED_ORIGINS` | `https://lessoncaddie.ssmlabs.com` | Comma-separated origins allowed as SSO `returnUrl` values. The home URL origin is always included. |
+Live Talk is on for this branch whenever the overlay attach is loaded. There is no disable env flag.
 
 Chat uses LibreChat’s own header. App ↔ Assistant switching lives in the LessonCaddie shell, not inside chat.
 
@@ -55,14 +59,14 @@ OpenAI credentials stay in the existing Compose/Doppler env. They are not writte
 | ID | `agent_instructor_assistant` |
 | Model | `gpt-4o` (`openAI`) |
 | MCP | `lessoncaddie-instructor` |
-| Tools | Instructor MCP tools including `open_app_screen` (`{name}_mcp_lessoncaddie-instructor`) |
-| Sharing | Owner ACL + USER role **viewer**. USER `permissions.AGENTS.CREATE` is `false`. |
+| Tools | All tools from `lessoncaddie-instructor` (`sys__server__sys_mcp_lessoncaddie-instructor` + `sys__all__sys_mcp_lessoncaddie-instructor`). Do not freeze a per-tool name list; LessonCaddie authorizes each call. |
+| Sharing | Owner ACL + USER role **viewer**. USER `permissions.AGENTS.CREATE` is managed by the reviewed [role permission snapshot](ssmlabs-role-permissions.md). |
 
 Default selection: model spec `instructor-assistant` with `softDefault: true` and `preset.agent_id: agent_instructor_assistant`. Existing conversations that use another agent are not rewritten.
 
 UI: `modelSelect` and `parameters` off; MCP `chatMenu` false; MCP create/share/public false; prompts off. Administrators retain agent create and tool diagnostics.
 
-On LibreChat **v0.8.9-rc1**, `interface.modelSelect: false` alone does **not** hide the header model/agent chip when `modelSpecs.list` is non-empty (the chip can still open “Search models”). Keep `modelSpecs` for `softDefault` and landing starters; hide the chip with the mounted `config/ssmlabs/hide-model-selector.browser.js` overlay (or rebuild the client after the `ModelSelector` fix). Do **not** set `showInMenu: false` on the only spec — that removes it from `/api/config` and breaks client-side default agent selection for new chats.
+On LibreChat **v0.8.9-rc1**, `interface.modelSelect: false` alone does **not** hide the header model/agent chip when `modelSpecs.list` is non-empty (the chip can still open “Search models”). Keep `modelSpecs` for `softDefault` and landing starters; hide the chip with the mounted `config/ssmlabs/hide-model-selector.browser.js` overlay. Do **not** fork `ModelSelector.tsx`. Do **not** set `showInMenu: false` on the only spec — that removes it from `/api/config` and breaks client-side default agent selection for new chats.
 
 ## Provision / update
 
@@ -82,13 +86,11 @@ The provision command is idempotent: it creates the agent if missing, otherwise 
 
 Native `hide_sequential_outputs` does not hide MCP “Ran tool” cards in v0.8.9-rc1.
 
-Server (`HIDE_TOOL_ACTIVITY`):
+Server (`HIDE_TOOL_ACTIVITY`), bind-mounted — do not fork `client/src` message components:
 
-- Drops tool SSE events for non-admins (OAuth prompts still stream).
+- Drops tool SSE events for non-admins (OAuth prompts still stream; `open_app_screen` still streams for the navigation overlay).
 - Redacts tool parts on message GET.
 - Returns 403 for tool-part detail routes for non-admins.
-
-The production image cannot rebuild the Vite client. Source patches in `client/src` are kept for a future rebuild. Do not rely on CSS alone.
 
 ## Identity status
 
@@ -96,4 +98,4 @@ Designed per LibreChat user OAuth → LessonCaddie instructor `userId`. This hos
 
 ## Upgrade notes
 
-Keep the bind-mounted API files listed in the compose override when pulling LibreChat images. Do not upgrade LibreChat as part of ordinary Instructor Assistant maintenance.
+Keep the bind-mounted API files listed in [ssmlabs-fork-patches.md](ssmlabs-fork-patches.md) when pulling LibreChat images. Do not upgrade LibreChat as part of ordinary Instructor Assistant maintenance. Do not bind-mount a custom `client/dist`.

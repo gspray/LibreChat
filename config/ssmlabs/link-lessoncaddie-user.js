@@ -1,6 +1,7 @@
 'use strict';
 
 /**
+ * SSM Labs overlay — docs/ssmlabs-fork-patches.md
  * Controlled linking for an existing LibreChat user to a Firebase UID.
  * Does not merge by email automatically.
  *
@@ -24,7 +25,9 @@ function readArg(name) {
 }
 
 async function main() {
-  const email = String(readArg('email') || '').trim().toLowerCase();
+  const email = String(readArg('email') || '')
+    .trim()
+    .toLowerCase();
   const firebaseUid = String(readArg('firebaseUid') || '').trim();
   if (!email || !firebaseUid) {
     throw new Error('Required: --email and --firebaseUid');
@@ -34,8 +37,12 @@ async function main() {
   if (!user) {
     throw new Error(`No LibreChat user for ${email}`);
   }
-  if (user.provider === PROVIDER && user.openidId && user.openidId !== firebaseUid) {
+  if (user.openidId && user.openidId !== firebaseUid) {
     throw new Error('User is already linked to a different Firebase UID');
+  }
+  const alreadyMapped = await findUser({ provider: PROVIDER, openidId: firebaseUid });
+  if (alreadyMapped && String(alreadyMapped._id) !== String(user._id)) {
+    throw new Error('Firebase UID is already linked to a different LibreChat user');
   }
   await updateUser(user._id, {
     provider: PROVIDER,

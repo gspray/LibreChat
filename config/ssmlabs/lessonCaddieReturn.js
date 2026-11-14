@@ -1,5 +1,6 @@
 'use strict';
 
+/** SSM Labs overlay — docs/ssmlabs-fork-patches.md. Allow-list + lessonCaddie /api/config payload. */
 const STORAGE_KEY = 'ssmlabs.lessoncaddie.returnUrl';
 const QUERY_KEYS = ['returnUrl', 'lessoncaddieReturn'];
 const DEFAULT_HOME_URL = 'https://lessoncaddie.ssmlabs.com/app';
@@ -61,7 +62,11 @@ function normalizeAllowedOrigins(raw, homeUrl) {
     .filter(Boolean)
     .forEach((part) => {
       const parsed = parseAbsoluteUrl(part.includes('://') ? part : `https://${part}`);
-      if (parsed && (parsed.protocol === 'https:' || (parsed.protocol === 'http:' && isLocalHttpHost(parsed.hostname)))) {
+      if (
+        parsed &&
+        (parsed.protocol === 'https:' ||
+          (parsed.protocol === 'http:' && isLocalHttpHost(parsed.hostname)))
+      ) {
         origins.add(parsed.origin);
       }
     });
@@ -76,14 +81,6 @@ function sanitizeReturnUrl(candidate, allowedOrigins) {
   return url.toString();
 }
 
-function readEnvFlag(env, name, defaultWhenUnset) {
-  const raw = env[name];
-  if (raw === undefined || raw === '') {
-    return defaultWhenUnset;
-  }
-  return !/^(0|false|no|off)$/i.test(String(raw).trim());
-}
-
 function resolveLessonCaddieConfig(env = process.env) {
   const requestedHome = trimString(env.LESSONCADDIE_HOME_URL) || DEFAULT_HOME_URL;
   const allowedOrigins = normalizeAllowedOrigins(env.LESSONCADDIE_ALLOWED_ORIGINS, requestedHome);
@@ -93,8 +90,6 @@ function resolveLessonCaddieConfig(env = process.env) {
     allowedOrigins,
     storageKey: STORAGE_KEY,
     queryKeys: QUERY_KEYS,
-    /** Pre-login safe; drives ssmlabs hide-model-selector overlay (see LESSONCADDIE_HIDE_MODEL_SELECTOR). */
-    hideModelSelector: readEnvFlag(env, 'LESSONCADDIE_HIDE_MODEL_SELECTOR', true),
   };
 }
 

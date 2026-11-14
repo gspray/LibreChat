@@ -1291,6 +1291,35 @@ describe('validateMCPServerConfig', () => {
 });
 
 describe('requiresEphemeralUserConnection', () => {
+  it('can reuse an opted-in HTTP connection with request-local headers', () => {
+    const config = {
+      source: 'yaml' as const,
+      type: 'streamable-http',
+      reuseConnection: true,
+      requestHeaders: { 'X-Conversation': '{{LIBRECHAT_BODY_CONVERSATIONID}}' },
+    };
+    expect(requiresEphemeralUserConnection(config)).toBe(false);
+    expect(getMissingRuntimeBodyPlaceholderFields(config, {})).toEqual(['conversationId']);
+    expect(requiresEphemeralUserConnection({ ...config, reuseConnection: false })).toBe(true);
+    expect(requiresEphemeralUserConnection({ ...config, type: 'sse' })).toBe(true);
+  });
+
+  it.each([
+    { url: 'https://example.com/{{LIBRECHAT_BODY_CONVERSATIONID}}' },
+    { oauth_headers: { 'X-Conversation': '{{LIBRECHAT_BODY_CONVERSATIONID}}' } },
+    { args: ['{{LIBRECHAT_BODY_CONVERSATIONID}}'] },
+    { env: { CONTEXT: '{{LIBRECHAT_BODY_CONVERSATIONID}}' } },
+  ])('does not reuse when non-header connection fields depend on the body: %j', (fields) => {
+    expect(
+      requiresEphemeralUserConnection({
+        source: 'yaml',
+        type: 'streamable-http',
+        reuseConnection: true,
+        ...fields,
+      }),
+    ).toBe(true);
+  });
+
   it('returns true when BODY placeholders affect oauth_headers', () => {
     expect(
       requiresEphemeralUserConnection({

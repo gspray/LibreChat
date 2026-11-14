@@ -1,7 +1,10 @@
 'use strict';
 
+/** SSM Labs overlay — docs/ssmlabs-fork-patches.md. Express routes mounted by attach-lessoncaddie-sso.js. */
 const express = require('express');
 const crypto = require('node:crypto');
+const { version: chatVersion } = require('../../package.json');
+const CHAT_STARTED_AT = new Date().toISOString();
 const {
   resolveSsoConfig,
   sanitizeAppReturnTo,
@@ -20,7 +23,19 @@ function createLessonCaddieSsoRouter(deps = {}) {
   const getModels = deps.getModels || (() => require('~/models'));
   const getAuthService = deps.getAuthService || (() => require('~/server/services/AuthService'));
   const logger = deps.logger || console;
-  const chatOrigin = () => new URL(process.env.DOMAIN_CLIENT || 'https://chat.ssmlabs.com').origin;
+  const chatUrl = () => new URL(process.env.DOMAIN_CLIENT || 'https://chat.ssmlabs.com');
+  const chatOrigin = () => chatUrl().origin;
+  const defaultReturnTo = () => `${chatUrl().pathname.replace(/\/$/, '')}/c/new`;
+
+  router.get('/version', (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      name: 'LessonCaddie Chat',
+      version: chatVersion,
+      startedAt: CHAT_STARTED_AT,
+      retrievedAt: new Date().toISOString(),
+    });
+  });
 
   router.get('/start', (req, res) => {
     const config = loadConfig();
@@ -31,7 +46,7 @@ function createLessonCaddieSsoRouter(deps = {}) {
     const returnTo = sanitizeAppReturnTo(
       req.query.returnTo || req.query.redirect_uri,
       [chatOrigin()],
-      '/c/new',
+      defaultReturnTo(),
     );
     const state = crypto.randomBytes(24).toString('base64url');
     res.cookie('lc_sso_state', state, {
@@ -50,7 +65,7 @@ function createLessonCaddieSsoRouter(deps = {}) {
       return;
     }
     const origin = chatOrigin();
-    const returnTo = sanitizeAppReturnTo(req.query.returnTo, [origin], '/c/new');
+    const returnTo = sanitizeAppReturnTo(req.query.returnTo, [origin], defaultReturnTo());
     const state = String(req.query.state || '');
     const cookieState = String(req.cookies?.lc_sso_state || '');
     res.clearCookie('lc_sso_state');
@@ -74,8 +89,20 @@ function createLessonCaddieSsoRouter(deps = {}) {
       res.redirect(302, returnTo.startsWith('/') ? returnTo : returnTo);
     } catch (error) {
       logger.error('[ssmlabs-lessoncaddie-sso] callback failed', error?.code || error?.message);
+      if (['EAI_AGAIN', 'ENOTFOUND', 'EHOSTUNREACH', 'ENETUNREACH'].includes(error?.cause?.code)) {
+        res
+          .status(503)
+          .send(
+            "Chat cannot reach LessonCaddie. Please retry from LessonCaddie. If this continues, ask your administrator to check the server's Tailscale connection.",
+          );
+        return;
+      }
       const mapped = mapIdentityError(error?.code);
-      if (error?.code === 'LINK_REQUIRED') {
+      if (
+        error?.code === 'LINK_REQUIRED' ||
+        error?.code === 'LINK_MISSING' ||
+        error?.code === 'LINK_CONFLICT'
+      ) {
         res.status(mapped.status).send(mapped.message);
         return;
       }

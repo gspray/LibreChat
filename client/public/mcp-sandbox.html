@@ -291,7 +291,9 @@
           granted.length > 0 ? granted.join(' ') : DEFAULT_SANDBOX,
         );
 
+        // The host's outer iframe controls which Apps can use fullscreen.
         const allowParts = [];
+        innerFrame.allowFullscreen = true;
         if (permissions && typeof permissions === 'object') {
           if (permissions.geolocation) allowParts.push('geolocation');
           if (permissions.clipboardWrite) allowParts.push('clipboard-write');

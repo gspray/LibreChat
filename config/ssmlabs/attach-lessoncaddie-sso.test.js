@@ -6,6 +6,26 @@ const http = require('node:http');
 const express = require('express');
 const createSpaFallback = require('../../api/server/utils/fallback');
 const { attach } = require('./attach-lessoncaddie-sso');
+const { createLessonCaddieSsoRouter } = require('./lessonCaddieSsoRoutes');
+
+test('Chat version route reports the running package version without caching', async () => {
+  const app = express();
+  app.use('/sso/lessoncaddie', createLessonCaddieSsoRouter());
+  const server = app.listen(0);
+  try {
+    const response = await fetch(
+      `http://127.0.0.1:${server.address().port}/sso/lessoncaddie/version`,
+    );
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    const info = await response.json();
+    assert.equal(info.name, 'LessonCaddie Chat');
+    assert.equal(info.version, require('../../package.json').version);
+    assert.match(info.startedAt, /^\d{4}-/);
+  } finally {
+    server.close();
+  }
+});
 
 test('SSO router is mounted before the SPA fallback', () => {
   const previousEnabled = process.env.LESSONCADDIE_SSO_ENABLED;

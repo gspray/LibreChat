@@ -3,7 +3,7 @@
 
 services:
   api:
-    container_name: LibreChat
+    container_name: ${LIBRECHAT_API_CONTAINER_NAME:-LibreChat}
     ports:
       - "${PORT}:${PORT}"
     depends_on:
@@ -38,7 +38,7 @@ services:
       - ./skill:/app/skill
       - librechat-data:/app/data
   admin-panel:
-    container_name: admin-panel
+    container_name: ${LIBRECHAT_ADMIN_CONTAINER_NAME:-admin-panel}
     image: registry.librechat.ai/librechat-ai/librechat-admin-panel:latest
     ports:
       - "${ADMIN_PANEL_PORT:-3000}:3000"
@@ -54,7 +54,7 @@ services:
       - VITE_API_BASE_URL=${DOMAIN_CLIENT:-http://localhost:3080}
       - SESSION_COOKIE_SECURE=${ADMIN_PANEL_SESSION_COOKIE_SECURE:-false}
   mongodb:
-    container_name: chat-mongodb
+    container_name: ${LIBRECHAT_MONGO_CONTAINER_NAME:-chat-mongodb}
     image: mongo:8.0.20
     restart: always
     user: "${UID}:${GID}"
@@ -62,7 +62,7 @@ services:
       - ./data-node:/data/db
     command: mongod --noauth
   meilisearch:
-    container_name: chat-meilisearch
+    container_name: ${LIBRECHAT_MEILI_CONTAINER_NAME:-chat-meilisearch}
     image: getmeili/meilisearch:v1.35.1
     restart: always
     user: "${UID}:${GID}"
@@ -73,7 +73,7 @@ services:
     volumes:
       - ./meili_data_v1.35.1:/meili_data
   vectordb:
-    container_name: vectordb
+    container_name: ${LIBRECHAT_VECTOR_CONTAINER_NAME:-vectordb}
     image: pgvector/pgvector:0.8.0-pg15-trixie
     environment:
       POSTGRES_DB: mydatabase
@@ -83,7 +83,7 @@ services:
     volumes:
       - pgdata2:/var/lib/postgresql/data
   rag_api:
-    container_name: rag_api
+    container_name: ${LIBRECHAT_RAG_CONTAINER_NAME:-rag_api}
     image: registry.librechat.ai/librechat-ai/librechat-rag-api-dev-lite:latest
     environment:
       - DB_HOST=vectordb

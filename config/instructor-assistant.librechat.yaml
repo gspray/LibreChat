@@ -1,55 +1,61 @@
 version: 1.3.18
+# Live Talk is the overlay on this branch, not a yaml modelSpec.
 cache: true
 mcpSettings:
   apps: true
   allowedDomains:
     - lessoncaddie.ssmlabs.com
 mcpServers:
+  lessoncaddie-student:
+    type: streamable-http
+    url: https://lessoncaddie.ssmlabs.com/api/student-mcp
+    iconPath: https://chat.ssmlabs.com/assets/caddie.png
+    reuseConnection: true
+    requiresOAuth: false
+    chatMenu: false
+    serverInstructions: true
+    headers:
+      X-LessonCaddie-Sso-Secret: '${LESSONCADDIE_SSO_SHARED_SECRET}'
+      X-LibreChat-Firebase-Uid: '{{LIBRECHAT_USER_OPENIDID}}'
+      X-LibreChat-User-Provider: '{{LIBRECHAT_USER_PROVIDER}}'
   lessoncaddie-instructor:
     type: streamable-http
     url: https://lessoncaddie.ssmlabs.com/api/instructor-mcp
-    requiresOAuth: true
+    iconPath: https://chat.ssmlabs.com/assets/caddie.png
+    # LessonCaddie resolves chat context on each HTTP request.
+    reuseConnection: true
+    requiresOAuth: false
     chatMenu: false
     serverInstructions: true
-    oauth:
-      scope: 'instructor:read instructor:write offline_access'
+    headers:
+      X-LessonCaddie-Sso-Secret: '${LESSONCADDIE_SSO_SHARED_SECRET}'
+      X-LibreChat-Firebase-Uid: '{{LIBRECHAT_USER_OPENIDID}}'
+      X-LibreChat-User-Provider: '{{LIBRECHAT_USER_PROVIDER}}'
     requestHeaders:
       X-LibreChat-User-Id: '{{LIBRECHAT_USER_ID}}'
-      X-LibreChat-Conversation-Id: '{{LIBRECHAT_BODY_CONVERSATIONID}}'
 mcpAppSandbox:
   url: https://mcp-sandbox.ssmlabs.com/api/mcp/sandbox
 interface:
-  customWelcome: "Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?"
+  customWelcome: 'Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?'
   landingHeading: entity
   landingFooter: false
-  # Endpoints/model chip off; modelSpecs below still drive softDefault + landing (v0.8.9-rc1 needs ssmlabs hide-model-selector overlay until client rebuild).
+  # Hide the model picker; modelSpecs still drive the default agent and landing page.
   modelSelect: false
   parameters: false
   presets: false
   mascot: false
   defaultPinnedTools: []
-  mcpServers:
-    use: true
-    create: false
-    share: false
-    public: false
-  agents:
-    use: true
-    # Creation is role-controlled: ADMIN can create agents; USER cannot.
-    share: false
-    public: false
-  prompts:
-    use: false
-    create: false
-    share: false
-    public: false
+  # Admin and User role permissions come from role-permissions.json.
+  # Explicit interface permission fields would overwrite those roles at startup.
 modelSpecs:
   enforce: false
   prioritize: true
   list:
     - name: instructor-assistant
       label: Instructor Assistant
-      description: "Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?"
+      iconURL: https://chat.ssmlabs.com/assets/caddie.png
+      default: true
+      description: 'Welcome! I’m Instructor Assistant. I can help you find students, review lessons, manage schedules, and work with practice plans. What would you like to do?'
       softDefault: true
       showOnLanding: true
       hideBadgeRow: true
@@ -58,6 +64,23 @@ modelSpecs:
         - Show my recent lessons
         - Help me schedule a lesson
         - Review a student’s practice plan
+      mcpServers:
+        - lessoncaddie-instructor
       preset:
         endpoint: agents
         agent_id: agent_instructor_assistant
+    - name: student-caddie
+      label: Student Caddie
+      iconURL: https://chat.ssmlabs.com/assets/student-caddie.png
+      description: 'Ask Caddie about your lessons, practices, and notifications.'
+      showOnLanding: true
+      hideBadgeRow: true
+      conversation_starters:
+        - "What's on my schedule?"
+        - Show my recent lessons
+        - What should I practice?
+      mcpServers:
+        - lessoncaddie-student
+      preset:
+        endpoint: agents
+        agent_id: agent_student_caddie

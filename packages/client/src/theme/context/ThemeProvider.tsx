@@ -36,10 +36,14 @@ const THEME_NAME_KEY = 'theme-name';
 const THEME_DEFINITION_KEY = 'theme-definition';
 const THEME_SOURCE_KEY = 'theme-source';
 const HIGH_CONTRAST_CLASS = 'high-contrast';
+/** SSM Labs fork patch — Lesson Caddie Instructor Assistant default palette (Settings → Theme → Default). */
+export const LESSON_CADDIE_DEFAULT_APPEARANCE = 'lesson-caddie-default';
+
 const themeModes = [
-  'light',
-  'dark',
+  'lesson-caddie-default',
   'system',
+  'dark',
+  'light',
   'high-contrast-light',
   'high-contrast-dark',
 ] as const;
@@ -149,7 +153,9 @@ export const isDark = (theme: string): boolean => {
   if (theme === 'system') {
     return matchesMedia('(prefers-color-scheme: dark)');
   }
-  return theme === 'dark' || theme === 'high-contrast-dark';
+  return (
+    theme === 'dark' || theme === 'high-contrast-dark' || theme === LESSON_CADDIE_DEFAULT_APPEARANCE
+  );
 };
 
 /**
@@ -750,6 +756,23 @@ export function ThemeProvider({
       root.classList.toggle('dark', mode === 'dark');
       root.classList.toggle('light', mode === 'light');
       root.classList.toggle(HIGH_CONTRAST_CLASS, highContrast);
+
+      const lessonCaddieDefault = currentTheme === LESSON_CADDIE_DEFAULT_APPEARANCE;
+      root.toggleAttribute('data-lesson-caddie-color-theme', lessonCaddieDefault);
+      if (lessonCaddieDefault) {
+        root.dataset.lessonCaddieColorTheme = 'default';
+      } else {
+        delete root.dataset.lessonCaddieColorTheme;
+      }
+      const body = window.document.body;
+      if (body) {
+        body.toggleAttribute('data-lesson-caddie-color-theme', lessonCaddieDefault);
+        if (lessonCaddieDefault) {
+          body.dataset.lessonCaddieColorTheme = 'default';
+        } else {
+          delete body.dataset.lessonCaddieColorTheme;
+        }
+      }
 
       /** A contrast mode is an accessibility need, so it outranks both a
        *  deployment's custom definition and the legacy RGB colors. */

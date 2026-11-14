@@ -50,6 +50,15 @@ export function isMcpAppResource(resource: UIResource): boolean {
   return !!resource.toolName && !!resource.serverName && isMcpAppMimeType(resource.mimeType);
 }
 
+/** Only the LessonCaddie Library player may enter browser fullscreen. */
+export function allowsLibraryVideoFullscreen(resource: UIResource): boolean {
+  return (
+    resource.serverName === 'lessoncaddie-instructor' &&
+    resource.toolName === 'play_library_item' &&
+    resource.uri.startsWith('ui://lessoncaddie-instructor/video-player/')
+  );
+}
+
 /**
  * Builds the App Bridge tool result from a UI resource. App-backed resources (toolName +
  * serverName) always produce a result so the app's ontoolresult fires even for empty output,
@@ -192,7 +201,9 @@ async function postMCPAppRequest<T>(
     signal,
   });
   if (!response.ok) {
-    throw new Error(`MCP App request failed (${response.status})`);
+    throw Object.assign(new Error(`MCP App request failed (${response.status})`), {
+      status: response.status,
+    });
   }
   return (await response.json()) as T;
 }

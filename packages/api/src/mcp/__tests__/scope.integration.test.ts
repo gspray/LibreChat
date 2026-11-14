@@ -751,6 +751,60 @@ describe('operator requestHeaders integration', () => {
     }
   });
 
+  it('reuses an opted-in connection across turns and keeps concurrent headers isolated', async () => {
+    const config = { ...createRequestHeadersConfig(server.url), reuseConnection: true };
+    const invoke = (conversationId: string, messageId: string) =>
+      manager.callTool({
+        user,
+        serverName,
+        serverConfig: config,
+        toolName: 'echo',
+        provider: 'openai',
+        toolArguments: { value: messageId },
+        requestBody: { conversationId, messageId },
+        requestScopedConnections: createContext(),
+        flowManager,
+      });
+    try {
+      await invoke('warm-chat', 'warm-message');
+      const warmHeaderCount = server.observedHeaders().length;
+      await cleanupMCPRequestContext([...contexts][0]);
+      expect(server.deleteCount()).toBe(0);
+      await invoke('next-chat', 'next-message');
+      const nextHeaders = server.observedHeaders().slice(warmHeaderCount);
+      expect(nextHeaders.some((headers) => headers['x-trace-id'] === 'next-message')).toBe(true);
+      await Promise.all(Array.from({ length: 8 }, (_, i) => invoke(`chat-${i}`, `message-${i}`)));
+      const headers = server.observedHeaders();
+      for (let i = 0; i < 8; i++) {
+        const matching = headers.filter((entry) => entry['x-trace-id'] === `message-${i}`);
+        expect(matching.length).toBeGreaterThan(0);
+        expect(matching.every((entry) => entry['x-conversation-id'] === `chat-${i}`)).toBe(true);
+      }
+      expect(server.sessionsCreated()).toBe(1);
+      expect(server.toolCallCount()).toBe(10);
+      await expect(
+        manager.callTool({
+          user,
+          serverName,
+          serverConfig: config,
+          toolName: 'echo',
+          provider: 'openai',
+          toolArguments: { value: 'missing' },
+          requestBody: { conversationId: 'chat' },
+          flowManager,
+        }),
+      ).rejects.toThrow(/messageId/);
+      expect(server.toolCallCount()).toBe(10);
+      await manager.disconnectUserConnection(user.id, serverName);
+      expect(server.deleteCount()).toBe(1);
+      await invoke('reconnected-chat', 'reconnected-message');
+      expect(server.sessionsCreated()).toBe(2);
+      expect(server.toolCallCount()).toBe(11);
+    } finally {
+      await manager.disconnectUserConnection(user.id, serverName);
+    }
+  });
+
   it('isolates two request bodies in separate connections with distinct headers', async () => {
     await callEchoWithBody({
       requestScopedConnections: createContext(),

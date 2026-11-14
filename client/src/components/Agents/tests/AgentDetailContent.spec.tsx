@@ -303,14 +303,13 @@ describe('AgentDetailContent', () => {
     });
   });
 
-  it('uses the public owner name when no support contact is configured', () => {
+  it('omits the owner name when no support contact is configured', () => {
     renderDetail({
       ...baseAgent,
       owner_contact: { name: 'Owner User' },
     });
 
-    expect(screen.getByText('Owner User')).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Owner User' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Owner User')).not.toBeInTheDocument();
   });
 
   it('filters empty starters and opens a new editable chat without submitting', async () => {

@@ -299,24 +299,17 @@ const startServer = async () => {
   const indexPath = path.join(appConfig.paths.dist, 'index.html');
   let indexHTML = fs.readFileSync(indexPath, 'utf8');
 
-  // Resolve relative Vite assets from the application root even when the current URL
-  // is a nested client route such as /c/new. DOMAIN_CLIENT also supplies the correct
-  // base path for deployments mounted below the host root.
-  let baseHref = '/';
+  // In order to provide support to serving the application in a sub-directory
+  // We need to update the base href if the DOMAIN_CLIENT is specified and not the root path
   if (process.env.DOMAIN_CLIENT) {
     const clientUrl = new URL(process.env.DOMAIN_CLIENT);
-    baseHref = clientUrl.pathname.endsWith('/')
+    const baseHref = clientUrl.pathname.endsWith('/')
       ? clientUrl.pathname
       : `${clientUrl.pathname}/`;
-  }
-  if (baseHref !== '/') {
-    logger.info(`Setting base href to ${baseHref}`);
-  }
-  const baseTag = `<base href="${escapeHtmlAttribute(baseHref)}">`;
-  if (/<base\b[^>]*>/i.test(indexHTML)) {
-    indexHTML = indexHTML.replace(/<base\b[^>]*>/i, baseTag);
-  } else {
-    indexHTML = indexHTML.replace(/<head\b[^>]*>/i, (headTag) => `${headTag}\n    ${baseTag}`);
+    if (baseHref !== '/') {
+      logger.info(`Setting base href to ${baseHref}`);
+      indexHTML = indexHTML.replace(/base href="\/"/, `base href="${baseHref}"`);
+    }
   }
 
   /* The composer lays out against whether a footer bar sits beneath it, and

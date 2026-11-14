@@ -10,6 +10,7 @@ const {
   sanitizeAppReturnTo,
   buildLessonCaddieStartUrl,
   ssoBrowserStateAllowsCallback,
+  ssoScopedEmail,
   resolveLibreChatUser,
 } = require('./lessonCaddieSso');
 
@@ -47,6 +48,29 @@ test('start URL sends the user through LessonCaddie with a return path', () => {
   assert.equal(url.origin, 'https://lessoncaddie.ssmlabs.com');
   assert.equal(url.searchParams.get('librechatSsoReturn'), '/c/new');
   assert.equal(url.searchParams.get('librechatSsoState'), 'browser-state');
+});
+
+test('SSO start keeps the configured chat base path', async () => {
+  const previous = process.env.DOMAIN_CLIENT;
+  process.env.DOMAIN_CLIENT = 'https://stage.lessoncaddie.app/chat';
+  try {
+    const app = express();
+    app.use(
+      '/sso/lessoncaddie',
+      createLessonCaddieSsoRouter({
+        resolveSsoConfig: () => ({ enabled: true, homeUrl: 'https://stage.lessoncaddie.app/app' }),
+      }),
+    );
+    const response = await request(app).get('/sso/lessoncaddie/start');
+    assert.equal(response.status, 302);
+    assert.equal(
+      new URL(response.headers.location).searchParams.get('librechatSsoReturn'),
+      '/chat/c/new',
+    );
+  } finally {
+    if (previous === undefined) delete process.env.DOMAIN_CLIENT;
+    else process.env.DOMAIN_CLIENT = previous;
+  }
 });
 
 test('iframe callback may omit the /start cookie; mismatched cookies are still rejected', () => {
@@ -133,8 +157,33 @@ test('callback without lc_sso_state cookie redeems the LessonCaddie handoff', as
   assert.equal(redeemed, 1);
 });
 
+test('callback reports a retry hint when LessonCaddie DNS is unavailable', async () => {
+  const app = express();
+  app.use(
+    '/sso/lessoncaddie',
+    createLessonCaddieSsoRouter({
+      resolveSsoConfig: () => ({ enabled: true, homeUrl: 'https://lessoncaddie.ssmlabs.com/app' }),
+      redeemWithLessonCaddie: async () => {
+        throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'EAI_AGAIN' } });
+      },
+      logger: { error() {} },
+    }),
+  );
+  const response = await request(app).get('/sso/lessoncaddie/callback?code=code&state=state');
+  assert.equal(response.status, 503);
+  assert.match(response.text, /retry from LessonCaddie/);
+  assert.match(response.text, /server's Tailscale connection/);
+});
+
 test('resolveLibreChatUser creates on first login and does not merge by email', async () => {
   const created = { _id: 'lc-new', provider: 'lessoncaddie', openidId: 'fb-1', role: 'USER' };
+  const scoped = {
+    _id: 'lc-scoped',
+    provider: 'lessoncaddie',
+    openidId: 'fb-1',
+    email: ssoScopedEmail('fb-1'),
+    role: 'USER',
+  };
   const models = {
     async findUser(query) {
       if (query.provider === 'lessoncaddie' && query.openidId === 'fb-1') {
@@ -148,14 +197,22 @@ test('resolveLibreChatUser creates on first login and does not merge by email', 
     async updateUser() {
       throw new Error('should not update on email collision');
     },
-    async createUserIfAbsent() {
-      return { ok: false, error: { code: 'user_exists' } };
+    async createUserIfAbsent(data) {
+      if (data.email === 'greg@example.com') {
+        return { ok: false, error: { code: 'user_exists' } };
+      }
+      assert.equal(data.email, ssoScopedEmail('fb-1'));
+      assert.equal(data.openidId, 'fb-1');
+      assert.equal(data.role, 'USER');
+      return { ok: true, value: scoped };
     },
   };
-  await assert.rejects(
-    () => resolveLibreChatUser({ firebaseUid: 'fb-1', email: 'greg@example.com' }, models),
-    (error) => error.code === 'LINK_REQUIRED',
+  const switched = await resolveLibreChatUser(
+    { firebaseUid: 'fb-1', email: 'greg@example.com' },
+    models,
   );
+  assert.equal(switched._id, 'lc-scoped');
+  assert.equal(switched.email, ssoScopedEmail('fb-1'));
 
   const createModels = {
     async findUser(query) {
@@ -177,6 +234,67 @@ test('resolveLibreChatUser creates on first login and does not merge by email', 
     createModels,
   );
   assert.equal(user._id, 'lc-new');
+});
+
+test('stale explicit links fail closed instead of creating a second account', async () => {
+  const models = {
+    async findUser(query) {
+      if (query.provider === 'lessoncaddie' || query._id) {
+        return null;
+      }
+      return null;
+    },
+    async updateUser() {
+      throw new Error('should not update a missing link');
+    },
+    async createUserIfAbsent() {
+      throw new Error('should not create when an explicit link is missing');
+    },
+  };
+  await assert.rejects(
+    () =>
+      resolveLibreChatUser(
+        {
+          firebaseUid: 'fb-stale',
+          email: 'stale@example.com',
+          linkedLibreChatUserId: 'missing-chat-user',
+        },
+        models,
+      ),
+    (error) => error.code === 'LINK_MISSING',
+  );
+});
+
+test('explicit links refuse to overwrite a different Firebase UID', async () => {
+  const models = {
+    async findUser(query) {
+      if (query.provider === 'lessoncaddie') {
+        return null;
+      }
+      if (String(query._id) === 'lc-taken') {
+        return { _id: 'lc-taken', openidId: 'other-uid', provider: 'lessoncaddie', role: 'USER' };
+      }
+      return null;
+    },
+    async updateUser() {
+      throw new Error('should not steal an existing mapping');
+    },
+    async createUserIfAbsent() {
+      throw new Error('should not create');
+    },
+  };
+  await assert.rejects(
+    () =>
+      resolveLibreChatUser(
+        {
+          firebaseUid: 'fb-new',
+          email: 'new@example.com',
+          linkedLibreChatUserId: 'lc-taken',
+        },
+        models,
+      ),
+    (error) => error.code === 'LINK_CONFLICT',
+  );
 });
 
 test('explicit link maps an existing LibreChat user without changing ADMIN', async () => {

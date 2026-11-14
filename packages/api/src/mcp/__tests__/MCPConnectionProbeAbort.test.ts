@@ -12,7 +12,7 @@
  */
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { ListToolsRequestSchema, PingRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { MCPConnection } from '~/mcp/connection';
 
 jest.setTimeout(10_000);
@@ -39,39 +39,6 @@ describe('MCPConnection health-probe abort', () => {
   afterEach(async () => {
     await server?.close().catch(() => undefined);
     server = undefined;
-  });
-
-  it('uses a completed initialize as the first health check', async () => {
-    server = new Server(
-      { name: 'initial-health-server', version: '1.0.0' },
-      { capabilities: { tools: {} } },
-    );
-    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [] }));
-    let pings = 0;
-    server.setRequestHandler(PingRequestSchema, async () => {
-      pings += 1;
-      return {};
-    });
-    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-    await server.connect(serverTransport);
-    const connection = new MCPConnection({
-      serverName: 'initial-health',
-      serverConfig: { type: 'streamable-http', url: 'http://localhost/mcp' },
-      useSSRFProtection: false,
-    });
-    Object.defineProperty(connection, 'constructTransport', {
-      value: async () => clientTransport,
-    });
-    try {
-      await connection.connectClient();
-      expect(await connection.isConnected()).toBe(true);
-      expect(pings).toBe(0);
-      Object.assign(connection, { lastConnectionCheckAt: 0 });
-      expect(await connection.isConnected()).toBe(true);
-      expect(pings).toBe(1);
-    } finally {
-      await connection.disconnect();
-    }
   });
 
   it('cancels a hung ping at the caller signal without disturbing connection state', async () => {

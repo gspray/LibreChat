@@ -59,6 +59,7 @@ export default [
   {
     ignores: [
       'vendor/code/**/*',
+      'config/ssmlabs/speak-core.realtime.js',
       'client/dist/**/*',
       'client/public/**/*',
       'client/coverage/**/*',
