@@ -1,4 +1,4 @@
-/* Pinned @spray/speak-core 0.2.22 / f9d52b4 for Live Talk trial. Generated from package public API. */
+/* Pinned @spray/speak-core 0.2.22 for Live Talk trial. Generated from package public API. */
 'use strict';
 var SpeakCore = (() => {
   var __defProp = Object.defineProperty;
@@ -79,6 +79,7 @@ var SpeakCore = (() => {
     getCanonicalSpeakMicConstraints: () => getCanonicalSpeakMicConstraints,
     isAmbientRoomEnergy: () => isAmbientRoomEnergy,
     isCommandSession: () => isCommandSession,
+    isGptLiveMcpFailure: () => isGptLiveMcpFailure,
     isLikelyPlaybackEcho: () => isLikelyPlaybackEcho,
     isListenAgainPrompt: () => isListenAgainPrompt,
     isLowEnergySpeech: () => isLowEnergySpeech,
@@ -5708,6 +5709,13 @@ var SpeakCore = (() => {
     if (value.startsWith('voice_')) return { id: value };
     return value;
   }
+  function isGptLiveMcpFailure({ code = '', message = '' } = {}) {
+    const failureCode = String(code || '');
+    const text = String(message || '').toLowerCase();
+    if (failureCode === 'responses_validation_failed') return true;
+    if (failureCode.toLowerCase().includes('mcp')) return true;
+    return /\bmcp\b/.test(text) && /(list|tool|424|validation)/.test(text);
+  }
   function buildGptLiveSessionConfig(options = {}) {
     const src = options.session && typeof options.session === 'object' ? options.session : {};
     const voice = namedOrCustomVoice(
@@ -5865,17 +5873,32 @@ var SpeakCore = (() => {
         return;
       }
       if (type === 'error' || type === 'session.error') {
+        const code = String(data.error?.code || data.code || '');
+        const message = data.error?.message || data.message || 'GPT-Live session error';
+        if (isGptLiveMcpFailure({ code, message })) {
+          emit(SpeakRealtimeEvent.TOOL_ERROR, {
+            event: data,
+            providerEvent: type,
+            source: 'mcp',
+            code,
+            message,
+          });
+          return;
+        }
         emit(SpeakRealtimeEvent.SESSION_FAILED, {
           event: data,
           providerEvent: type,
-          code: data.error?.code || data.code || '',
-          message: data.error?.message || data.message || 'GPT-Live session error',
+          code,
+          message,
         });
         return;
       }
       if (type === 'session.input_transcript.delta') {
         lastInputAt = Date.now();
-        if (!sawInputTranscript) {
+        if (sawOutputAudio) {
+          sawOutputAudio = false;
+          emit(SpeakRealtimeEvent.USER_SPEECH_START, { event: data, providerEvent: type });
+        } else if (!sawInputTranscript) {
           sawInputTranscript = true;
           emit(SpeakRealtimeEvent.USER_SPEECH_START, { event: data, providerEvent: type });
         }
@@ -5887,6 +5910,7 @@ var SpeakCore = (() => {
         return;
       }
       if (type === 'session.output_transcript.delta') {
+        const piece = String(data.delta || '');
         if (sawInputTranscript && !sawOutputAudio && lastInputAt != null) {
           emit(
             SpeakRealtimeEvent.USER_SPEECH_END,
@@ -5904,9 +5928,14 @@ var SpeakCore = (() => {
           emit(SpeakRealtimeEvent.ASSISTANT_AUDIO_START, {
             event: data,
             providerEvent: type,
-            text: String(data.delta || ''),
+            text: piece,
           });
         }
+        emit(SpeakRealtimeEvent.PROVIDER_EVENT, {
+          event: data,
+          providerEvent: type,
+          text: piece,
+        });
         return;
       }
       if (

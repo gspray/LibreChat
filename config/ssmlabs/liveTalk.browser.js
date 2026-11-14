@@ -44,6 +44,9 @@
   let gptLiveHangupInFlight = false;
   let gptLiveHangupKind = '';
   let gptLiveHeard = '';
+  let liveTalkConversationId = '';
+  let liveTalkUserHeard = '';
+  let liveTalkAssistantHeard = '';
   let gptLiveLastEventAt = 0;
   let gptLiveLastUsefulAt = 0;
   let gptLiveLastTranscriptAt = 0;
@@ -383,6 +386,92 @@
     return id;
   }
 
+  function findQueryClient() {
+    const rootEl = root.getElementById?.('root');
+    if (!rootEl) return null;
+    const fiberKey = Object.keys(rootEl).find(
+      (key) => key.startsWith('__reactFiber') || key.startsWith('__reactContainer'),
+    );
+    if (!fiberKey) return null;
+    let fiber = rootEl[fiberKey];
+    const seen = new Set();
+    for (let i = 0; i < 500 && fiber && !seen.has(fiber); i += 1) {
+      seen.add(fiber);
+      const contexts = fiber.dependencies?.firstContext || fiber.dependencies?.first;
+      let dep = contexts;
+      while (dep) {
+        const value = dep.memoizedValue || dep._currentValue;
+        if (value && typeof value.invalidateQueries === 'function') return value;
+        if (value?.client && typeof value.client.invalidateQueries === 'function')
+          return value.client;
+        dep = dep.next;
+      }
+      const queued = fiber.memoizedState;
+      if (queued && typeof queued.invalidateQueries === 'function') return queued;
+      fiber = fiber.return || fiber.child || fiber.alternate?.return;
+    }
+    return null;
+  }
+
+  async function refreshAskConversation(conversationId) {
+    const id = clean(conversationId || liveTalkConversationId);
+    if (!id) return;
+    let messages = null;
+    try {
+      const response = await nativeFetch(
+        `${chatBasePath()}/api/messages/${encodeURIComponent(id)}`,
+        {
+          credentials: 'include',
+          headers: {
+            accept: 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+      if (response.ok) {
+        const payload = await response.json();
+        messages = Array.isArray(payload) ? payload : payload?.messages;
+      }
+    } catch (_) {
+      /* Ask refresh is best-effort after the save */
+    }
+    const client = findQueryClient();
+    if (!client || !Array.isArray(messages)) return;
+    const viewId = conversationIdFromLocation() || 'new';
+    for (const key of new Set([id, viewId])) {
+      try {
+        client.setQueryData(['messages', key], messages);
+      } catch (_) {
+        /* Recoil QueryClient shape can differ */
+      }
+    }
+  }
+
+  async function saveLiveTranscript(role, text) {
+    const sessionId = active?.sessionId;
+    const spoken = clean(text);
+    if (!sessionId || !spoken || !['user', 'assistant'].includes(role)) return;
+    try {
+      await api(liveTalkPath(`/live-talk/session/${sessionId}/transcript`), {
+        method: 'POST',
+        body: JSON.stringify({ role, text: spoken }),
+        quiet: true,
+      });
+      liveTalkLog('transcript.saved', { role, chars: spoken.length });
+      await refreshAskConversation(liveTalkConversationId);
+    } catch (error) {
+      liveTalkWarn('transcript.save-failed', summarizeError(error, { role }));
+    }
+  }
+
+  function flushLiveTranscript(role) {
+    const spoken = role === 'user' ? liveTalkUserHeard : liveTalkAssistantHeard;
+    if (role === 'user') liveTalkUserHeard = '';
+    else liveTalkAssistantHeard = '';
+    if (!clean(spoken)) return null;
+    return saveLiveTranscript(role, spoken);
+  }
+
   function liveTalkSpecFromLocation() {
     try {
       return new URL(windowObject.location.href).searchParams.get('spec') || '';
@@ -503,6 +592,9 @@
   async function stopCall(bar, reason) {
     const current = active;
     liveTalkLog('stop', { reason: String(reason || ''), sessionId: current?.sessionId || '' });
+    await Promise.all(
+      [flushLiveTranscript('user'), flushLiveTranscript('assistant')].filter(Boolean),
+    );
     active = null;
     stopGptLiveHangupWatch();
     windowObject.clearTimeout(gptLiveHangupSpeechTimer);
@@ -1086,9 +1178,10 @@
             retry: gptLive ? 0 : 2,
           });
           sessionId = created.sessionId;
+          liveTalkConversationId = created.conversationId || conversationId;
           liveTalkLog('bootstrap.answer', {
             sessionId,
-            conversationId: created.conversationId || conversationId,
+            conversationId: liveTalkConversationId,
             sdpChars: String(created.sdp || '').length,
             toolCount: Array.isArray(created.tools) ? created.tools.length : 0,
           });
@@ -1151,6 +1244,12 @@
             event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE ||
             event.type === SpeakCore.SpeakRealtimeEvent.TOOL_CALL;
           noteGptLiveActivity(useful ? 'useful' : 'speech');
+          if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_START) {
+            flushLiveTranscript('user');
+          }
+          if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE) {
+            flushLiveTranscript('assistant');
+          }
           if (useful) resetGptLiveHeard();
         }
         const providerEvent = event.detail?.providerEvent || event.detail?.event?.type || '';
@@ -1336,9 +1435,20 @@
           active?.session === session
         )
           void stopCall(bar, 'closed');
+        if (
+          gptLive &&
+          event.type === SpeakCore.SpeakRealtimeEvent.PROVIDER_EVENT &&
+          providerEvent === 'session.output_transcript.delta' &&
+          transcript
+        ) {
+          liveTalkAssistantHeard = `${liveTalkAssistantHeard}${transcript}`;
+        }
         if (event.type === SpeakCore.SpeakRealtimeEvent.INPUT_TRANSCRIPT && transcript) {
           liveTalkLog('transcript.heard', { chars: transcript.length });
-          if (gptLive && !gptLiveHangupInFlight) {
+          if (!gptLive) {
+            void saveLiveTranscript('user', transcript);
+          } else if (!gptLiveHangupInFlight) {
+            liveTalkUserHeard = `${liveTalkUserHeard} ${transcript}`.replace(/\s+/g, ' ').trim();
             gptLiveHeard = `${gptLiveHeard} ${transcript}`.replace(/\s+/g, ' ').trim();
             if (gptLiveHeard.length > 240) gptLiveHeard = gptLiveHeard.slice(-240);
             noteGptLiveActivity('transcript');

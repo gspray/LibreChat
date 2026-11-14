@@ -26,7 +26,7 @@ Leaving this branch (or dropping the overlay attach) is the off switch. Existing
 - Ask a directory or lesson question; the spoken answer uses a read tool.
 - If GPT-Live reports `responses_validation_failed`, talk stays up and the bar says lesson tools are unavailable; do not treat that as a dead session.
 - Ask to schedule or message; Live Talk can call the same write tools as typed Ask after spoken confirmation. LessonCaddie still authorizes the mutation.
-- Stop, then type in the same thread. Voice transcripts remain.
+- On Ask, Talk turns appear in the same conversation as typed Chat. Stop, then type in the same thread. Voice transcripts remain.
 - Leave the thread or reload: microphone and provider session stop.
 
 Live audio quality is not proven by unit tests.

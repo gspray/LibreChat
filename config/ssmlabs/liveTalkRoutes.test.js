@@ -346,6 +346,52 @@ test('Live Talk bootstraps a session with the live MCP catalog including writes'
   }
 });
 
+test('Live Talk transcripts save onto the Ask conversation', async () => {
+  const saved = [];
+  const app = createApp({
+    saveMessage: async (_ctx, message) => {
+      saved.push(message);
+      return message;
+    },
+  });
+  const server = await listen(app);
+  try {
+    const created = await fetch(`http://127.0.0.1:${server.address().port}/live-talk/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ conversationId: 'convo-1', sdp: 'offer' }),
+    });
+    assert.equal(created.status, 201);
+    const session = await created.json();
+    const user = await fetch(
+      `http://127.0.0.1:${server.address().port}/live-talk/session/${session.sessionId}/transcript`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ role: 'user', text: 'Open my calendar' }),
+      },
+    );
+    const assistant = await fetch(
+      `http://127.0.0.1:${server.address().port}/live-talk/session/${session.sessionId}/transcript`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ role: 'assistant', text: 'Opening Calendar.' }),
+      },
+    );
+    assert.equal(user.status, 201);
+    assert.equal(assistant.status, 201);
+    assert.equal(saved[0].isCreatedByUser, true);
+    assert.equal(saved[0].text, 'Open my calendar');
+    assert.equal(saved[0].conversationId, 'convo-1');
+    assert.equal(saved[1].isCreatedByUser, false);
+    assert.equal(saved[1].text, 'Opening Calendar.');
+  } finally {
+    resetLiveTalkSessions();
+    server.close();
+  }
+});
+
 test('Live Talk fails closed when the MCP catalog is empty', async () => {
   const app = createApp({
     listMcpTools: async () => [],
