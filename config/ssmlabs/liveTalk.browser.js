@@ -1375,28 +1375,10 @@
     const copy = gptLiveHangupCopy(kind);
     liveTalkLog('hangup.begin', { kind, status: copy.status });
     setStatus(ensureBar(), 'responding', copy.status);
-    try {
-      session.cancel?.('hangup');
-    } catch (_) {
-      /* interrupt is best-effort */
-    }
-    try {
-      session.sendEvent({
-        type: 'response.create',
-        response: {
-          tool_choice: 'none',
-          instructions: `Speak only American English. Speak only this exact line, then stop. Say exactly: ${copy.say}`,
-        },
-      });
-    } catch (error) {
-      liveTalkWarn('hangup.speak-failed', summarizeError(error, { kind }));
-      void finishGptLiveHangup(session, kind);
-      return;
-    }
     windowObject.clearTimeout(gptLiveHangupSpeechTimer);
     gptLiveHangupSpeechTimer = windowObject.setTimeout(() => {
       void finishGptLiveHangup(session, kind);
-    }, 5000);
+    }, 700);
   }
 
   function armGptLiveHangupWatch(session) {
@@ -1794,6 +1776,7 @@
           providerEvent === 'session.output_transcript.delta' &&
           deltaText
         ) {
+          noteGptLiveActivity('assistant');
           liveTalkAssistantHeard = appendLiveTalkDelta(liveTalkAssistantHeard, deltaText);
           scheduleLivePreview('assistant');
           if (isLiveTalkFarewellPhrase(liveTalkAssistantHeard)) {
