@@ -1246,13 +1246,13 @@
         const audible = Math.sqrt(energy / samples.length) > 0.01;
         if (audible) {
           meter.lastAudibleAt = Date.now();
+          noteGptLiveActivity('assistant');
           if (ui.state !== 'responding') setStatus(ensureBar(), 'responding', 'Responding…');
-        } else if (Date.now() - meter.lastAudibleAt > 700 && assistantAudioPlaying) {
-          assistantAudioPlaying = false;
-          if (active?.gptLive && liveVoiceSettings.muteMicWhileSheTalks) {
-            active.session.setMuted?.(durationDraining);
-          }
-          if (ui.state === 'responding') setStatus(ensureBar(), 'listening', 'Listening…');
+        } else if (
+          Date.now() - meter.lastAudibleAt > 700 &&
+          (assistantAudioPlaying || (ui.state === 'responding' && !gptLiveHangupInFlight))
+        ) {
+          finishGptLiveAssistantTurn(session);
         }
       }, 100);
     } catch (error) {
@@ -1408,13 +1408,33 @@
   function scheduleAssistantTurnEnd(session) {
     windowObject.clearTimeout(gptLiveAssistantDoneTimer);
     gptLiveAssistantDoneTimer = windowObject.setTimeout(() => {
-      awaitingAssistant = false;
-      assistantAudioPlaying = false;
-      if (!gptLivePlaybackMeter && liveVoiceSettings.muteMicWhileSheTalks) {
-        session.setMuted?.(durationDraining);
+      if (active?.session !== session) return;
+      if (gptLivePlaybackMeter && Date.now() - gptLivePlaybackMeter.lastAudibleAt < 700) {
+        scheduleAssistantTurnEnd(session);
+        return;
       }
-      maybeHangupAfterAssistantTurn(session);
+      finishGptLiveAssistantTurn(session);
     }, 900);
+  }
+
+  function finishGptLiveAssistantTurn(session) {
+    if (active?.session !== session || gptLiveHangupInFlight) return;
+    windowObject.clearTimeout(gptLiveAssistantDoneTimer);
+    gptLiveAssistantDoneTimer = 0;
+    awaitingAssistant = false;
+    assistantAudioPlaying = false;
+    noteGptLiveActivity('assistant');
+    if (liveVoiceSettings.muteMicWhileSheTalks) {
+      try {
+        session.setMuted?.(durationDraining);
+      } catch (_) {
+        /* playback has ended; the session may already be closing */
+      }
+    }
+    maybeHangupAfterAssistantTurn(session);
+    if (!gptLiveHangupInFlight && ui.state === 'responding') {
+      setStatus(ensureBar(), 'listening', 'Listening…');
+    }
   }
 
   function stopGptLiveHangupWatch() {
@@ -1772,12 +1792,15 @@
         ) {
           finishGreeting('playback-stopped');
         }
+        if (gptLive && !greetingPending && providerEvent === 'session.output_transcript.done') {
+          scheduleAssistantTurnEnd(session);
+        }
         if (
           !greetingPending &&
           (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_INTERRUPTED ||
             providerEvent === 'output_audio_buffer.stopped' ||
             providerEvent === 'output_audio_buffer.cleared' ||
-            providerEvent === 'session.output_transcript.done')
+            (!gptLive && providerEvent === 'session.output_transcript.done'))
         ) {
           awaitingAssistant = false;
           assistantAudioPlaying = false;
