@@ -149,6 +149,8 @@ test('GPT-Live delegates through a session-scoped MCP proxy and revokes it on st
     assert.doesNotMatch(liveSession.instructions, /Always speak American English/);
     assert.equal(liveSession.delegation.type, 'responses');
     assert.equal(liveSession.delegation.responses.model, 'gpt-6-luna');
+    assert.match(liveSession.instructions, /Generate <\|SpawnThinking\|> when:/);
+    assert.match(liveSession.delegation.responses.instructions, /call open_app_screen/);
     const [tool] = liveSession.delegation.responses.tools;
     assert.equal(tool.type, 'mcp');
     assert.equal(tool.server_url, `https://chat.example.test/chat/live-talk/mcp/${sessionId}`);

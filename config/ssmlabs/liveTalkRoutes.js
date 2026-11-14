@@ -18,6 +18,7 @@ const {
   liveTalkToolNames,
   isAllowedLiveTalkTool,
   liveTalkInstructions,
+  gptLiveDelegationInstructions,
 } = require('./liveTalkConfig');
 
 const sessions = new Map();
@@ -614,12 +615,13 @@ function createLiveTalkRouter(deps = {}) {
               sdp,
               session: {
                 model: 'gpt-live-1',
-                instructions: `${instructions}\n\n${gptLiveVoiceInstructions(voiceSettings)}`,
+                instructions: `${instructions}\n\n${gptLiveVoiceInstructions(voiceSettings)}\n\n${gptLiveDelegationInstructions()}`,
                 audio: { output: { voice: outputVoice } },
                 delegation: {
                   type: 'responses',
                   responses: {
                     model: 'gpt-6-luna',
+                    instructions: `${instructions}\n\nFor page requests, call open_app_screen with the destination. Report the tool result accurately; do not claim the page switched without a navigation result.`,
                     text: {
                       verbosity:
                         voiceSettings.verboseLevel === 'none' ? 'low' : voiceSettings.verboseLevel,

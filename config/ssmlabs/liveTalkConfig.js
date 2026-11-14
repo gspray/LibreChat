@@ -276,6 +276,18 @@ function liveTalkInstructions(agentInstructions, pack, voice) {
   return base ? `${base}\n\n${extra}` : extra;
 }
 
+function gptLiveDelegationInstructions() {
+  return `Delegation policy:
+Backend tools:
+- Open LessonCaddie app pages and perform authorized LessonCaddie lookups and actions.
+Generate <|SpawnThinking|> when:
+- The user asks to open, show, or go to an app page. The backend must call open_app_screen to request the page switch.
+- The user asks for LessonCaddie information or an action that needs a backend tool.
+Do not generate <|SpawnThinking|> when:
+- The user is only greeting you or you need a brief clarification before knowing what to do.
+Generate <|SpawnThinking|> before answering a page request. Wait for the backend result. Do not say a page opened based only on your own spoken acknowledgement.`;
+}
+
 module.exports = {
   CADDIE_VOICE_ID,
   LIVE_TALK_PACKS,
@@ -291,4 +303,5 @@ module.exports = {
   liveTalkToolNames,
   isAllowedLiveTalkTool,
   liveTalkInstructions,
+  gptLiveDelegationInstructions,
 };
