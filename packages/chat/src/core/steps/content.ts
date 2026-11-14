@@ -223,6 +223,25 @@ export function updateContent(
     );
   }
 
+  /** A late tool update can carry a shifted step index after text has already
+   * filled that slot. Keep the text and settle the call at its existing id. */
+  if (
+    contentType === ContentTypes.TOOL_CALL &&
+    'tool_call' in contentPart &&
+    contentPart.tool_call?.id &&
+    updatedContent[index]?.type === ContentTypes.TEXT
+  ) {
+    const existingCallIndex = updatedContent.findIndex(
+      (part) =>
+        part?.type === ContentTypes.TOOL_CALL &&
+        'tool_call' in part &&
+        part.tool_call?.id === contentPart.tool_call.id,
+    );
+    if (existingCallIndex >= 0) {
+      index = existingCallIndex;
+    }
+  }
+
   if (!updatedContent[index] && contentType !== ContentTypes.TOOL_CALL) {
     updatedContent[index] = { type: contentPart.type as AllContentTypes };
   }
