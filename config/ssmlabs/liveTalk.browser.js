@@ -39,6 +39,7 @@
   let readyTimer = 0;
   let pingTimer = 0;
   let gptLiveIdleTimer = 0;
+  let gptLiveClientActionTimer = 0;
   let gptLivePlaybackMeter = null;
   let liveVoiceSettings = {
     waitForYou: 'patient',
@@ -241,6 +242,40 @@
     };
   }
 
+  function applyHostToolResult(name, result) {
+    postAppDataChanged(name, result);
+    if (clean(name) !== 'open_app_screen') return false;
+    const overlay = windowObject.LessonCaddieNavigationOverlay;
+    const opened = overlay?.onPayload?.(result);
+    liveTalkLog('tool.navigate', {
+      opened: Boolean(opened),
+      destination: result?.destination || result?.structuredContent?.destination || '',
+    });
+    return Boolean(opened);
+  }
+
+  function stopGptLiveClientActionPoll() {
+    windowObject.clearInterval(gptLiveClientActionTimer);
+    gptLiveClientActionTimer = 0;
+  }
+
+  function startGptLiveClientActionPoll(session, sessionId) {
+    stopGptLiveClientActionPoll();
+    gptLiveClientActionTimer = windowObject.setInterval(() => {
+      if (active?.session !== session || !sessionId) return;
+      void api(liveTalkPath(`/live-talk/session/${sessionId}/client-actions`), { quiet: true })
+        .then((payload) => {
+          const actions = Array.isArray(payload?.actions) ? payload.actions : [];
+          for (const action of actions) {
+            applyHostToolResult(action?.name, action?.result);
+          }
+        })
+        .catch(() => {
+          /* poll is best-effort; ping handles expired sessions */
+        });
+    }, 400);
+  }
+
   function postAppDataChanged(toolName, result) {
     const name = clean(toolName);
     if (!WRITE_TOOLS[name]) return;
@@ -413,6 +448,7 @@
     active = null;
     windowObject.clearTimeout(gptLiveIdleTimer);
     gptLiveIdleTimer = 0;
+    stopGptLiveClientActionPoll();
     stopGptLivePlaybackMeter();
     if (!current?.gptLive) {
       try {
@@ -963,15 +999,7 @@
                 name: call.name,
                 ms: Date.now() - startedAt,
               });
-              postAppDataChanged(call.name, result);
-              if (call.name === 'open_app_screen') {
-                const overlay = windowObject.LessonCaddieNavigationOverlay;
-                const opened = overlay?.onPayload?.(result);
-                liveTalkLog('tool.navigate', {
-                  opened: Boolean(opened),
-                  destination: result?.destination || result?.structuredContent?.destination || '',
-                });
-              }
+              applyHostToolResult(call.name, result);
               return result;
             },
           });
@@ -1185,7 +1213,10 @@
           return;
         }
         session.setMuted?.(!gptLive);
-        if (gptLive) armGptLiveIdle(session);
+        if (gptLive) {
+          armGptLiveIdle(session);
+          startGptLiveClientActionPoll(session, sessionId);
+        }
         liveTalkLog('session.started', session.snapshot?.() || { sessionId });
         if (pingTimer) windowObject.clearInterval(pingTimer);
         pingTimer = windowObject.setInterval(() => {

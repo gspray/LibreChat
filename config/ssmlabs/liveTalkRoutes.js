@@ -70,6 +70,95 @@ function clearTimers(record) {
   record.idleTimer = null;
 }
 
+function parseJsonSafe(text) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function unwrapMcpResult(result) {
+  if (result == null) return null;
+  if (typeof result === 'string') {
+    const parsed = parseJsonSafe(result);
+    return parsed == null ? { text: result } : unwrapMcpResult(parsed);
+  }
+  if (Array.isArray(result)) return unwrapMcpResult(result[0]);
+  if (typeof result !== 'object') return result;
+  if (result.structuredContent && typeof result.structuredContent === 'object') {
+    return result.structuredContent;
+  }
+  if (Array.isArray(result.content)) {
+    const first = result.content.find((part) => part && part.text != null) || result.content[0];
+    return unwrapMcpResult(first && first.text != null ? first.text : first);
+  }
+  return result;
+}
+
+function rpcMessagesFromBody(body) {
+  if (body == null) return [];
+  if (typeof body === 'string' || Buffer.isBuffer(body)) {
+    return rpcMessagesFromBody(parseJsonSafe(String(body)));
+  }
+  if (Array.isArray(body)) return body.filter((item) => item && typeof item === 'object');
+  if (body && typeof body === 'object') return [body];
+  return [];
+}
+
+function mcpToolCallsFromRequest(req) {
+  if (req.method !== 'POST') return [];
+  return rpcMessagesFromBody(req.body)
+    .filter((msg) => msg.method === 'tools/call')
+    .map((msg) => ({ id: msg.id, name: clean(msg.params?.name) }))
+    .filter((call) => call.name);
+}
+
+function rpcMessagesFromResponse(text, contentType) {
+  const type = String(contentType || '').toLowerCase();
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return [];
+  if (type.includes('json') && !type.includes('event-stream')) {
+    return rpcMessagesFromBody(trimmed);
+  }
+  const messages = rpcMessagesFromBody(trimmed);
+  if (messages.length) return messages;
+  const found = [];
+  for (const block of trimmed.split('\n\n')) {
+    const data = block
+      .split('\n')
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trim())
+      .filter((line) => line && line !== '[DONE]')
+      .join('\n');
+    if (!data) continue;
+    found.push(...rpcMessagesFromBody(data));
+  }
+  return found;
+}
+
+function enqueueClientActions(record, toolCalls, responseText, contentType) {
+  if (!record || !toolCalls.length) return;
+  const messages = rpcMessagesFromResponse(responseText, contentType);
+  const byId = new Map();
+  for (const msg of messages) {
+    if (msg.id != null && msg.result != null) byId.set(String(msg.id), msg.result);
+  }
+  record.clientActions = Array.isArray(record.clientActions) ? record.clientActions : [];
+  for (const call of toolCalls) {
+    let result = call.id != null ? byId.get(String(call.id)) : null;
+    if (result == null && messages.length === 1 && messages[0]?.result != null) {
+      result = messages[0].result;
+    }
+    if (result == null) continue;
+    record.clientActions.push({ name: call.name, result: unwrapMcpResult(result) });
+    liveTalkLog('info', 'mcp.proxy.client-action', { name: call.name, sessionId: record.id });
+  }
+  if (record.clientActions.length > 20) {
+    record.clientActions.splice(0, record.clientActions.length - 20);
+  }
+}
+
 function destroySession(sessionId, reason = 'stop') {
   const record = sessions.get(sessionId);
   if (!record) return null;
@@ -124,6 +213,7 @@ function createLiveTalkMcpProxy() {
       res.status(413).json({ error: 'MCP request too large' });
       return;
     }
+    const toolCalls = mcpToolCallsFromRequest(req);
     const controller = new AbortController();
     record.proxyRequests.add(controller);
     res.on('close', () => controller.abort());
@@ -149,10 +239,12 @@ function createLiveTalkMcpProxy() {
         },
         body,
       });
+      const contentType = String(upstream.headers.get('content-type') || '');
       liveTalkLog('info', 'mcp.proxy.upstream', {
         method: req.method,
         status: upstream.status,
-        contentType: String(upstream.headers.get('content-type') || '').split(';')[0],
+        contentType: contentType.split(';')[0],
+        toolCalls: toolCalls.map((call) => call.name),
       });
       res.status(upstream.status);
       for (const name of ['content-type', 'mcp-session-id', 'cache-control']) {
@@ -160,8 +252,15 @@ function createLiveTalkMcpProxy() {
         if (value) res.set(name, value);
       }
       res.set('Cache-Control', 'no-store');
-      if (upstream.body) await pipeline(Readable.fromWeb(upstream.body), res);
-      else res.end();
+      if (toolCalls.length && upstream.body) {
+        const buffer = Buffer.from(await upstream.arrayBuffer());
+        enqueueClientActions(record, toolCalls, buffer.toString('utf8'), contentType);
+        res.end(buffer);
+      } else if (upstream.body) {
+        await pipeline(Readable.fromWeb(upstream.body), res);
+      } else {
+        res.end();
+      }
     } catch (error) {
       liveTalkLog('warn', 'mcp.proxy.failed', { method: req.method, name: error?.name || '' });
       if (!res.headersSent) res.status(502).json({ error: 'MCP connection unavailable' });
@@ -490,6 +589,7 @@ function createLiveTalkRouter(deps = {}) {
           proxyToken,
           mcpProxy: delegation,
           proxyRequests: new Set(),
+          clientActions: [],
         };
         sessions.set(sessionId, proxyRecord);
         rememberUserSession(userId, 1);
@@ -570,6 +670,7 @@ function createLiveTalkRouter(deps = {}) {
               proxyToken: proxyRecord.proxyToken,
               mcpProxy: proxyRecord.mcpProxy,
               proxyRequests: proxyRecord.proxyRequests,
+              clientActions: proxyRecord.clientActions || [],
             }
           : {}),
         closed: false,
@@ -688,6 +789,16 @@ function createLiveTalkRouter(deps = {}) {
       );
       record.parentMessageId = saved?.messageId || messageId;
       res.status(201).json({ ok: true, messageId: record.parentMessageId });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.get('/session/:sessionId/client-actions', (req, res, next) => {
+    try {
+      const record = requireSession(req);
+      const actions = Array.isArray(record.clientActions) ? record.clientActions.splice(0) : [];
+      res.json({ ok: true, actions });
     } catch (error) {
       next(error);
     }

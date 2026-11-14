@@ -194,6 +194,106 @@ test('GPT-Live delegates through a session-scoped MCP proxy and revokes it on st
   }
 });
 
+test('GPT-Live MCP open_app_screen results are queued for the Live Talk client', async () => {
+  const originalSecret = process.env.LESSONCADDIE_SSO_SHARED_SECRET;
+  const originalFetch = global.fetch;
+  const liveAnswer = 'v=0\r\no=- 2 2 IN IP4 127.0.0.1\r\ns=-\r\n';
+  process.env.LESSONCADDIE_SSO_SHARED_SECRET = 's'.repeat(32);
+  let liveSession;
+  global.fetch = async (url) => {
+    if (String(url) === 'https://mcp.example.test/api/instructor-mcp') {
+      return new Response(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: 7,
+          result: {
+            structuredContent: {
+              type: 'lessoncaddie.navigation',
+              version: 1,
+              destination: 'calendar',
+              requestId: 'nav-calendar-1',
+            },
+          },
+        }),
+        { headers: { 'content-type': 'application/json' } },
+      );
+    }
+    return originalFetch(url);
+  };
+  const app = createApp({
+    resolveLiveTalkConfig: () => ({
+      ...liveTalkConfig(),
+      gptLiveEnabled: false,
+      gptLiveMcpProxyUrl: 'https://chat.example.test/chat/live-talk/mcp',
+    }),
+    getMcpDelegation: async () => ({
+      serverUrl: 'https://mcp.example.test/api/instructor-mcp',
+      firebaseUid: 'firebase-instructor-1',
+    }),
+    bootstrapGptLive: async ({ session }) => {
+      liveSession = session;
+      return { sdp: liveAnswer, sessionId: 'provider-1' };
+    },
+  });
+  app.use('/live-talk/mcp', createLiveTalkMcpProxy());
+  const server = await listen(app);
+  const base = `http://127.0.0.1:${server.address().port}/live-talk`;
+  try {
+    const created = await originalFetch(`${base}/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        conversationId: 'convo-1',
+        sdp: 'offer',
+        liveVoice: { provider: 'gpt-live' },
+      }),
+    });
+    assert.equal(created.status, 201);
+    const { sessionId } = await created.json();
+    const authorization = liveSession.delegation.responses.tools[0].authorization;
+    const proxied = await originalFetch(`${base}/mcp/${sessionId}`, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${authorization}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 7,
+        method: 'tools/call',
+        params: { name: 'open_app_screen', arguments: { destination: 'calendar' } },
+      }),
+    });
+    assert.equal(proxied.status, 200);
+    const drained = await originalFetch(`${base}/session/${sessionId}/client-actions`);
+    assert.equal(drained.status, 200);
+    const payload = await drained.json();
+    assert.deepEqual(payload.actions, [
+      {
+        name: 'open_app_screen',
+        result: {
+          type: 'lessoncaddie.navigation',
+          version: 1,
+          destination: 'calendar',
+          requestId: 'nav-calendar-1',
+        },
+      },
+    ]);
+    const empty = await originalFetch(`${base}/session/${sessionId}/client-actions`);
+    assert.deepEqual((await empty.json()).actions, []);
+    const forbidden = await originalFetch(`${base}/session/${sessionId}/client-actions`, {
+      headers: { 'x-user': 'someone-else' },
+    });
+    assert.equal(forbidden.status, 403);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+    resetLiveTalkSessions();
+    global.fetch = originalFetch;
+    if (originalSecret === undefined) delete process.env.LESSONCADDIE_SSO_SHARED_SECRET;
+    else process.env.LESSONCADDIE_SSO_SHARED_SECRET = originalSecret;
+  }
+});
+
 test('Live Talk bootstraps a session with the live MCP catalog including writes', async () => {
   const app = createApp({
     resolveLiveTalkConfig: () => ({ ...liveTalkConfig(), gptLiveEnabled: true }),
