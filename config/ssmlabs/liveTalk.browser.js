@@ -39,6 +39,14 @@
   let readyTimer = 0;
   let pingTimer = 0;
   let gptLiveIdleTimer = 0;
+  let gptLiveHeardTimer = 0;
+  let gptLiveHangupSpeechTimer = 0;
+  let gptLiveHangupInFlight = false;
+  let gptLiveHangupKind = '';
+  let gptLiveHeard = '';
+  let gptLiveLastEventAt = 0;
+  let gptLiveLastUsefulAt = 0;
+  let gptLiveLastTranscriptAt = 0;
   let gptLiveClientActionTimer = 0;
   let gptLivePlaybackMeter = null;
   let liveVoiceSettings = {
@@ -78,6 +86,56 @@
 
   function clean(value) {
     return String(value || '').trim();
+  }
+
+  function normalizeHeard(text) {
+    return String(text || '')
+      .toLowerCase()
+      .replace(/[^\w\s']/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function isLiveTalkDonePhrase(text) {
+    const heard = normalizeHeard(text);
+    if (!heard || heard.length > 72) return false;
+    return /^(ok(?:ay)? |all right |alright )?(thanks? |thank you )?(i(?:'m| am) done|that(?:'s| is) (?:all|it)|we(?:'re| are) done|you can (?:hang up|stop|go)|hang up|stop (?:talking|listening)|end (?:talk|the (?:call|session)|live talk)|good ?bye|bye(?: bye)?)( now| please)?$/.test(
+      heard,
+    );
+  }
+
+  function gptLiveSilenceMs() {
+    return Number(config.gptLiveIdleMs) > 0 ? Number(config.gptLiveIdleMs) : 20000;
+  }
+
+  function gptLiveNoiseMs() {
+    return Number(config.gptLiveNoiseMs) > 0 ? Number(config.gptLiveNoiseMs) : 60000;
+  }
+
+  function gptLiveHangupCopy(kind) {
+    const silenceSec = Math.round(gptLiveSilenceMs() / 1000);
+    const noiseSec = Math.round(gptLiveNoiseMs() / 1000);
+    if (kind === 'done') {
+      return { say: 'Okay, hanging up.', status: 'Hung up because you said you were done.' };
+    }
+    if (kind === 'noise') {
+      return {
+        say: 'Okay, hanging up. I am not catching words.',
+        status: `Hung up after ${noiseSec} seconds of noise without a question.`,
+      };
+    }
+    return {
+      say: 'Okay, hanging up. You went quiet.',
+      status: `Hung up after ${silenceSec} seconds of silence.`,
+    };
+  }
+
+  function gptLiveStopStatus(reason) {
+    if (reason === 'done' || reason === 'silence' || reason === 'noise' || reason === 'idle') {
+      return gptLiveHangupCopy(reason === 'idle' ? 'silence' : reason).status;
+    }
+    if (reason === 'failed') return ui.text || 'Could not connect Live Talk.';
+    return 'Live Talk stopped.';
   }
 
   function liveTalkLog(stage, data) {
@@ -446,8 +504,12 @@
     const current = active;
     liveTalkLog('stop', { reason: String(reason || ''), sessionId: current?.sessionId || '' });
     active = null;
-    windowObject.clearTimeout(gptLiveIdleTimer);
-    gptLiveIdleTimer = 0;
+    stopGptLiveHangupWatch();
+    windowObject.clearTimeout(gptLiveHangupSpeechTimer);
+    gptLiveHangupSpeechTimer = 0;
+    gptLiveHangupInFlight = false;
+    gptLiveHangupKind = '';
+    gptLiveHeard = '';
     stopGptLiveClientActionPoll();
     stopGptLivePlaybackMeter();
     if (!current?.gptLive) {
@@ -502,7 +564,7 @@
     windowObject.clearTimeout(readyTimer);
     readyTimer = 0;
     if (reason !== 'restart' && reason !== 'failed') {
-      setStatus(bar, 'idle', 'Live Talk stopped.');
+      setStatus(bar, 'idle', gptLiveStopStatus(reason));
     }
   }
 
@@ -867,15 +929,87 @@
     });
   }
 
-  function armGptLiveIdle(session) {
-    windowObject.clearTimeout(gptLiveIdleTimer);
-    gptLiveIdleTimer = windowObject.setTimeout(
-      () => {
-        if (active?.session !== session) return;
-        void stopCall(ensureBar(), 'idle');
-      },
-      Number(config.gptLiveIdleMs) || 120000,
-    );
+  function noteGptLiveActivity(kind) {
+    const now = Date.now();
+    gptLiveLastEventAt = now;
+    if (kind === 'useful' || kind === 'assistant' || kind === 'tool') gptLiveLastUsefulAt = now;
+    if (kind === 'transcript') gptLiveLastTranscriptAt = now;
+  }
+
+  function resetGptLiveHeard() {
+    gptLiveHeard = '';
+    windowObject.clearTimeout(gptLiveHeardTimer);
+    gptLiveHeardTimer = 0;
+  }
+
+  function stopGptLiveHangupWatch() {
+    windowObject.clearInterval(gptLiveIdleTimer);
+    gptLiveIdleTimer = 0;
+    windowObject.clearTimeout(gptLiveHeardTimer);
+    gptLiveHeardTimer = 0;
+  }
+
+  async function finishGptLiveHangup(session, kind) {
+    if (active?.session !== session) return;
+    const reason = kind || gptLiveHangupKind || 'silence';
+    await stopCall(ensureBar(), reason);
+  }
+
+  function beginGptLiveHangup(session, kind) {
+    if (!session || gptLiveHangupInFlight || active?.session !== session) return;
+    gptLiveHangupInFlight = true;
+    gptLiveHangupKind = kind;
+    stopGptLiveHangupWatch();
+    const copy = gptLiveHangupCopy(kind);
+    liveTalkLog('hangup.begin', { kind, status: copy.status });
+    setStatus(ensureBar(), 'responding', copy.status);
+    try {
+      session.cancel?.('hangup');
+    } catch (_) {
+      /* interrupt is best-effort */
+    }
+    try {
+      session.sendEvent({
+        type: 'response.create',
+        response: {
+          tool_choice: 'none',
+          instructions: `Speak only American English. Speak only this exact line, then stop. Say exactly: ${copy.say}`,
+        },
+      });
+    } catch (error) {
+      liveTalkWarn('hangup.speak-failed', summarizeError(error, { kind }));
+      void finishGptLiveHangup(session, kind);
+      return;
+    }
+    windowObject.clearTimeout(gptLiveHangupSpeechTimer);
+    gptLiveHangupSpeechTimer = windowObject.setTimeout(() => {
+      void finishGptLiveHangup(session, kind);
+    }, 5000);
+  }
+
+  function armGptLiveHangupWatch(session) {
+    stopGptLiveHangupWatch();
+    const now = Date.now();
+    gptLiveHangupInFlight = false;
+    gptLiveHangupKind = '';
+    gptLiveHeard = '';
+    gptLiveLastEventAt = now;
+    gptLiveLastUsefulAt = now;
+    gptLiveLastTranscriptAt = 0;
+    gptLiveIdleTimer = windowObject.setInterval(() => {
+      if (active?.session !== session || paused || gptLiveHangupInFlight) return;
+      if (assistantAudioPlaying || awaitingAssistant) return;
+      if (['connecting', 'greeting', 'responding', 'tool'].includes(ui.state)) return;
+      const at = Date.now();
+      const silenceMs = gptLiveSilenceMs();
+      const noiseMs = gptLiveNoiseMs();
+      const transcriptIsFresh = gptLiveLastTranscriptAt && at - gptLiveLastTranscriptAt < 2500;
+      if (transcriptIsFresh && at - gptLiveLastUsefulAt >= noiseMs) {
+        beginGptLiveHangup(session, 'noise');
+        return;
+      }
+      if (at - gptLiveLastEventAt >= silenceMs) beginGptLiveHangup(session, 'silence');
+    }, 250);
   }
 
   async function startCall(bar) {
@@ -1008,11 +1142,17 @@
         if (
           gptLive &&
           (event.type === SpeakCore.SpeakRealtimeEvent.USER_SPEECH_START ||
-            event.type === SpeakCore.SpeakRealtimeEvent.INPUT_TRANSCRIPT ||
             event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_START ||
-            event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE)
-        )
-          armGptLiveIdle(session);
+            event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE ||
+            event.type === SpeakCore.SpeakRealtimeEvent.TOOL_CALL)
+        ) {
+          const useful =
+            event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_START ||
+            event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE ||
+            event.type === SpeakCore.SpeakRealtimeEvent.TOOL_CALL;
+          noteGptLiveActivity(useful ? 'useful' : 'speech');
+          if (useful) resetGptLiveHeard();
+        }
         const providerEvent = event.detail?.providerEvent || event.detail?.event?.type || '';
         const transcript = clean(
           event.detail?.event?.transcript || event.detail?.transcript || event.detail?.text,
@@ -1116,6 +1256,12 @@
             greeting: greetingPending,
           });
           /* response.done ends generation, but WebRTC may still be playing the greeting. */
+          if (gptLive && gptLiveHangupInFlight && active?.session === session) {
+            windowObject.clearTimeout(gptLiveHangupSpeechTimer);
+            gptLiveHangupSpeechTimer = 0;
+            void finishGptLiveHangup(session, gptLiveHangupKind);
+            return;
+          }
           if (!greetingPending && !assistantAudioPlaying) {
             try {
               session.setMuted?.(false);
@@ -1192,6 +1338,16 @@
           void stopCall(bar, 'closed');
         if (event.type === SpeakCore.SpeakRealtimeEvent.INPUT_TRANSCRIPT && transcript) {
           liveTalkLog('transcript.heard', { chars: transcript.length });
+          if (gptLive && !gptLiveHangupInFlight) {
+            gptLiveHeard = `${gptLiveHeard} ${transcript}`.replace(/\s+/g, ' ').trim();
+            if (gptLiveHeard.length > 240) gptLiveHeard = gptLiveHeard.slice(-240);
+            noteGptLiveActivity('transcript');
+            windowObject.clearTimeout(gptLiveHeardTimer);
+            gptLiveHeardTimer = windowObject.setTimeout(() => {
+              if (active?.session !== session || gptLiveHangupInFlight) return;
+              if (isLiveTalkDonePhrase(gptLiveHeard)) beginGptLiveHangup(session, 'done');
+            }, 900);
+          }
         }
       });
       active = {
@@ -1214,7 +1370,7 @@
         }
         session.setMuted?.(!gptLive);
         if (gptLive) {
-          armGptLiveIdle(session);
+          armGptLiveHangupWatch(session);
           startGptLiveClientActionPoll(session, sessionId);
         }
         liveTalkLog('session.started', session.snapshot?.() || { sessionId });

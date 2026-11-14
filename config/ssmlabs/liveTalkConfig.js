@@ -99,7 +99,8 @@ function resolveLiveTalkConfig(env = process.env) {
     model: String(env.LIVE_TALK_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL,
     gptLiveEnabled: parseBoolean(env.LIVE_TALK_GPT_LIVE, false),
     gptLiveMcpProxyUrl: String(env.LIVE_TALK_MCP_PROXY_URL || '').trim(),
-    gptLiveIdleMs: parsePositiveInt(env.LIVE_TALK_GPT_LIVE_IDLE_MS, 120000),
+    gptLiveIdleMs: parsePositiveInt(env.LIVE_TALK_GPT_LIVE_IDLE_MS, 20000),
+    gptLiveNoiseMs: parsePositiveInt(env.LIVE_TALK_GPT_LIVE_NOISE_MS, 60000),
     voice: String(env.LIVE_TALK_VOICE || DEFAULT_VOICE).trim() || DEFAULT_VOICE,
     openaiApiKey: String(env.OPENAI_API_KEY || '').trim(),
     maxSessionMs: parsePositiveInt(env.LIVE_TALK_MAX_SESSION_MS, DEFAULT_MAX_SESSION_MS),
@@ -232,6 +233,7 @@ function liveTalkInstructions(agentInstructions, pack) {
     isStudent
       ? null
       : 'When the user asks to open, go to, or show a page, call open_app_screen. Calendar is destination calendar. Today is today. Students list is student-list. Lessons is lesson-list. My Business is business-overview; pass period this_month, last_month, or year_to_date when requested. Library is library. Playbook is playbook. Notifications is notices. App Feedback is app-feedback. Demo Environment is demo-environment. Settings is settings. Account is account. Profiles is profiles.',
+    'If the user clearly says they are done, goodbye, hang up, or that is all, say a brief goodbye and stop. Do not keep the conversation going.',
     'Follow the same confirmation rules as typed Chat before mutating data. In voice, do not use Markdown approval links; ask the user to speak a clear approval, then call the tool with confirmed true and a stable mutation ID.',
     'Do not claim a write succeeded until the tool returns success. If LessonCaddie asks for confirmation or denies the action, say that.',
   ]

@@ -16,7 +16,7 @@ Live Talk is on whenever this overlay is loaded. There is no env flag to disable
 
 GPT-Live tools need a **public HTTPS URL** to this Chat's `/live-talk/mcp` proxy. Read [ssmlabs-gpt-live-public-mcp.md](./ssmlabs-gpt-live-public-mcp.md) before touching Funnel, Caddy 443, or `LIVE_TALK_MCP_PROXY_URL`.
 
-The Chat server issues a random bearer credential per voice session. The proxy forwards MCP traffic with the existing LessonCaddie SSO headers; it never sends the SSO secret or OpenAI key to the browser or OpenAI MCP. Proxy hops log method/status without secrets. Stopping Live Talk revokes the proxy credential. GPT-Live also stops after two minutes without speech or a reply (`LIVE_TALK_GPT_LIVE_IDLE_MS`). GPT-Live keeps the mic open while she talks (full duplex); Realtime still mutes on assistant audio unless the user allows interrupt.
+The Chat server issues a random bearer credential per voice session. The proxy forwards MCP traffic with the existing LessonCaddie SSO headers; it never sends the SSO secret or OpenAI key to the browser or OpenAI MCP. Proxy hops log method/status without secrets. Stopping Live Talk revokes the proxy credential. GPT-Live hangs up after 20 seconds of true silence (`LIVE_TALK_GPT_LIVE_IDLE_MS`) or 60 seconds of noise without a usable question (`LIVE_TALK_GPT_LIVE_NOISE_MS`), and when the instructor says they are done. It speaks the reason, then disconnects. GPT-Live keeps the mic open while she talks (full duplex); Realtime still mutes on assistant audio unless the user allows interrupt.
 
 Leaving this branch (or dropping the overlay attach) is the off switch. Existing typed Chat is unchanged.
 

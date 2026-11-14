@@ -441,6 +441,7 @@ function createLiveTalkRouter(deps = {}) {
       speakCoreRevision: config.speakCoreRevision,
       provider: config.gptLiveEnabled && pack.id === 'instructor' ? 'gpt-live' : 'openai-realtime',
       gptLiveIdleMs: config.gptLiveIdleMs,
+      gptLiveNoiseMs: config.gptLiveNoiseMs,
     });
   });
 
