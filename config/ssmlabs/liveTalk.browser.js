@@ -49,6 +49,10 @@
   let liveTalkConversationId = '';
   let liveTalkUserHeard = '';
   let liveTalkAssistantHeard = '';
+  let delegationHistory = [];
+  let lastDelegationUtterance = '';
+  let delegationIds = new Set();
+  let delegationPending = false;
   let liveTalkUserDraftId = '';
   let liveTalkAssistantDraftId = '';
   let liveTalkPreviewTimer = 0;
@@ -57,8 +61,6 @@
   let gptLiveLastEventAt = 0;
   let gptLiveLastUsefulAt = 0;
   let gptLiveLastTranscriptAt = 0;
-  let gptLiveClientActionTimer = 0;
-  let clientActionPollInFlight = false;
   let durationDraining = false;
   let durationDrainStopping = false;
   let durationProxyPending = 0;
@@ -429,11 +431,6 @@
     return Boolean(opened);
   }
 
-  function stopGptLiveClientActionPoll() {
-    windowObject.clearInterval(gptLiveClientActionTimer);
-    gptLiveClientActionTimer = 0;
-  }
-
   function noteDurationDrain(session, payload) {
     if (active?.session !== session || !payload?.draining || durationDrainStopping) return;
     if (!durationDraining) setStatus(ensureBar(), 'responding', 'Finishing the current response…');
@@ -452,7 +449,7 @@
       !durationDraining ||
       durationDrainStopping ||
       active?.session !== session ||
-      clientActionPollInFlight
+      delegationPending
     )
       return;
     if (durationProxyPending || awaitingAssistant || assistantAudioPlaying || greetingPending)
@@ -461,35 +458,6 @@
     if (active.gptLive && Date.now() - (gptLivePlaybackMeter?.lastAudibleAt || 0) < 3000) return;
     durationDrainStopping = true;
     void stopCall(ensureBar(), 'duration');
-  }
-
-  function startGptLiveClientActionPoll(session, sessionId) {
-    stopGptLiveClientActionPoll();
-    gptLiveClientActionTimer = windowObject.setInterval(() => {
-      if (active?.session !== session || !sessionId || clientActionPollInFlight) return;
-      clientActionPollInFlight = true;
-      void api(liveTalkPath(`/live-talk/session/${sessionId}/client-actions`), { quiet: true })
-        .then((payload) => {
-          const actions = Array.isArray(payload?.actions) ? payload.actions : [];
-          for (const action of actions) {
-            applyHostToolResult(action?.name, action?.result);
-          }
-          noteDurationDrain(session, payload);
-        })
-        .catch((error) => {
-          if (
-            active?.session === session &&
-            (error?.status === 401 || error?.status === 403 || error?.status === 404)
-          ) {
-            stopGptLiveClientActionPoll();
-            void stopCall(ensureBar(), 'expired');
-          }
-        })
-        .finally(() => {
-          clientActionPollInFlight = false;
-          maybeFinishDurationDrain(session);
-        });
-    }, 400);
   }
 
   function postAppDataChanged(toolName, result) {
@@ -739,6 +707,11 @@
     else liveTalkAssistantHeard = '';
     upsertLivePreview(role, spoken);
     if (!clean(spoken)) return null;
+    if (active?.gptLive) {
+      delegationHistory.push({ role, text: clean(spoken).slice(0, 2000) });
+      delegationHistory = delegationHistory.slice(-8);
+      if (role === 'user') lastDelegationUtterance = clean(spoken);
+    }
     const saving = saveLiveTranscript(role, spoken);
     transcriptSaves.add(saving);
     void saving.finally(() => transcriptSaves.delete(saving));
@@ -927,6 +900,10 @@
     gptLiveHangupInFlight = false;
     gptLiveHangupKind = '';
     gptLiveHeard = '';
+    delegationHistory = [];
+    lastDelegationUtterance = '';
+    delegationIds = new Set();
+    delegationPending = false;
     gptLiveUserWantsHangup = false;
     liveTalkUserDraftId = '';
     liveTalkAssistantDraftId = '';
@@ -935,7 +912,6 @@
       windowObject.clearTimeout(liveTalkPreviewTimer);
       liveTalkPreviewTimer = 0;
     }
-    stopGptLiveClientActionPoll();
     stopGptLivePlaybackMeter();
     if (!current?.gptLive) {
       try {
@@ -1366,6 +1342,66 @@
     if (kind === 'transcript') gptLiveLastTranscriptAt = now;
   }
 
+  async function handleGptLiveDelegation(session, sessionId, delegationId) {
+    if (!delegationId || delegationIds.has(delegationId) || active?.session !== session) return;
+    delegationIds.add(delegationId);
+    session.sendEvent({
+      type: 'session.thinking.append',
+      event_id: `delegation_quiet_${delegationId}`,
+      delegation_id: delegationId,
+      content: '',
+    });
+    noteGptLiveActivity('tool');
+    if (delegationPending) {
+      session.sendEvent({
+        type: 'session.commentary.append',
+        event_id: `delegation_busy_${delegationId}`,
+        delegation_id: delegationId,
+        content: 'I am still finishing the previous LessonCaddie request.',
+      });
+      return;
+    }
+    if (Date.now() - gptLiveLastTranscriptAt > 10000) await sleep(300);
+    const utterance =
+      Date.now() - gptLiveLastTranscriptAt <= 10000
+        ? clean(liveTalkUserHeard || lastDelegationUtterance)
+        : '';
+    const history = delegationHistory.slice(-8);
+    if (history.at(-1)?.role === 'user' && history.at(-1)?.text === utterance) history.pop();
+    delegationPending = true;
+    setStatus(ensureBar(), 'tool', 'Checking LessonCaddie…');
+    try {
+      const payload = await api(liveTalkPath(`/live-talk/session/${sessionId}/delegation`), {
+        method: 'POST',
+        body: JSON.stringify({ delegationId, utterance, history }),
+      });
+      if (active?.session !== session) return;
+      for (const action of payload.actions || []) applyHostToolResult(action.name, action.result);
+      noteGptLiveActivity('tool');
+      session.sendEvent({
+        type: 'session.commentary.append',
+        event_id: `delegation_result_${delegationId}`,
+        delegation_id: delegationId,
+        content: payload.reply,
+      });
+    } catch (error) {
+      if (active?.session !== session) return;
+      liveTalkWarn('delegation.failed', summarizeError(error));
+      session.sendEvent({
+        type: 'session.commentary.append',
+        event_id: `delegation_error_${delegationId}`,
+        delegation_id: delegationId,
+        content: 'I could not complete that LessonCaddie request. Please try again.',
+      });
+    } finally {
+      delegationPending = false;
+      if (active?.session === session) {
+        setStatus(ensureBar(), 'listening', 'Listening…');
+        maybeFinishDurationDrain(session);
+      }
+    }
+  }
+
   function resetGptLiveHeard() {
     gptLiveHeard = '';
     windowObject.clearTimeout(gptLiveHeardTimer);
@@ -1662,6 +1698,10 @@
           }
         }
         const providerEvent = event.detail?.providerEvent || event.detail?.event?.type || '';
+        if (gptLive && providerEvent === 'session.delegation.created') {
+          const delegationId = clean(event.detail?.event?.delegation?.id);
+          void handleGptLiveDelegation(session, sessionId, delegationId);
+        }
         const deltaText = String(
           event.detail?.event?.delta ??
             event.detail?.text ??
@@ -1917,7 +1957,6 @@
         session.setMuted?.(!gptLive);
         if (gptLive) {
           armGptLiveHangupWatch(session);
-          startGptLiveClientActionPoll(session, sessionId);
         }
         liveTalkLog('session.started', session.snapshot?.() || { sessionId });
         if (pingTimer) windowObject.clearInterval(pingTimer);

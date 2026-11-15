@@ -680,32 +680,11 @@ function createLiveTalkRouter(deps = {}) {
           );
         }
         sessionConfig.maxSessionMs = Math.min(config.maxSessionMs, quotaRemainingMs);
-        let proxyUrl;
-        try {
-          proxyUrl = new URL(config.gptLiveMcpProxyUrl);
-        } catch {
-          throw publicError(
-            503,
-            'mcp_proxy_unconfigured',
-            'Live Talk MCP proxy URL is unavailable.',
-          );
-        }
-        if (
-          proxyUrl.protocol !== 'https:' ||
-          proxyUrl.username ||
-          proxyUrl.password ||
-          proxyUrl.search ||
-          proxyUrl.hash
-        ) {
-          throw publicError(503, 'mcp_proxy_unconfigured', 'Live Talk MCP proxy URL is invalid.');
-        }
-        const proxyToken = crypto.randomBytes(32).toString('base64url');
         proxyRecord = {
           id: sessionId,
           userId,
           closed: false,
           idleMs: config.idleMs,
-          proxyToken,
           mcpProxy: delegation,
           proxyRequests: new Set(),
           clientActions: [],
@@ -723,27 +702,7 @@ function createLiveTalkRouter(deps = {}) {
                 model: 'gpt-live-1',
                 instructions: `${instructions}\n\n${gptLiveVoiceInstructions(voiceSettings)}\n\n${gptLiveDelegationInstructions()}`,
                 audio: { output: { voice: outputVoice } },
-                delegation: {
-                  type: 'responses',
-                  responses: {
-                    model: 'gpt-6-luna',
-                    instructions: `${instructions}\n\nFor page requests, call open_app_screen with the destination. Report the tool result accurately; do not claim the page switched without a navigation result.`,
-                    text: {
-                      verbosity:
-                        voiceSettings.verboseLevel === 'none' ? 'low' : voiceSettings.verboseLevel,
-                    },
-                    tools: [
-                      {
-                        type: 'mcp',
-                        server_url: `${proxyUrl.toString().replace(/\/+$/, '')}/${sessionId}`,
-                        server_label: 'Instructor',
-                        authorization: proxyToken,
-                        require_approval: 'never',
-                      },
-                    ],
-                    tool_choice: 'auto',
-                  },
-                },
+                delegation: { type: 'client', acknowledgement_delay_ms: 800 },
               },
             }),
           );
@@ -786,9 +745,9 @@ function createLiveTalkRouter(deps = {}) {
         idleMs: config.idleMs,
         parentMessageId: clean(convo.lastMessageId || convo.last_message_id),
         allowedTools,
+        delegationInstructions: gptLive ? instructions : '',
         ...(proxyRecord
           ? {
-              proxyToken: proxyRecord.proxyToken,
               mcpProxy: proxyRecord.mcpProxy,
               proxyRequests: proxyRecord.proxyRequests,
               clientActions: proxyRecord.clientActions || [],
@@ -830,6 +789,138 @@ function createLiveTalkRouter(deps = {}) {
         code: error?.code || '',
         status: error?.status || '',
       });
+      next(error);
+    }
+  });
+
+  router.post('/session/:sessionId/delegation', async (req, res, next) => {
+    try {
+      const record = requireSession(req);
+      if (!record.gptLive) {
+        throw publicError(400, 'invalid_delegation', 'This is not a GPT-Live session.');
+      }
+      const delegationId = clean(req.body?.delegationId);
+      const utterance = clean(req.body?.utterance).slice(0, 4000);
+      if (!delegationId || delegationId.length > 200 || !utterance) {
+        throw publicError(400, 'invalid_delegation', 'The delegated request is incomplete.');
+      }
+      if (record.delegationPending) {
+        throw publicError(409, 'delegation_busy', 'A LessonCaddie request is already in progress.');
+      }
+      record.delegationPending = true;
+      try {
+        const config = loadConfig();
+        const mcpTools = await listMcpTools({
+          user: req.user,
+          conversationId: record.conversationId,
+          config: { ...config, serverName: record.serverName },
+        });
+        const tools = toOpenAiTools(mcpTools);
+        record.allowedTools = liveTalkToolNames(tools);
+        if (!tools.length) {
+          throw publicError(502, 'mcp_tools_unavailable', 'LessonCaddie tools are unavailable.');
+        }
+        const history = Array.isArray(req.body?.history)
+          ? req.body.history
+              .slice(-8)
+              .filter((item) => ['user', 'assistant'].includes(item?.role))
+              .map((item) => ({ role: item.role, content: clean(item.text).slice(0, 2000) }))
+              .filter((item) => item.content)
+          : [];
+        let input = [...history, { role: 'user', content: utterance }];
+        let previousResponseId;
+        let reply = '';
+        const actions = [];
+        for (let round = 0; round < 6; round += 1) {
+          const upstream = await fetch('https://api.openai.com/v1/responses', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${config.openaiApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gpt-6-luna',
+              instructions: `${record.delegationInstructions}\n\nUse LessonCaddie tools for app facts and actions. For page requests call open_app_screen. Report tool results accurately. Keep the final reply brief for speech.`,
+              input,
+              tools,
+              tool_choice: 'auto',
+              ...(previousResponseId ? { previous_response_id: previousResponseId } : {}),
+            }),
+            signal: AbortSignal.timeout(45000),
+          });
+          const response = await upstream.json().catch(() => ({}));
+          if (!upstream.ok) {
+            liveTalkLog('warn', 'delegation.model-failed', { status: upstream.status });
+            throw publicError(
+              502,
+              'delegation_failed',
+              'The assistant could not complete that request.',
+            );
+          }
+          const calls = (response.output || []).filter((item) => item.type === 'function_call');
+          if (!calls.length) {
+            reply = clean(
+              response.output_text ||
+                (response.output || [])
+                  .flatMap((item) => item.content || [])
+                  .filter((item) => item.type === 'output_text')
+                  .map((item) => item.text)
+                  .join(' '),
+            );
+            break;
+          }
+          previousResponseId = response.id;
+          input = [];
+          for (const call of calls) {
+            if (record.closed) {
+              throw publicError(410, 'session_closed', 'The Live Talk session has ended.');
+            }
+            let result;
+            if (!isAllowedLiveTalkTool(call.name, record.allowedTools)) {
+              result = { error: 'Tool unavailable.' };
+            } else {
+              try {
+                const args = parseJsonSafe(call.arguments);
+                result = await callMcpTool({
+                  user: req.user,
+                  serverName: record.serverName,
+                  toolName: call.name,
+                  toolArguments:
+                    args && typeof args === 'object' && !Array.isArray(args) ? args : {},
+                  conversationId: record.conversationId,
+                });
+                actions.push({ name: call.name, result: unwrapMcpResult(result) });
+                liveTalkLog('info', 'delegation.tool-ok', {
+                  sessionId: record.id,
+                  name: call.name,
+                });
+              } catch (error) {
+                liveTalkLog('warn', 'delegation.tool-failed', {
+                  sessionId: record.id,
+                  name: call.name,
+                  message: error.message,
+                });
+                result = { error: 'LessonCaddie could not complete this action.' };
+              }
+            }
+            input.push({
+              type: 'function_call_output',
+              call_id: call.call_id,
+              output: JSON.stringify(result ?? null),
+            });
+          }
+        }
+        if (!reply)
+          throw publicError(
+            502,
+            'delegation_failed',
+            'The assistant could not complete that request.',
+          );
+        res.json({ ok: true, delegationId, reply: reply.slice(0, 1800), actions });
+      } finally {
+        record.delegationPending = false;
+      }
+    } catch (error) {
       next(error);
     }
   });
