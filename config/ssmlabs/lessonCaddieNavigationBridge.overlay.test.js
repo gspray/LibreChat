@@ -253,7 +253,7 @@ test('opens a named student page directly from standalone Chat', () => {
   assert.deepEqual(opened, [result.deepLink]);
 });
 
-test('opens a named student page when the embedded app does not acknowledge navigation', () => {
+test('preserves the embedded Chat session when app navigation is not acknowledged', () => {
   const opened = [];
   const timers = [];
   const browser = {
@@ -282,7 +282,7 @@ test('opens a named student page when the embedded app does not acknowledge navi
   );
   assert.equal(opened.length, 0);
   timers.at(-1)();
-  assert.deepEqual(opened, [result.deepLink]);
+  assert.deepEqual(opened, []);
 });
 
 test('leaves Chat navigation links alone while forwarding LessonCaddie handoff links', () => {

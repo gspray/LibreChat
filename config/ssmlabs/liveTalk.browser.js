@@ -376,59 +376,20 @@
     };
   }
 
-  function navigationFromToolResult(result) {
-    let src = {};
-    if (result?.structuredContent && typeof result.structuredContent === 'object') {
-      src = result.structuredContent;
-    } else if (result && typeof result === 'object') {
-      src = result;
-    }
-    const destination = clean(src.destination);
-    if (!destination) return null;
-    const params =
-      src.params && typeof src.params === 'object' && !Array.isArray(src.params) ? src.params : {};
-    return {
-      destination,
-      params,
-      requestId: clean(src.requestId) || `live-nav-${Date.now()}`,
-    };
-  }
-
-  function postParentNavigate(result) {
-    const overlay = windowObject.LessonCaddieNavigationOverlay;
-    if (overlay?.onPayload?.(result)) return true;
-    if (windowObject.parent === windowObject) return false;
-    const nav = navigationFromToolResult(result);
-    if (!nav) return false;
-    try {
-      windowObject.parent.postMessage(
-        {
-          source: ASSISTANT_MESSAGE_SOURCE,
-          type: 'navigate',
-          version: 1,
-          requestId: nav.requestId,
-          destination: nav.destination,
-          params: nav.params,
-          surface: 'app',
-        },
-        '*',
-      );
-      liveTalkLog('tool.navigate.fallback', { destination: nav.destination });
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function applyHostToolResult(name, result) {
+  async function applyHostToolResult(name, result) {
     postAppDataChanged(name, result);
-    if (clean(name) !== 'open_app_screen') return false;
-    const opened = postParentNavigate(result);
+    if (clean(name) !== 'open_app_screen') return null;
+    const overlay = windowObject.LessonCaddieNavigationOverlay;
+    const outcome =
+      typeof overlay?.navigate === 'function'
+        ? await overlay.navigate(result)
+        : { ok: false, code: 'bridge_unavailable' };
     liveTalkLog('tool.navigate', {
-      opened: Boolean(opened),
-      destination: result?.destination || result?.structuredContent?.destination || '',
+      opened: outcome.ok === true,
+      code: outcome.code,
+      requestId: outcome.requestId || '',
     });
-    return Boolean(opened);
+    return outcome;
   }
 
   function noteDurationDrain(session, payload) {
@@ -1376,13 +1337,24 @@
         body: JSON.stringify({ delegationId, utterance, history }),
       });
       if (active?.session !== session) return;
-      for (const action of payload.actions || []) applyHostToolResult(action.name, action.result);
+      const navigationResults = [];
+      for (const action of payload.actions || []) {
+        const outcome = await applyHostToolResult(action.name, action.result);
+        if (outcome) navigationResults.push(outcome);
+      }
+      if (active?.session !== session) return;
+      let reply = payload.reply;
+      if (navigationResults.length) {
+        reply = navigationResults.every((outcome) => outcome.ok === true)
+          ? 'The app confirmed that the requested page is open.'
+          : 'I could not confirm that the app opened the requested page. Please try opening it from the app menu.';
+      }
       noteGptLiveActivity('tool');
       session.sendEvent({
         type: 'session.commentary.append',
         event_id: `delegation_result_${delegationId}`,
         delegation_id: delegationId,
-        content: payload.reply,
+        content: reply,
       });
     } catch (error) {
       if (active?.session !== session) return;
@@ -1653,8 +1625,18 @@
                 name: call.name,
                 ms: Date.now() - startedAt,
               });
-              applyHostToolResult(call.name, result);
-              return result;
+              const navigation = await applyHostToolResult(call.name, result);
+              return navigation
+                ? {
+                    ...result,
+                    opened: navigation.ok === true,
+                    navigationStatus: navigation.code,
+                    responseGuidance:
+                      navigation.ok === true
+                        ? 'The app confirmed the requested page is open.'
+                        : 'The app did not confirm navigation. Tell the user the page could not be opened; do not claim success.',
+                  }
+                : result;
             },
           });
       bridge?.attach(session);
