@@ -9,7 +9,7 @@ services:
       APP_TITLE: Ask Lesson Caddie Assistant
       APP_SHORT_NAME: Ask Caddie
       SSMLABS_BRANDING_ASSET_VERSION: "1"
-      SSMLABS_CHAT_THEME_ASSET_VERSION: "52"
+      SSMLABS_CHAT_THEME_ASSET_VERSION: "53"
       HIDE_TOOL_ACTIVITY: "true"
       INSTRUCTOR_ASSISTANT_MODEL: gpt-4o
       LIBRECHAT_INSTANCE_ENV: ${LIBRECHAT_INSTANCE_ENV:-}
@@ -19,7 +19,12 @@ services:
       CROSS_ORIGIN_RESOURCE_POLICY: same-site
       CSP_FRAME_ANCESTORS: "'self' https://lessoncaddie.ssmlabs.com http://127.0.0.1:3021"
       MCP_SANDBOX_FRAME_ANCESTORS: "https://chat.ssmlabs.com https://lessoncaddie.ssmlabs.com"
-      LIVE_TALK_SPEAK_CORE_SHA: 36581f2
+      LIVE_TALK_SPEAK_CORE_SHA: f9d52b4
+      LIVE_TALK_GPT_LIVE: "false"
+      # GPT-Live only (OpenAI fetches this). Typed Chat uses librechat.yaml LessonCaddie MCP.
+      # Public HTTPS 443 URL of /live-talk/mcp. Never Tailscale Funnel on 443 (breaks PWAs).
+      # See docs/ssmlabs-gpt-live-public-mcp.md
+      LIVE_TALK_MCP_PROXY_URL: https://ssmlabs.tail1ad636.ts.net:8443/live-talk/mcp
       # inject-index-html keeps api/server/index.js upstream; attach-sso is a no-op until enabled.
       NODE_OPTIONS: --require /app/config/ssmlabs/inject-index-html.js --require /app/config/ssmlabs/attach-lessoncaddie-sso.js --require /app/config/ssmlabs/attach-live-talk.js
     volumes:

@@ -97,6 +97,10 @@ function resolveLiveTalkConfig(env = process.env) {
     serverName: String(env.LIVE_TALK_MCP_SERVER || DEFAULT_SERVER).trim() || DEFAULT_SERVER,
     agentId: String(env.LIVE_TALK_AGENT_ID || DEFAULT_AGENT_ID).trim() || DEFAULT_AGENT_ID,
     model: String(env.LIVE_TALK_MODEL || DEFAULT_MODEL).trim() || DEFAULT_MODEL,
+    gptLiveEnabled: parseBoolean(env.LIVE_TALK_GPT_LIVE, false),
+    gptLiveMcpProxyUrl: String(env.LIVE_TALK_MCP_PROXY_URL || '').trim(),
+    gptLiveIdleMs: parsePositiveInt(env.LIVE_TALK_GPT_LIVE_IDLE_MS, 20000),
+    gptLiveNoiseMs: parsePositiveInt(env.LIVE_TALK_GPT_LIVE_NOISE_MS, 60000),
     voice: String(env.LIVE_TALK_VOICE || DEFAULT_VOICE).trim() || DEFAULT_VOICE,
     openaiApiKey: String(env.OPENAI_API_KEY || '').trim(),
     maxSessionMs: parsePositiveInt(env.LIVE_TALK_MAX_SESSION_MS, DEFAULT_MAX_SESSION_MS),
@@ -105,7 +109,7 @@ function resolveLiveTalkConfig(env = process.env) {
       env.LIVE_TALK_MAX_SESSIONS_PER_USER,
       DEFAULT_MAX_SESSIONS_PER_USER,
     ),
-    speakCoreRevision: String(env.LIVE_TALK_SPEAK_CORE_SHA || '36581f2').trim(),
+    speakCoreRevision: String(env.LIVE_TALK_SPEAK_CORE_SHA || 'f9d52b4').trim(),
     vadType: parseVadType(env.LIVE_TALK_VAD_TYPE),
     vadEagerness: parseVadEagerness(env.LIVE_TALK_VAD_EAGERNESS),
     vadThreshold: parseUnitInterval(env.LIVE_TALK_VAD_THRESHOLD, DEFAULT_VAD_THRESHOLD),
@@ -120,6 +124,7 @@ function resolveLiveTalkConfig(env = process.env) {
 
 const WAIT_FOR_YOU = ['patient', 'balanced', 'fast'];
 const VOICES = ['marin', 'cedar', 'shimmer', 'verse', 'alloy'];
+const CADDIE_VOICE_ID = 'voice_6af8799a11fc81919fafac391a27ce36';
 const WAIT_PRESETS = {
   patient: {
     vadEagerness: 'medium',
@@ -145,16 +150,47 @@ function normalizeLiveVoiceSettings(raw) {
   )
     ? String(src.waitForYou).trim().toLowerCase()
     : 'patient';
-  const voiceRaw = String(src.voice || '')
-    .trim()
-    .toLowerCase();
+  const voiceValue =
+    typeof src.voice === 'object'
+      ? String(src.voice?.id || '').trim()
+      : String(src.voice || '').trim();
+  const voiceRaw = voiceValue.toLowerCase();
+  const verboseLevel = ['high', 'medium', 'low', 'none'].includes(src.verboseLevel)
+    ? src.verboseLevel
+    : 'medium';
+  let voice = '';
+  if (/^voice_[A-Za-z0-9_-]+$/.test(voiceValue)) voice = { id: voiceValue };
+  else if (VOICES.includes(voiceRaw)) voice = voiceRaw;
   return {
     waitForYou,
     allowInterrupt: src.allowInterrupt === true,
     ignoreBackgroundNoise: src.ignoreBackgroundNoise !== false,
     muteMicWhileSheTalks: src.muteMicWhileSheTalks !== false,
-    voice: VOICES.includes(voiceRaw) ? voiceRaw : '',
+    voice,
+    verboseLevel,
   };
+}
+
+function gptLiveVoiceInstructions(settings) {
+  const wait = {
+    patient:
+      'Wait through thoughtful pauses. Do not finish the user’s sentences or respond until they clearly finish.',
+    balanced: 'Allow a natural conversational pause before responding.',
+    fast: 'Respond promptly when the user appears to have finished speaking.',
+  }[settings.waitForYou];
+  const noise = settings.ignoreBackgroundNoise
+    ? 'Ignore keyboard clicks, HVAC, and other background noise; respond to the user’s words.'
+    : '';
+  const interrupt = settings.allowInterrupt
+    ? 'When the user interrupts you, stop speaking and listen to their latest request.'
+    : 'Finish your current thought when incidental sounds occur. Yield when the user clearly asks you to stop or changes the request.';
+  const detail = {
+    high: 'Give full spoken explanations when useful, while staying conversational.',
+    medium: 'Use a natural amount of spoken detail.',
+    low: 'Keep spoken replies brief and direct.',
+    none: 'Do not speak, backchannel, acknowledge, or generate spoken audio. Keep listening and use the backend tools for requested actions. Do not announce tool results.',
+  }[settings.verboseLevel];
+  return `${wait} ${noise} ${interrupt} ${detail}`;
 }
 
 function applyLiveVoiceToConfig(config, liveVoice) {
@@ -210,14 +246,23 @@ function isAllowedLiveTalkTool(name, allowedNames) {
   return allowedNames.has(tool);
 }
 
-function liveTalkInstructions(agentInstructions, pack) {
+function liveTalkInstructions(agentInstructions, pack, voice) {
   const base = String(agentInstructions || '').trim();
   const isStudent = pack?.id === 'student';
+  let languageInstruction =
+    'Always speak American English. Do not switch languages, even briefly, unless the user clearly speaks another language first; then match that language. Never start or continue in Chinese, Japanese, Korean, or any other language on your own.';
+  if (voice?.id === CADDIE_VOICE_ID) {
+    languageInstruction =
+      'Use the Caddie voice: an older caddie from Scotland with a moderate Scottish accent. Speak English with that Scottish accent. Do not switch languages unless the user clearly speaks another language first; then match that language.';
+  } else if (voice?.id) {
+    languageInstruction =
+      'Speak English in the accent and delivery of the selected custom voice. Do not switch languages unless the user clearly speaks another language first; then match that language.';
+  }
   const extra = [
     isStudent
       ? 'You are in LessonCaddie Live Talk, the spoken form of Student Caddie.'
       : 'You are in LessonCaddie Live Talk, the spoken form of Instructor Assistant.',
-    'Always speak American English. Do not switch languages, even briefly, unless the user clearly speaks another language first; then match that language. Never start or continue in Chinese, Japanese, Korean, or any other language on your own.',
+    languageInstruction,
     'Do not introduce yourself, greet the user, or say you are Student Caddie or Instructor Assistant unless the user asks who you are. The only allowed opening line is the exact greeting from a greeting turn. After that greeting, wait silently until the user speaks. Do not call tools or ask a question until the user speaks.',
     isStudent
       ? 'You have the same student LessonCaddie tools as typed Ask. LessonCaddie authorizes each call.'
@@ -229,6 +274,7 @@ function liveTalkInstructions(agentInstructions, pack) {
     isStudent
       ? null
       : 'When the user asks to open, go to, or show a page, call open_app_screen. Calendar is destination calendar. Today is today. Students list is student-list. Lessons is lesson-list. My Business is business-overview; pass period this_month, last_month, or year_to_date when requested. Library is library. Playbook is playbook. Notifications is notices. App Feedback is app-feedback. Demo Environment is demo-environment. Settings is settings. Account is account. Profiles is profiles.',
+    'If the user clearly says they are done, goodbye, hang up, or that is all, say a brief goodbye and stop. Do not keep the conversation going.',
     'Follow the same confirmation rules as typed Chat before mutating data. In voice, do not use Markdown approval links; ask the user to speak a clear approval, then call the tool with confirmed true and a stable mutation ID.',
     'Do not claim a write succeeded until the tool returns success. If LessonCaddie asks for confirmation or denies the action, say that.',
   ]
@@ -237,7 +283,20 @@ function liveTalkInstructions(agentInstructions, pack) {
   return base ? `${base}\n\n${extra}` : extra;
 }
 
+function gptLiveDelegationInstructions() {
+  return `Delegation policy:
+Backend tools:
+- Open LessonCaddie app pages and perform authorized LessonCaddie lookups and actions.
+Generate <|SpawnThinking|> when:
+- The user asks to open, show, or go to an app page. The backend must call open_app_screen to request the page switch.
+- The user asks for LessonCaddie information or an action that needs a backend tool.
+Do not generate <|SpawnThinking|> when:
+- The user is only greeting you or you need a brief clarification before knowing what to do.
+Generate <|SpawnThinking|> before answering a page request. Wait for the backend result. Do not say a page opened based only on your own spoken acknowledgement.`;
+}
+
 module.exports = {
+  CADDIE_VOICE_ID,
   LIVE_TALK_PACKS,
   DEFAULT_AGENT_ID,
   STUDENT_AGENT_ID,
@@ -245,9 +304,11 @@ module.exports = {
   applyLiveTalkPack,
   resolveLiveTalkConfig,
   normalizeLiveVoiceSettings,
+  gptLiveVoiceInstructions,
   applyLiveVoiceToConfig,
   liveTalkTurnDetection,
   liveTalkToolNames,
   isAllowedLiveTalkTool,
   liveTalkInstructions,
+  gptLiveDelegationInstructions,
 };

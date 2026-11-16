@@ -5,7 +5,8 @@
  * Mounts /live-talk at listen time so api/server/index.js stays upstream.
  */
 const http = require('http');
-const { createLiveTalkRouter } = require('./liveTalkRoutes');
+const { createLiveTalkRouter, createLiveTalkMcpProxy } = require('./liveTalkRoutes');
+const { unwrapMcpResult } = require('./liveTalkMcpResult');
 
 const originalListen = http.Server.prototype.listen;
 
@@ -50,7 +51,7 @@ function createBoundRouter() {
     updateToken,
     deleteTokens,
   } = require('~/models');
-  const { getMCPManager, getFlowStateManager } = require('~/config');
+  const { getMCPManager, getMCPServersRegistry, getFlowStateManager } = require('~/config');
   const { getLogStores } = require('~/cache');
   const { CacheKeys } = require('librechat-data-provider');
 
@@ -120,30 +121,29 @@ function createBoundRouter() {
     return unwrapMcpResult(result);
   }
 
-  function unwrapMcpResult(result) {
-    if (result == null) return null;
-    if (typeof result === 'string') {
-      try {
-        return unwrapMcpResult(JSON.parse(result));
-      } catch {
-        return { text: result };
-      }
+  async function getMcpDelegation({ user, config }) {
+    const firebaseUid = String(user?.openidId || '').trim();
+    if (user?.provider !== 'lessoncaddie' || !firebaseUid) {
+      return null;
     }
-    if (Array.isArray(result)) {
-      return unwrapMcpResult(result[0]);
+    const registry = getMCPServersRegistry();
+    const serverConfig = await registry.getServerConfig(
+      config.serverName,
+      user.id,
+      undefined,
+      user.role,
+      { idOnTheSource: user.idOnTheSource },
+    );
+    if (!serverConfig || !(await registry.isAppServerConfig(config.serverName, serverConfig))) {
+      return null;
     }
-    if (typeof result !== 'object') return result;
-    if (result.structuredContent && typeof result.structuredContent === 'object') {
-      return result.structuredContent;
-    }
-    if (Array.isArray(result.content)) {
-      const first = result.content.find((part) => part && part.text != null) || result.content[0];
-      return unwrapMcpResult(first && first.text != null ? first.text : first);
-    }
-    return result;
+    const serverUrl = String(serverConfig.url || '');
+    if (!serverUrl.startsWith('https://')) return null;
+    return { serverUrl, firebaseUid };
   }
 
   const router = require('express').Router();
+  router.use('/mcp', createLiveTalkMcpProxy());
   router.use(requireJwtAuth);
   router.use(
     createLiveTalkRouter({
@@ -152,6 +152,7 @@ function createBoundRouter() {
       getAgent,
       saveMessage,
       listMcpTools,
+      getMcpDelegation,
       callMcpTool,
     }),
   );

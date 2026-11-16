@@ -3,3 +3,10 @@
 .lc-live-talk-composer-btn {
   display: none !important;
 }
+
+/* Talk owns the turn — typed send would abort the stream and show the red incomplete banner. */
+html[data-ssmlabs-live-talk='on'] form:has(textarea) textarea,
+html[data-ssmlabs-live-talk='on'] form:has(textarea) button[type='submit'] {
+  pointer-events: none !important;
+  opacity: 0.55;
+}

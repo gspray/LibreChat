@@ -372,6 +372,23 @@
     }
   }
 
+  // TEMP navigation diagnosis: remove after the failing handoff is identified.
+  function traceNavigation(windowObject, stage, data = {}) {
+    try {
+      (windowObject.console || console).info(
+        '[LCNavTrace]',
+        JSON.stringify({
+          revision: 'nav-debug-20261115-1',
+          layer: 'bridge',
+          stage,
+          ...data,
+        }),
+      );
+    } catch {
+      /* Console diagnostics must not interrupt navigation. */
+    }
+  }
+
   function isFramed(windowObject) {
     try {
       return windowObject.parent !== windowObject;
@@ -395,8 +412,10 @@
       appNavigationBridge: false,
       processedIds: new Set(),
       lastResult: null,
+      pendingNavigation: null,
       lastRecovery: null,
       fallbackTimers: {},
+      acknowledgements: new Map(),
       helpOverview: false,
     };
   }
@@ -500,17 +519,34 @@
     if (state.fallbackTimers[requestId]) {
       windowObject.clearTimeout(state.fallbackTimers[requestId]);
     }
-    state.fallbackTimers[requestId] = windowObject.setTimeout(() => {
-      delete state.fallbackTimers[requestId];
-      if (!state.processedIds.has(`${requestId}:acked`)) {
-        if (openStudentDetailFallback(windowObject, state, result, 'bridge_timeout')) return;
-        logNav('fallback_link', {
-          requestId,
-          destination: result.destination,
-          code: 'bridge_timeout',
-        });
-      }
-    }, 1500);
+    state.fallbackTimers[requestId] = windowObject.setTimeout(
+      () => {
+        delete state.fallbackTimers[requestId];
+        const pending = state.acknowledgements?.get(requestId);
+        if (pending) {
+          state.acknowledgements.delete(requestId);
+          traceNavigation(windowObject, 'ack-timeout', {
+            requestId,
+            destination: result.destination,
+          });
+          pending({ ok: false, code: 'bridge_timeout', requestId });
+          logNav('navigation_unconfirmed', {
+            requestId,
+            destination: result.destination,
+            code: 'bridge_timeout',
+          });
+          return;
+        }
+        if (!state.processedIds.has(`${requestId}:acked`)) {
+          logNav('fallback_link', {
+            requestId,
+            destination: result.destination,
+            code: 'bridge_timeout',
+          });
+        }
+      },
+      state.acknowledgements?.has(requestId) ? 15000 : 1500,
+    );
   }
 
   function ensureEmbeddedBridge(windowObject, state) {
@@ -601,6 +637,13 @@
 
   function postNavigate(windowObject, state, result) {
     ensureEmbeddedBridge(windowObject, state);
+    traceNavigation(windowObject, 'post-attempt', {
+      requestId: result.requestId,
+      destination: result.destination,
+      framed: isFramed(windowObject),
+      bridgeEnabled: state.appNavigationBridge,
+      parentOrigin: resolveParentOrigin(windowObject, state),
+    });
     if (!isFramed(windowObject) || state.appNavigationBridge !== true) {
       logNav('external_client', {
         requestId: result.requestId,
@@ -628,6 +671,11 @@
     }
     try {
       windowObject.parent.postMessage(message, origin);
+      traceNavigation(windowObject, 'message-posted', {
+        requestId: result.requestId,
+        destination: result.destination,
+        targetOrigin: origin,
+      });
       logNav('bridge_sent', { requestId: result.requestId, destination: result.destination });
       scheduleFallback(windowObject, state, result);
       return true;
@@ -681,12 +729,30 @@
     if (!event?.data || event.data.source !== SHELL_MESSAGE_SOURCE) {
       return;
     }
-    if (!isAllowedOrigin(windowObject, event.origin) || !isFramed(windowObject)) {
+    traceNavigation(windowObject, 'shell-message', {
+      type: event.data.type,
+      requestId: event.data.requestId,
+      ok: event.data.ok,
+      code: event.data.code,
+      origin: event.origin,
+      parentSource: event.source === windowObject.parent,
+      allowedOrigin: isAllowedOrigin(windowObject, event.origin),
+    });
+    if (
+      !isAllowedOrigin(windowObject, event.origin) ||
+      !isFramed(windowObject) ||
+      event.source !== windowObject.parent
+    ) {
       return;
     }
     state.parentOrigin = event.origin;
     if (event.data.capabilities && event.data.capabilities.appNavigationBridge === true) {
       state.appNavigationBridge = true;
+      if (state.pendingNavigation) {
+        const pending = state.pendingNavigation;
+        state.pendingNavigation = null;
+        postNavigate(windowObject, state, pending);
+      }
     }
     if (event.data.type === 'page-help') {
       state.pageHelp = event.data;
@@ -701,12 +767,15 @@
           windowObject.clearTimeout(state.fallbackTimers[requestId]);
           delete state.fallbackTimers[requestId];
         }
+        const pending = state.acknowledgements.get(requestId);
+        if (pending) {
+          state.acknowledgements.delete(requestId);
+          pending({ ok: event.data.ok === true, code: clean(event.data.code), requestId });
+        }
       }
-      if (event.data.ok === true && state.lastResult) {
+      if (event.data.ok === true && state.lastResult?.requestId === requestId) {
         hideResolvedDeepLinks(windowObject, state.lastResult);
         windowObject.setTimeout(() => hideResolvedDeepLinks(windowObject, state.lastResult), 800);
-      } else if (event.data.ok === false && state.lastResult?.requestId === requestId) {
-        openStudentDetailFallback(windowObject, state, state.lastResult, 'bridge_rejected');
       }
       logNav('ack_received', {
         requestId,
@@ -856,6 +925,23 @@
   }
 
   function consumePayload(windowObject, state, payload) {
+    if (payload?.event === 'on_token_usage' && isFramed(windowObject)) {
+      const origin = resolveParentOrigin(windowObject, state);
+      if (origin) {
+        try {
+          windowObject.parent.postMessage(
+            {
+              source: ASSISTANT_MESSAGE_SOURCE,
+              type: 'typed-chat-usage',
+              version: NAVIGATION_VERSION,
+            },
+            origin,
+          );
+        } catch (error) {
+          console.warn('LessonCaddie typed Chat usage refresh failed', error);
+        }
+      }
+    }
     const recovery = extractRecoveryFromPayload(payload);
     if (recovery) {
       state.lastRecovery = recovery;
@@ -880,15 +966,19 @@
     }
     ensureEmbeddedBridge(windowObject, state);
     if (state.appNavigationBridge === true) {
+      state.pendingNavigation = null;
       return postNavigate(windowObject, state, result);
     }
+    state.pendingNavigation = result;
     windowObject.setTimeout(() => {
       if (state.lastResult && state.lastResult.requestId === result.requestId) {
         if (state.appNavigationBridge === true) {
-          postNavigate(windowObject, state, result);
+          if (state.pendingNavigation?.requestId === result.requestId) {
+            state.pendingNavigation = null;
+            postNavigate(windowObject, state, result);
+          }
           return;
         }
-        if (openStudentDetailFallback(windowObject, state, result, 'unknown_client')) return;
         logNav('fallback_link', {
           requestId: result.requestId,
           destination: result.destination,
@@ -1177,6 +1267,30 @@
     }
 
     windowObject.LessonCaddieNavigationOverlay = {
+      navigate(payload) {
+        const result = extractNavigationFromPayload(payload, windowObject);
+        traceNavigation(windowObject, 'navigation-request', {
+          parsed: Boolean(result),
+          requestId: result?.requestId,
+          destination: result?.destination,
+          payloadKeys: payload && typeof payload === 'object' ? Object.keys(payload) : [],
+        });
+        if (!result) return Promise.resolve({ ok: false, code: 'invalid_navigation' });
+        if (!isFramed(windowObject)) return Promise.resolve({ ok: false, code: 'not_framed' });
+        if (state.acknowledgements.has(result.requestId)) {
+          return Promise.resolve({ ok: false, code: 'navigation_in_flight' });
+        }
+        state.lastResult = result;
+        state.processedIds.delete(result.requestId);
+        state.processedIds.delete(`${result.requestId}:acked`);
+        return new Promise((resolve) => {
+          state.acknowledgements.set(result.requestId, resolve);
+          if (!postNavigate(windowObject, state, result)) {
+            state.acknowledgements.delete(result.requestId);
+            resolve({ ok: false, code: 'bridge_unavailable', requestId: result.requestId });
+          }
+        });
+      },
       onPayload(payload) {
         return consumePayload(windowObject, state, payload);
       },
@@ -1199,6 +1313,7 @@
         return postNavigate(windowObject, state, result);
       },
     };
+    traceNavigation(windowObject, 'loaded', { framed: isFramed(windowObject) });
   }
 
   return {

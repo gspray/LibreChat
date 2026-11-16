@@ -38,12 +38,42 @@
   let pendingKickTimer = 0;
   let readyTimer = 0;
   let pingTimer = 0;
+  let gptLiveIdleTimer = 0;
+  let gptLiveHeardTimer = 0;
+  let gptLiveHangupSpeechTimer = 0;
+  let gptLiveAssistantDoneTimer = 0;
+  let gptLiveHangupInFlight = false;
+  let gptLiveHangupKind = '';
+  let gptLiveHeard = '';
+  let gptLiveUserWantsHangup = false;
+  let liveTalkConversationId = '';
+  let liveTalkUserHeard = '';
+  let liveTalkAssistantHeard = '';
+  let delegationHistory = [];
+  let lastDelegationUtterance = '';
+  let delegationIds = new Set();
+  let delegationPending = false;
+  let liveTalkUserDraftId = '';
+  let liveTalkAssistantDraftId = '';
+  let liveTalkPreviewTimer = 0;
+  let liveTalkPreviewRoles = new Set();
+  let liveTalkQueryClient = null;
+  let gptLiveLastEventAt = 0;
+  let gptLiveLastUsefulAt = 0;
+  let gptLiveLastTranscriptAt = 0;
+  let durationDraining = false;
+  let durationDrainStopping = false;
+  let durationProxyPending = 0;
+  const transcriptSaves = new Set();
+  let gptLivePlaybackMeter = null;
   let liveVoiceSettings = {
     waitForYou: 'patient',
     allowInterrupt: false,
     ignoreBackgroundNoise: true,
     muteMicWhileSheTalks: true,
     voice: 'marin',
+    provider: 'openai-realtime',
+    verboseLevel: 'medium',
   };
 
   function normalizeLiveVoiceSettings(raw) {
@@ -55,16 +85,26 @@
     )
       ? String(src.waitForYou).trim().toLowerCase()
       : 'patient';
-    const voiceRaw = String(src.voice || '')
+    const customVoiceId = typeof src.voice === 'object' ? clean(src.voice.id) : clean(src.voice);
+    const voiceRaw = String(customVoiceId || '')
       .trim()
       .toLowerCase();
     const voices = ['marin', 'cedar', 'shimmer', 'verse', 'alloy'];
+    let selectedVoice = voices.includes(voiceRaw) ? voiceRaw : 'marin';
+    if (/^voice_[A-Za-z0-9_-]+$/.test(customVoiceId)) selectedVoice = { id: customVoiceId };
     return {
       waitForYou,
       allowInterrupt: src.allowInterrupt === true,
       ignoreBackgroundNoise: src.ignoreBackgroundNoise !== false,
       muteMicWhileSheTalks: src.muteMicWhileSheTalks !== false,
-      voice: voices.includes(voiceRaw) ? voiceRaw : 'marin',
+      voice: selectedVoice,
+      provider:
+        typeof selectedVoice === 'object' || src.provider === 'gpt-live'
+          ? 'gpt-live'
+          : 'openai-realtime',
+      verboseLevel: ['high', 'medium', 'low', 'none'].includes(src.verboseLevel)
+        ? src.verboseLevel
+        : 'medium',
     };
   }
 
@@ -72,11 +112,130 @@
     return String(value || '').trim();
   }
 
+  function appendLiveTalkDelta(buffer, piece) {
+    return `${buffer || ''}${piece == null ? '' : String(piece)}`;
+  }
+
+  function formatLiveTalkUtterance(text) {
+    let next = String(text || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!next) return '';
+    next = next.replace(/\s+([.,!?;:])/g, '$1');
+    next = next.replace(/([.!?])(\s*)([A-Za-z])/g, '$1 $3');
+    next = next.replace(/,([^\s])/g, ', $1');
+    return next;
+  }
+
+  function normalizeHeard(text) {
+    return String(text || '')
+      .toLowerCase()
+      .replace(/[^\w\s']/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function isLiveTalkDonePhrase(text) {
+    const heard = normalizeHeard(text);
+    if (!heard || heard.length > 96) return false;
+    if (/\b(don'?t|do not|never) (hang up|go|stop|goodbye|good bye)\b/.test(heard)) return false;
+    if (/\bi(?:'m| am) done (with|for)\b/.test(heard)) return false;
+    const core = heard
+      .replace(/^(ok(?:ay)? |all right |alright |please |thanks? |thank you )+/g, '')
+      .replace(/ (please|thanks?|thank you|now)$/g, '')
+      .trim();
+    if (
+      /^(i(?:'m| am) done|that(?:'s| is) (?:all|it)|we(?:'re| are) done|you can (?:hang up|stop|go)|hang up|stop (?:talking|listening)|end (?:talk|the (?:call|session)|live talk)|good ?bye|bye(?: bye)?)$/.test(
+        core,
+      )
+    ) {
+      return true;
+    }
+    return /\b(good ?bye|bye bye|hang up)\b/.test(heard) && heard.split(' ').length <= 12;
+  }
+
+  function isLiveTalkFarewellPhrase(text) {
+    const heard = normalizeHeard(text);
+    if (!heard || heard.length > 280) return false;
+    if (isLiveTalkDonePhrase(heard)) return true;
+    if (
+      /\b(good ?bye|bye bye|hanging up|i(?:'m| am) hanging up|i(?:'ll| will) let you go)\b/.test(
+        heard,
+      )
+    ) {
+      return true;
+    }
+    return /\b(talk to you later|see you later|take care|have a (good|great) (one|day|night))( now)?$/.test(
+      heard,
+    );
+  }
+
+  function gptLiveSilenceMs() {
+    return Number(config.gptLiveIdleMs) > 0 ? Number(config.gptLiveIdleMs) : 20000;
+  }
+
+  function gptLiveNoiseMs() {
+    return Number(config.gptLiveNoiseMs) > 0 ? Number(config.gptLiveNoiseMs) : 60000;
+  }
+
+  function gptLiveHangupCopy(kind) {
+    const silenceSec = Math.round(gptLiveSilenceMs() / 1000);
+    const noiseSec = Math.round(gptLiveNoiseMs() / 1000);
+    if (kind === 'done') {
+      return { say: 'Okay, hanging up.', status: 'Goodbye - Disconnected.' };
+    }
+    if (kind === 'farewell') {
+      return { say: '', status: 'Hung up after goodbye.' };
+    }
+    if (kind === 'noise') {
+      return {
+        say: 'Okay, hanging up. I am not catching words.',
+        status: `Hung up after ${noiseSec} seconds of noise without a question.`,
+      };
+    }
+    return {
+      say: 'Okay, hanging up. You went quiet.',
+      status: `Hung up after ${silenceSec} seconds of silence.`,
+    };
+  }
+
+  function gptLiveStopStatus(reason) {
+    if (
+      reason === 'done' ||
+      reason === 'farewell' ||
+      reason === 'silence' ||
+      reason === 'noise' ||
+      reason === 'idle'
+    ) {
+      return gptLiveHangupCopy(reason === 'idle' ? 'silence' : reason).status;
+    }
+    if (reason === 'failed') return ui.text || 'Could not connect Live Talk.';
+    if (reason === 'duration') return 'Live Talk session limit reached.';
+    return 'Live Talk stopped.';
+  }
+
   function liveTalkLog(stage, data) {
     try {
       windowObject.console.info(LOG_PREFIX, stage, data || {});
     } catch (_) {
       /* ignore console failures */
+    }
+  }
+
+  // TEMP navigation diagnosis: remove after the failing handoff is identified.
+  function traceNavigation(stage, data = {}) {
+    try {
+      windowObject.console.info(
+        '[LCNavTrace]',
+        JSON.stringify({
+          revision: 'nav-debug-20261115-1',
+          layer: 'live-talk',
+          stage,
+          ...data,
+        }),
+      );
+    } catch (_) {
+      /* Console diagnostics must not interrupt Live Talk. */
     }
   }
 
@@ -234,6 +393,59 @@
     };
   }
 
+  async function applyHostToolResult(name, result) {
+    traceNavigation('tool-result', {
+      name,
+      requestId: result?.requestId || result?.structuredContent?.requestId,
+      destination: result?.destination || result?.structuredContent?.destination,
+      resultKeys: result && typeof result === 'object' ? Object.keys(result) : [],
+      bridgeAvailable: typeof windowObject.LessonCaddieNavigationOverlay?.navigate === 'function',
+    });
+    postAppDataChanged(name, result);
+    if (clean(name) !== 'open_app_screen') return null;
+    const overlay = windowObject.LessonCaddieNavigationOverlay;
+    const outcome =
+      typeof overlay?.navigate === 'function'
+        ? await overlay.navigate(result)
+        : { ok: false, code: 'bridge_unavailable' };
+    traceNavigation('navigation-outcome', outcome);
+    liveTalkLog('tool.navigate', {
+      opened: outcome.ok === true,
+      code: outcome.code,
+      requestId: outcome.requestId || '',
+    });
+    return outcome;
+  }
+
+  function noteDurationDrain(session, payload) {
+    if (active?.session !== session || !payload?.draining || durationDrainStopping) return;
+    if (!durationDraining) setStatus(ensureBar(), 'responding', 'Finishing the current response…');
+    durationDraining = true;
+    durationProxyPending = Number(payload.pendingProxyRequests) || 0;
+    try {
+      session.setMuted?.(true);
+    } catch (_) {
+      /* closing the current turn remains possible */
+    }
+    maybeFinishDurationDrain(session);
+  }
+
+  function maybeFinishDurationDrain(session) {
+    if (
+      !durationDraining ||
+      durationDrainStopping ||
+      active?.session !== session ||
+      delegationPending
+    )
+      return;
+    if (durationProxyPending || awaitingAssistant || assistantAudioPlaying || greetingPending)
+      return;
+    if (active.gptLive && Date.now() - gptLiveLastEventAt < 3000) return;
+    if (active.gptLive && Date.now() - (gptLivePlaybackMeter?.lastAudibleAt || 0) < 3000) return;
+    durationDrainStopping = true;
+    void stopCall(ensureBar(), 'duration');
+  }
+
   function postAppDataChanged(toolName, result) {
     const name = clean(toolName);
     if (!WRITE_TOOLS[name]) return;
@@ -283,6 +495,215 @@
     return id;
   }
 
+  function isQueryClient(value) {
+    return Boolean(
+      value && typeof value.setQueryData === 'function' && typeof value.getQueryData === 'function',
+    );
+  }
+
+  function queryClientFromFiber(fiber) {
+    const props = fiber?.memoizedProps || fiber?.pendingProps || {};
+    if (isQueryClient(props.client)) return props.client;
+    if (isQueryClient(props.value)) return props.value;
+    const queued = fiber?.memoizedState;
+    if (isQueryClient(queued)) return queued;
+    if (isQueryClient(queued?.client)) return queued.client;
+    let dep = fiber?.dependencies?.firstContext || fiber?.dependencies?.first;
+    while (dep) {
+      const value = dep.memoizedValue || dep._currentValue;
+      if (isQueryClient(value)) return value;
+      if (isQueryClient(value?.client)) return value.client;
+      dep = dep.next;
+    }
+    return null;
+  }
+
+  function findQueryClient() {
+    if (isQueryClient(liveTalkQueryClient)) return liveTalkQueryClient;
+    const rootEl = root.getElementById?.('root');
+    if (!rootEl) return null;
+    const fiberKey = Object.keys(rootEl).find(
+      (key) => key.startsWith('__reactFiber') || key.startsWith('__reactContainer'),
+    );
+    if (!fiberKey) return null;
+    const queue = [rootEl[fiberKey]];
+    const seen = new Set();
+    for (let i = 0; i < 8000 && queue.length; i += 1) {
+      const fiber = queue.shift();
+      if (!fiber || seen.has(fiber)) continue;
+      seen.add(fiber);
+      const client = queryClientFromFiber(fiber);
+      if (client) {
+        liveTalkQueryClient = client;
+        return client;
+      }
+      if (fiber.child) queue.push(fiber.child);
+      if (fiber.sibling) queue.push(fiber.sibling);
+      if (fiber.alternate && !seen.has(fiber.alternate)) queue.push(fiber.alternate);
+    }
+    return null;
+  }
+
+  function liveTalkCacheKeys() {
+    const id = clean(liveTalkConversationId);
+    const viewId = conversationIdFromLocation() || 'new';
+    return [...new Set([id, viewId].filter(Boolean))];
+  }
+
+  function newLiveTalkDraftId(role) {
+    const rand =
+      typeof windowObject.crypto?.randomUUID === 'function'
+        ? windowObject.crypto.randomUUID()
+        : `${Date.now()}-${Math.random()}`;
+    return `live-${role}-${rand}`;
+  }
+
+  function upsertLivePreview(role, text) {
+    const spoken = formatLiveTalkUtterance(text);
+    if (!spoken || !['user', 'assistant'].includes(role)) return;
+    const client = findQueryClient();
+    if (!client) return;
+    const convoId = clean(liveTalkConversationId) || conversationIdFromLocation() || 'new';
+    const isUser = role === 'user';
+    if (isUser && !liveTalkUserDraftId) liveTalkUserDraftId = newLiveTalkDraftId('user');
+    if (!isUser && !liveTalkAssistantDraftId)
+      liveTalkAssistantDraftId = newLiveTalkDraftId('assistant');
+    const messageId = isUser ? liveTalkUserDraftId : liveTalkAssistantDraftId;
+    const now = new Date().toISOString();
+    for (const key of liveTalkCacheKeys()) {
+      const prev = client.getQueryData(['messages', key]);
+      const list = Array.isArray(prev) ? prev.slice() : [];
+      const idx = list.findIndex((message) => message && message.messageId === messageId);
+      const part = { type: 'text', text: spoken };
+      if (idx >= 0) {
+        list[idx] = {
+          ...list[idx],
+          text: spoken,
+          content: [part],
+          unfinished: false,
+          error: false,
+          finish_reason: 'stop',
+          updatedAt: now,
+        };
+      } else {
+        const last = list[list.length - 1];
+        list.push({
+          messageId,
+          conversationId: convoId,
+          parentMessageId: last?.messageId || null,
+          sender: isUser ? 'User' : 'Instructor Assistant',
+          text: spoken,
+          content: [part],
+          isCreatedByUser: isUser,
+          endpoint: 'agents',
+          unfinished: false,
+          error: false,
+          finish_reason: 'stop',
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
+      client.setQueryData(['messages', key], list);
+    }
+  }
+
+  function scheduleLivePreview(role) {
+    liveTalkPreviewRoles.add(role);
+    if (liveTalkPreviewTimer) return;
+    const run = () => {
+      liveTalkPreviewTimer = 0;
+      const roles = liveTalkPreviewRoles;
+      liveTalkPreviewRoles = new Set();
+      if (roles.has('user') || roles.has('both')) upsertLivePreview('user', liveTalkUserHeard);
+      if (roles.has('assistant') || roles.has('both')) {
+        upsertLivePreview('assistant', liveTalkAssistantHeard);
+      }
+    };
+    if (typeof windowObject.requestAnimationFrame === 'function') {
+      liveTalkPreviewTimer = windowObject.requestAnimationFrame(run);
+      return;
+    }
+    liveTalkPreviewTimer = windowObject.setTimeout(run, 32);
+  }
+
+  function clearLivePreviewDraft(role) {
+    if (role === 'user') liveTalkUserDraftId = '';
+    else liveTalkAssistantDraftId = '';
+  }
+
+  async function refreshAskConversation(conversationId) {
+    const id = clean(conversationId || liveTalkConversationId);
+    if (!id) return;
+    let messages = null;
+    try {
+      const response = await nativeFetch(
+        `${chatBasePath()}/api/messages/${encodeURIComponent(id)}`,
+        {
+          credentials: 'include',
+          headers: {
+            accept: 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+      if (response.ok) {
+        const payload = await response.json();
+        messages = Array.isArray(payload) ? payload : payload?.messages;
+      }
+    } catch (_) {
+      /* Ask refresh is best-effort after the save */
+    }
+    const client = findQueryClient();
+    if (!client || !Array.isArray(messages)) return;
+    for (const key of liveTalkCacheKeys()) {
+      try {
+        client.setQueryData(['messages', key], messages);
+      } catch (_) {
+        /* Recoil QueryClient shape can differ */
+      }
+    }
+    try {
+      client.invalidateQueries(['allConversations']);
+    } catch (_) {
+      /* conversation list refresh is best-effort */
+    }
+  }
+
+  async function saveLiveTranscript(role, text) {
+    const sessionId = active?.sessionId;
+    const spoken = formatLiveTalkUtterance(text);
+    if (!sessionId || !spoken || !['user', 'assistant'].includes(role)) return;
+    try {
+      await api(liveTalkPath(`/live-talk/session/${sessionId}/transcript`), {
+        method: 'POST',
+        body: JSON.stringify({ role, text: spoken, unfinished: false }),
+        quiet: true,
+      });
+      liveTalkLog('transcript.saved', { role, chars: spoken.length });
+      clearLivePreviewDraft(role);
+      await refreshAskConversation(liveTalkConversationId);
+    } catch (error) {
+      liveTalkWarn('transcript.save-failed', summarizeError(error, { role }));
+    }
+  }
+
+  function flushLiveTranscript(role) {
+    const spoken = role === 'user' ? liveTalkUserHeard : liveTalkAssistantHeard;
+    if (role === 'user') liveTalkUserHeard = '';
+    else liveTalkAssistantHeard = '';
+    upsertLivePreview(role, spoken);
+    if (!clean(spoken)) return null;
+    if (active?.gptLive) {
+      delegationHistory.push({ role, text: clean(spoken).slice(0, 2000) });
+      delegationHistory = delegationHistory.slice(-8);
+      if (role === 'user') lastDelegationUtterance = clean(spoken);
+    }
+    const saving = saveLiveTranscript(role, spoken);
+    transcriptSaves.add(saving);
+    void saving.finally(() => transcriptSaves.delete(saving));
+    return saving;
+  }
+
   function liveTalkSpecFromLocation() {
     try {
       return new URL(windowObject.location.href).searchParams.get('spec') || '';
@@ -323,6 +744,51 @@
     );
   }
 
+  function lockTypedComposer(on) {
+    try {
+      root.documentElement.setAttribute('data-ssmlabs-live-talk', on ? 'on' : 'off');
+    } catch (_) {
+      /* document may be unavailable */
+    }
+  }
+
+  function installComposerLock() {
+    if (!root || root.__ssmlabsLiveTalkComposerLock) return;
+    root.__ssmlabsLiveTalkComposerLock = true;
+    if (root.head && !root.getElementById('ssmlabs-live-talk-composer-lock')) {
+      const style = root.createElement('style');
+      style.id = 'ssmlabs-live-talk-composer-lock';
+      style.textContent =
+        'html[data-ssmlabs-live-talk="on"] form:has(textarea) textarea,' +
+        'html[data-ssmlabs-live-talk="on"] form:has(textarea) button[type="submit"]' +
+        '{pointer-events:none!important;opacity:.55}';
+      root.head.appendChild(style);
+    }
+    const block = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    root.addEventListener(
+      'submit',
+      (event) => {
+        if (isTalkingState(ui.state)) block(event);
+      },
+      true,
+    );
+    root.addEventListener(
+      'keydown',
+      (event) => {
+        if (!isTalkingState(ui.state)) return;
+        if (event.key !== 'Enter' || event.shiftKey) return;
+        const target = event.target;
+        if (!target || typeof target.closest !== 'function') return;
+        if (target.tagName !== 'TEXTAREA' && !target.closest('form')) return;
+        block(event);
+      },
+      true,
+    );
+  }
+
   function sleep(ms) {
     return new Promise((resolve) => windowObject.setTimeout(resolve, ms));
   }
@@ -331,6 +797,7 @@
     if (paused && !['paused', 'idle', 'error'].includes(state)) return;
     ui.state = String(state || 'idle');
     ui.text = String(text || '');
+    lockTypedComposer(isTalkingState(ui.state));
     postStatus();
   }
 
@@ -403,14 +870,44 @@
   async function stopCall(bar, reason) {
     const current = active;
     liveTalkLog('stop', { reason: String(reason || ''), sessionId: current?.sessionId || '' });
+    await Promise.all(
+      [flushLiveTranscript('user'), flushLiveTranscript('assistant')].filter(Boolean),
+    );
+    await Promise.all([...transcriptSaves]);
     active = null;
-    try {
-      current?.session?.cancel?.(reason);
-    } catch (_) {
-      /* already closed */
+    durationDraining = false;
+    durationDrainStopping = false;
+    durationProxyPending = 0;
+    stopGptLiveHangupWatch();
+    windowObject.clearTimeout(gptLiveHangupSpeechTimer);
+    gptLiveHangupSpeechTimer = 0;
+    windowObject.clearTimeout(gptLiveAssistantDoneTimer);
+    gptLiveAssistantDoneTimer = 0;
+    gptLiveHangupInFlight = false;
+    gptLiveHangupKind = '';
+    gptLiveHeard = '';
+    delegationHistory = [];
+    lastDelegationUtterance = '';
+    delegationIds = new Set();
+    delegationPending = false;
+    gptLiveUserWantsHangup = false;
+    liveTalkUserDraftId = '';
+    liveTalkAssistantDraftId = '';
+    if (liveTalkPreviewTimer) {
+      windowObject.cancelAnimationFrame?.(liveTalkPreviewTimer);
+      windowObject.clearTimeout(liveTalkPreviewTimer);
+      liveTalkPreviewTimer = 0;
+    }
+    stopGptLivePlaybackMeter();
+    if (!current?.gptLive) {
+      try {
+        current?.session?.cancel?.(reason);
+      } catch (_) {
+        /* already closed */
+      }
     }
     try {
-      current?.session?.stop?.(reason);
+      await current?.session?.stop?.(reason);
     } catch (_) {
       /* already closed */
     }
@@ -454,7 +951,7 @@
     windowObject.clearTimeout(readyTimer);
     readyTimer = 0;
     if (reason !== 'restart' && reason !== 'failed') {
-      setStatus(bar, 'idle', 'Live Talk stopped.');
+      setStatus(bar, 'idle', gptLiveStopStatus(reason));
     }
   }
 
@@ -499,7 +996,7 @@
       /* audio may already be clear */
     }
     try {
-      active.session?.setMuted?.(false);
+      active.session?.setMuted?.(durationDraining);
     } catch (_) {
       /* reconnect can still fail later */
     }
@@ -600,7 +1097,7 @@
     }
     enableTurnResponses(active?.session);
     try {
-      active?.session?.setMuted?.(false);
+      active?.session?.setMuted?.(durationDraining);
     } catch (_) {
       /* user must be able to speak after the greeting */
     }
@@ -673,14 +1170,73 @@
     return Array.from(root.querySelectorAll('audio[data-lc-live-talk="true"]'));
   }
 
+  function stopGptLivePlaybackMeter() {
+    const meter = gptLivePlaybackMeter;
+    gptLivePlaybackMeter = null;
+    if (!meter) return;
+    windowObject.clearInterval(meter.timer);
+    meter.source.disconnect();
+    void meter.context.close().catch(() => {});
+  }
+
+  function startGptLivePlaybackMeter(session, audio) {
+    if (gptLivePlaybackMeter || !audio.srcObject) return;
+    const AudioContext = windowObject.AudioContext || windowObject.webkitAudioContext;
+    if (!AudioContext) {
+      liveTalkWarn('playback.meter-unavailable', {});
+      return;
+    }
+    let context;
+    try {
+      context = new AudioContext();
+      const source = context.createMediaStreamSource(audio.srcObject);
+      const analyser = context.createAnalyser();
+      analyser.fftSize = 1024;
+      source.connect(analyser);
+      const samples = new Float32Array(analyser.fftSize);
+      const meter = { context, source, timer: 0, lastAudibleAt: Date.now() };
+      gptLivePlaybackMeter = meter;
+      void context.resume().then(
+        () => liveTalkLog('playback.meter-ready', { state: context.state }),
+        (error) => liveTalkWarn('playback.meter-resume-failed', summarizeError(error)),
+      );
+      meter.timer = windowObject.setInterval(() => {
+        if (active?.session !== session || paused || context.state !== 'running') return;
+        analyser.getFloatTimeDomainData(samples);
+        let energy = 0;
+        for (const sample of samples) energy += sample * sample;
+        const audible = Math.sqrt(energy / samples.length) > 0.01;
+        if (audible) {
+          meter.lastAudibleAt = Date.now();
+          noteGptLiveActivity('assistant');
+          if (ui.state !== 'responding') setStatus(ensureBar(), 'responding', 'Responding…');
+        } else if (
+          Date.now() - meter.lastAudibleAt > 700 &&
+          (assistantAudioPlaying || (ui.state === 'responding' && !gptLiveHangupInFlight))
+        ) {
+          finishGptLiveAssistantTurn(session);
+        }
+      }, 100);
+    } catch (error) {
+      liveTalkWarn('playback.meter-failed', summarizeError(error));
+      if (gptLivePlaybackMeter) stopGptLivePlaybackMeter();
+      else if (context) void context.close().catch(() => {});
+    }
+  }
+
   function createLiveTalkAudioElement() {
     const audio = root.createElement('audio');
     audio.autoplay = true;
+    audio.muted =
+      liveVoiceSettings.provider === 'gpt-live' && liveVoiceSettings.verboseLevel === 'none';
     audio.playsInline = true;
     audio.setAttribute('playsinline', 'true');
     audio.setAttribute('data-lc-live-talk', 'true');
     audio.hidden = true;
     (root.body || root.documentElement).appendChild(audio);
+    audio.addEventListener('playing', () => {
+      if (active?.gptLive) startGptLivePlaybackMeter(active.session, audio);
+    });
     audio.addEventListener('pause', () => {
       liveTalkWarn('playback.paused', {
         paused: audio.paused,
@@ -740,6 +1296,7 @@
         }
         if (!audio.paused) {
           liveTalkLog('playback.remote-ready', { readyState: audio.readyState });
+          if (active?.gptLive) startGptLivePlaybackMeter(session, audio);
           return true;
         }
       }
@@ -762,6 +1319,230 @@
         }
       }, ms);
     });
+  }
+
+  function noteGptLiveActivity(kind) {
+    const now = Date.now();
+    gptLiveLastEventAt = now;
+    if (kind === 'useful' || kind === 'assistant' || kind === 'tool') gptLiveLastUsefulAt = now;
+    if (kind === 'transcript') gptLiveLastTranscriptAt = now;
+  }
+
+  async function handleGptLiveDelegation(session, sessionId, delegationId) {
+    traceNavigation('delegation-received', {
+      delegationId,
+      activeSession: active?.session === session,
+      duplicate: delegationIds.has(delegationId),
+      busy: delegationPending,
+    });
+    if (!delegationId || delegationIds.has(delegationId) || active?.session !== session) return;
+    delegationIds.add(delegationId);
+    session.sendEvent({
+      type: 'session.thinking.append',
+      event_id: `delegation_quiet_${delegationId}`,
+      delegation_id: delegationId,
+      content: '',
+    });
+    noteGptLiveActivity('tool');
+    if (delegationPending) {
+      session.sendEvent({
+        type: 'session.commentary.append',
+        event_id: `delegation_busy_${delegationId}`,
+        delegation_id: delegationId,
+        content: 'I am still finishing the previous LessonCaddie request.',
+      });
+      return;
+    }
+    if (Date.now() - gptLiveLastTranscriptAt > 10000) await sleep(300);
+    const utterance =
+      Date.now() - gptLiveLastTranscriptAt <= 10000
+        ? clean(liveTalkUserHeard || lastDelegationUtterance)
+        : '';
+    const history = delegationHistory.slice(-8);
+    if (history.at(-1)?.role === 'user' && history.at(-1)?.text === utterance) history.pop();
+    delegationPending = true;
+    setStatus(ensureBar(), 'tool', 'Checking LessonCaddie…');
+    try {
+      traceNavigation('delegation-request', { delegationId, utteranceLength: utterance.length });
+      const payload = await api(liveTalkPath(`/live-talk/session/${sessionId}/delegation`), {
+        method: 'POST',
+        body: JSON.stringify({ delegationId, utterance, history }),
+      });
+      traceNavigation('delegation-response', {
+        delegationId,
+        activeSession: active?.session === session,
+        actions: (payload.actions || []).map((action) => ({
+          name: action.name,
+          requestId: action.result?.requestId || action.result?.structuredContent?.requestId,
+          destination: action.result?.destination || action.result?.structuredContent?.destination,
+        })),
+      });
+      if (active?.session !== session) return;
+      const navigationResults = [];
+      for (const action of payload.actions || []) {
+        const outcome = await applyHostToolResult(action.name, action.result);
+        if (outcome) navigationResults.push(outcome);
+      }
+      if (active?.session !== session) return;
+      let reply = payload.reply;
+      if (navigationResults.length) {
+        reply = navigationResults.every((outcome) => outcome.ok === true)
+          ? 'The app confirmed that the requested page is open.'
+          : 'I could not confirm that the app opened the requested page. Please try opening it from the app menu.';
+      }
+      noteGptLiveActivity('tool');
+      session.sendEvent({
+        type: 'session.commentary.append',
+        event_id: `delegation_result_${delegationId}`,
+        delegation_id: delegationId,
+        content: reply,
+      });
+    } catch (error) {
+      if (active?.session !== session) return;
+      traceNavigation('delegation-error', { delegationId, name: error?.name });
+      liveTalkWarn('delegation.failed', summarizeError(error));
+      session.sendEvent({
+        type: 'session.commentary.append',
+        event_id: `delegation_error_${delegationId}`,
+        delegation_id: delegationId,
+        content: 'I could not complete that LessonCaddie request. Please try again.',
+      });
+    } finally {
+      delegationPending = false;
+      if (active?.session === session) {
+        setStatus(ensureBar(), 'listening', 'Listening…');
+        maybeFinishDurationDrain(session);
+      }
+    }
+  }
+
+  function resetGptLiveHeard() {
+    gptLiveHeard = '';
+    windowObject.clearTimeout(gptLiveHeardTimer);
+    gptLiveHeardTimer = 0;
+  }
+
+  function markUserHangupIfDone() {
+    if (isLiveTalkDonePhrase(gptLiveHeard)) gptLiveUserWantsHangup = true;
+    return gptLiveUserWantsHangup;
+  }
+
+  function hangupAfterSpokenTurn(session, kind) {
+    if (!session || active?.session !== session) return;
+    gptLiveHangupInFlight = true;
+    gptLiveHangupKind = kind || gptLiveHangupKind || 'farewell';
+    stopGptLiveHangupWatch();
+    windowObject.clearTimeout(gptLiveAssistantDoneTimer);
+    gptLiveAssistantDoneTimer = 0;
+    const copy = gptLiveHangupCopy(gptLiveHangupKind);
+    liveTalkLog('hangup.after-speech', { kind: gptLiveHangupKind, status: copy.status });
+    setStatus(ensureBar(), 'responding', copy.status);
+    windowObject.clearTimeout(gptLiveHangupSpeechTimer);
+    gptLiveHangupSpeechTimer = windowObject.setTimeout(() => {
+      void finishGptLiveHangup(session, gptLiveHangupKind);
+    }, 700);
+  }
+
+  function maybeHangupAfterAssistantTurn(session) {
+    if (!session || active?.session !== session) return;
+    const farewell = isLiveTalkFarewellPhrase(liveTalkAssistantHeard);
+    if (gptLiveHangupInFlight) {
+      hangupAfterSpokenTurn(session, gptLiveHangupKind || (farewell ? 'farewell' : 'done'));
+      return;
+    }
+    if (farewell || gptLiveUserWantsHangup) {
+      hangupAfterSpokenTurn(session, farewell ? 'farewell' : 'done');
+    }
+  }
+
+  function scheduleAssistantTurnEnd(session) {
+    windowObject.clearTimeout(gptLiveAssistantDoneTimer);
+    gptLiveAssistantDoneTimer = windowObject.setTimeout(() => {
+      if (active?.session !== session) return;
+      if (gptLivePlaybackMeter && Date.now() - gptLivePlaybackMeter.lastAudibleAt < 700) {
+        scheduleAssistantTurnEnd(session);
+        return;
+      }
+      finishGptLiveAssistantTurn(session);
+    }, 900);
+  }
+
+  function finishGptLiveAssistantTurn(session) {
+    if (active?.session !== session || gptLiveHangupInFlight) return;
+    windowObject.clearTimeout(gptLiveAssistantDoneTimer);
+    gptLiveAssistantDoneTimer = 0;
+    awaitingAssistant = false;
+    assistantAudioPlaying = false;
+    noteGptLiveActivity('assistant');
+    if (liveVoiceSettings.muteMicWhileSheTalks) {
+      try {
+        session.setMuted?.(durationDraining);
+      } catch (_) {
+        /* playback has ended; the session may already be closing */
+      }
+    }
+    maybeHangupAfterAssistantTurn(session);
+    if (!gptLiveHangupInFlight && ui.state === 'responding') {
+      setStatus(ensureBar(), 'listening', 'Listening…');
+    }
+  }
+
+  function stopGptLiveHangupWatch() {
+    windowObject.clearInterval(gptLiveIdleTimer);
+    gptLiveIdleTimer = 0;
+    windowObject.clearTimeout(gptLiveHeardTimer);
+    gptLiveHeardTimer = 0;
+  }
+
+  async function finishGptLiveHangup(session, kind) {
+    if (active?.session !== session) return;
+    const reason = kind || gptLiveHangupKind || 'silence';
+    await stopCall(ensureBar(), reason);
+  }
+
+  function beginGptLiveHangup(session, kind) {
+    if (!session || gptLiveHangupInFlight || active?.session !== session) return;
+    gptLiveHangupInFlight = true;
+    gptLiveHangupKind = kind;
+    stopGptLiveHangupWatch();
+    const copy = gptLiveHangupCopy(kind);
+    liveTalkLog('hangup.begin', { kind, status: copy.status });
+    setStatus(ensureBar(), 'responding', copy.status);
+    windowObject.clearTimeout(gptLiveHangupSpeechTimer);
+    gptLiveHangupSpeechTimer = windowObject.setTimeout(() => {
+      void finishGptLiveHangup(session, kind);
+    }, 700);
+  }
+
+  function armGptLiveHangupWatch(session) {
+    stopGptLiveHangupWatch();
+    const now = Date.now();
+    gptLiveHangupInFlight = false;
+    gptLiveHangupKind = '';
+    gptLiveHeard = '';
+    gptLiveUserWantsHangup = false;
+    gptLiveLastEventAt = now;
+    gptLiveLastUsefulAt = now;
+    gptLiveLastTranscriptAt = 0;
+    gptLiveIdleTimer = windowObject.setInterval(() => {
+      if (active?.session !== session || paused || gptLiveHangupInFlight) return;
+      if (['connecting', 'greeting', 'tool'].includes(ui.state)) return;
+      const at = Date.now();
+      const silenceMs = gptLiveSilenceMs();
+      const noiseMs = gptLiveNoiseMs();
+      if (
+        (assistantAudioPlaying || awaitingAssistant || ui.state === 'responding') &&
+        at - gptLiveLastUsefulAt < silenceMs
+      ) {
+        return;
+      }
+      const transcriptIsFresh = gptLiveLastTranscriptAt && at - gptLiveLastTranscriptAt < 2500;
+      if (transcriptIsFresh && at - gptLiveLastUsefulAt >= noiseMs) {
+        beginGptLiveHangup(session, 'noise');
+        return;
+      }
+      if (at - gptLiveLastEventAt >= silenceMs) beginGptLiveHangup(session, 'silence');
+    }, 250);
   }
 
   async function startCall(bar) {
@@ -812,12 +1593,18 @@
       let sessionId = '';
       let bridgeInputHeld = false;
       const voice = normalizeLiveVoiceSettings(liveVoiceSettings);
+      const gptLive = voice.provider === 'gpt-live' && config.spec === 'instructor-assistant';
       const session = SpeakCore.createSpeakRealtimeSession({
-        provider: 'openai-realtime',
+        provider: gptLive ? 'gpt-live' : 'openai-realtime',
+        ...(gptLive
+          ? {
+              session: { model: 'gpt-live-1', audio: { output: { voice: voice.voice } } },
+            }
+          : {}),
         holdInput: voice.muteMicWhileSheTalks,
         conversationBehavior: { interruption: voice.allowInterrupt ? 'enabled' : 'disabled' },
         createAudioElement: createLiveTalkAudioElement,
-        bootstrapCall: async ({ sdp }) => {
+        [gptLive ? 'bootstrapLiveSession' : 'bootstrapCall']: async ({ sdp }) => {
           /* The mic stream now exists; apply the startup mute before sending the offer. */
           session.setMuted?.(true);
           liveTalkLog('bootstrap.offer', {
@@ -829,84 +1616,149 @@
           const created = await api(liveTalkPath('/live-talk/session'), {
             method: 'POST',
             body: JSON.stringify({ conversationId, sdp, liveVoice: voice, spec }),
-            retry: 2,
+            retry: gptLive ? 0 : 2,
           });
           sessionId = created.sessionId;
+          liveTalkConversationId = created.conversationId || conversationId;
           liveTalkLog('bootstrap.answer', {
             sessionId,
-            conversationId: created.conversationId || conversationId,
+            conversationId: liveTalkConversationId,
             sdpChars: String(created.sdp || '').length,
             toolCount: Array.isArray(created.tools) ? created.tools.length : 0,
           });
-          return created.sdp;
+          return gptLive ? { sdp: created.sdp, sessionId: created.providerSessionId } : created.sdp;
         },
       });
-      const bridge = SpeakCore.createOpenAIRealtimeFunctionCallBridge({
-        holdInput: voice.muteMicWhileSheTalks,
-        conversationBehavior: { interruption: voice.allowInterrupt ? 'enabled' : 'disabled' },
-        pauseInput: () => {
-          bridgeInputHeld = true;
-          session.setMuted?.(true);
-        },
-        resumeInput: () => {
-          bridgeInputHeld = false;
-          session.setMuted?.(paused);
-        },
-        invokeTool: async (call) => {
-          const startedAt = Date.now();
-          liveTalkLog('tool.invoke', { name: call.name, callId: call.callId || '', sessionId });
-          if (ui.state === 'connecting') {
-            liveTalkLog('tool.ignored-while-starting', { name: call.name });
-            return {
-              ok: false,
-              error: 'Live Talk is still connecting. Retry the tool after the greeting.',
-            };
-          }
-          if (greetingPending) finishGreeting('tool-call');
-          setStatus(bar, 'tool', `Looking up ${call.name}…`);
-          const payload = await api(liveTalkPath(`/live-talk/session/${sessionId}/tool`), {
-            method: 'POST',
-            body: JSON.stringify({
-              name: call.name,
-              arguments: call.arguments,
-              callId: call.callId,
-            }),
+      const bridge = gptLive
+        ? null
+        : SpeakCore.createOpenAIRealtimeFunctionCallBridge({
+            holdInput: voice.muteMicWhileSheTalks,
+            conversationBehavior: { interruption: voice.allowInterrupt ? 'enabled' : 'disabled' },
+            pauseInput: () => {
+              bridgeInputHeld = true;
+              session.setMuted?.(true);
+            },
+            resumeInput: () => {
+              bridgeInputHeld = false;
+              session.setMuted?.(paused || durationDraining);
+            },
+            invokeTool: async (call) => {
+              const startedAt = Date.now();
+              liveTalkLog('tool.invoke', { name: call.name, callId: call.callId || '', sessionId });
+              if (ui.state === 'connecting') {
+                liveTalkLog('tool.ignored-while-starting', { name: call.name });
+                return {
+                  ok: false,
+                  error: 'Live Talk is still connecting. Retry the tool after the greeting.',
+                };
+              }
+              if (greetingPending) finishGreeting('tool-call');
+              setStatus(bar, 'tool', `Looking up ${call.name}…`);
+              const payload = await api(liveTalkPath(`/live-talk/session/${sessionId}/tool`), {
+                method: 'POST',
+                body: JSON.stringify({
+                  name: call.name,
+                  arguments: call.arguments,
+                  callId: call.callId,
+                }),
+              });
+              const result = payload.result;
+              liveTalkLog('tool.returned', {
+                name: call.name,
+                ms: Date.now() - startedAt,
+              });
+              const navigation = await applyHostToolResult(call.name, result);
+              return navigation
+                ? {
+                    ...result,
+                    opened: navigation.ok === true,
+                    navigationStatus: navigation.code,
+                    responseGuidance:
+                      navigation.ok === true
+                        ? 'The app confirmed the requested page is open.'
+                        : 'The app did not confirm navigation. Tell the user the page could not be opened; do not claim success.',
+                  }
+                : result;
+            },
           });
-          const result = payload.result;
-          liveTalkLog('tool.returned', {
-            name: call.name,
-            ms: Date.now() - startedAt,
-          });
-          postAppDataChanged(call.name, result);
-          if (call.name === 'open_app_screen') {
-            const overlay = windowObject.LessonCaddieNavigationOverlay;
-            const opened = overlay?.onPayload?.(result);
-            liveTalkLog('tool.navigate', {
-              opened: Boolean(opened),
-              destination: result?.destination || result?.structuredContent?.destination || '',
-            });
-          }
-          return result;
-        },
-      });
-      bridge.attach(session);
+      bridge?.attach(session);
       session.onEvent((event) => {
+        if (
+          gptLive &&
+          (event.type === SpeakCore.SpeakRealtimeEvent.USER_SPEECH_START ||
+            event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_START ||
+            event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE ||
+            event.type === SpeakCore.SpeakRealtimeEvent.TOOL_CALL)
+        ) {
+          const useful =
+            event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_START ||
+            event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE ||
+            event.type === SpeakCore.SpeakRealtimeEvent.TOOL_CALL;
+          noteGptLiveActivity(useful ? 'useful' : 'speech');
+          if (event.type === SpeakCore.SpeakRealtimeEvent.TOOL_CALL) {
+            const toolName = clean(
+              event.detail?.name ||
+                event.detail?.event?.item?.name ||
+                event.detail?.event?.name ||
+                event.detail?.toolName,
+            );
+            setStatus(bar, 'tool', toolName ? `Looking up ${toolName}…` : 'Looking up…');
+          }
+          if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_START) {
+            flushLiveTranscript('user');
+            markUserHangupIfDone();
+          }
+          if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_DONE) {
+            flushLiveTranscript('assistant');
+            maybeHangupAfterAssistantTurn(session);
+          }
+          if (
+            useful &&
+            event.type !== SpeakCore.SpeakRealtimeEvent.ASSISTANT_RESPONSE_START &&
+            !gptLiveUserWantsHangup &&
+            !gptLiveHangupInFlight
+          ) {
+            resetGptLiveHeard();
+          }
+        }
         const providerEvent = event.detail?.providerEvent || event.detail?.event?.type || '';
-        const transcript = clean(
-          event.detail?.event?.transcript || event.detail?.transcript || event.detail?.text,
+        if (gptLive && providerEvent === 'session.delegation.created') {
+          const delegationId = clean(event.detail?.event?.delegation?.id);
+          traceNavigation('provider-delegation-event', { delegationId });
+          void handleGptLiveDelegation(session, sessionId, delegationId);
+        }
+        const deltaText = String(
+          event.detail?.event?.delta ??
+            event.detail?.text ??
+            event.detail?.event?.transcript ??
+            event.detail?.transcript ??
+            '',
         );
+        const transcript = clean(deltaText);
         const interesting =
           event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED ||
           event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CONNECTED ||
           event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CLOSED ||
           event.type === SpeakCore.SpeakRealtimeEvent.CONNECTION_STATE ||
           event.type === SpeakCore.SpeakRealtimeEvent.TOOL_ERROR;
+        const recoverableLiveError =
+          gptLive &&
+          event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED &&
+          (event.detail?.code === 'responses_validation_failed' ||
+            (event.detail?.code === 'invalid_request_error' &&
+              /retrieving tool list from MCP server/i.test(event.detail?.message || '')));
         if (interesting || event.detail?.message) {
-          (event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED
-            ? liveTalkError
-            : liveTalkLog)('realtime.event', summarizeEvent(event));
+          let logEvent = liveTalkLog;
+          if (recoverableLiveError) logEvent = liveTalkWarn;
+          else if (event.type === SpeakCore.SpeakRealtimeEvent.SESSION_FAILED)
+            logEvent = liveTalkError;
+          logEvent('realtime.event', summarizeEvent(event));
         }
-        if (paused && event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_AUDIO_START) {
+        if (
+          !gptLive &&
+          paused &&
+          event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_AUDIO_START
+        ) {
           try {
             session.sendEvent({ type: 'output_audio_buffer.clear' });
           } catch (_) {
@@ -947,10 +1799,12 @@
           });
         }
         if (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_AUDIO_START) {
-          try {
-            session.setMuted?.(true);
-          } catch (_) {
-            /* holdInput still covers echo */
+          if (!gptLive || (voice.muteMicWhileSheTalks && voice.verboseLevel !== 'none')) {
+            try {
+              session.setMuted?.(true);
+            } catch (_) {
+              /* holdInput still covers echo */
+            }
           }
           if (greetingPending) {
             if (
@@ -979,10 +1833,14 @@
             id: event.detail?.event?.response?.id || '',
             greeting: greetingPending,
           });
-          /* response.done ends generation, but WebRTC may still be playing the greeting. */
+          /* GPT-Live often never sends response.done; hangup waits for audio/transcript end. */
+          if (gptLive && active?.session === session) {
+            maybeHangupAfterAssistantTurn(session);
+            if (gptLiveHangupInFlight) return;
+          }
           if (!greetingPending && !assistantAudioPlaying) {
             try {
-              session.setMuted?.(false);
+              session.setMuted?.(durationDraining);
             } catch (_) {
               /* keep listening even if mute release throws */
             }
@@ -999,15 +1857,24 @@
         ) {
           finishGreeting('playback-stopped');
         }
+        if (gptLive && !greetingPending && providerEvent === 'session.output_transcript.done') {
+          scheduleAssistantTurnEnd(session);
+        }
         if (
           !greetingPending &&
           (event.type === SpeakCore.SpeakRealtimeEvent.ASSISTANT_INTERRUPTED ||
             providerEvent === 'output_audio_buffer.stopped' ||
-            providerEvent === 'output_audio_buffer.cleared')
+            providerEvent === 'output_audio_buffer.cleared' ||
+            (!gptLive && providerEvent === 'session.output_transcript.done'))
         ) {
+          awaitingAssistant = false;
           assistantAudioPlaying = false;
+          if (gptLive && active?.session === session) {
+            maybeHangupAfterAssistantTurn(session);
+            if (gptLiveHangupInFlight) return;
+          }
           try {
-            session.setMuted?.(false);
+            session.setMuted?.(durationDraining);
           } catch (_) {
             /* keep listening even if mute release throws */
           }
@@ -1026,7 +1893,7 @@
         if (event.type === SpeakCore.SpeakRealtimeEvent.USER_SPEECH_END) {
           if (greetingPending) finishGreeting('user-speech-end');
           liveTalkLog('turn.speech-end', { awaitingAssistant, state: ui.state });
-          if (!awaitingAssistant && ui.state !== 'responding' && ui.state !== 'tool') {
+          if (!gptLive && !awaitingAssistant && ui.state !== 'responding' && ui.state !== 'tool') {
             armSpeechEndKick(session);
           }
         }
@@ -1035,20 +1902,69 @@
             { message: event.detail?.message, name: event.detail?.name, code: event.detail?.code },
             summarizeEvent(event),
           );
+          if (recoverableLiveError) {
+            liveTalkWarn('session.failed', failed);
+            setStatus(bar, 'listening', 'Lesson tools unavailable; voice is still connected.');
+            return;
+          }
           liveTalkError('session.failed', failed);
           setStatus(
             bar,
             'error',
             event.detail?.message || event.detail?.name || 'Could not connect Live Talk.',
           );
+          if (gptLive && active?.session === session) void stopCall(bar, 'failed');
         }
-        if (event.type === SpeakCore.SpeakRealtimeEvent.INPUT_TRANSCRIPT && transcript) {
-          liveTalkLog('transcript.heard', { chars: transcript.length });
+        if (
+          gptLive &&
+          event.type === SpeakCore.SpeakRealtimeEvent.SESSION_CLOSED &&
+          active?.session === session
+        )
+          void stopCall(bar, 'closed');
+        if (
+          gptLive &&
+          event.type === SpeakCore.SpeakRealtimeEvent.PROVIDER_EVENT &&
+          providerEvent === 'session.output_transcript.delta' &&
+          deltaText
+        ) {
+          if (voice.muteMicWhileSheTalks && voice.verboseLevel !== 'none') session.setMuted?.(true);
+          noteGptLiveActivity('assistant');
+          liveTalkAssistantHeard = appendLiveTalkDelta(liveTalkAssistantHeard, deltaText);
+          scheduleLivePreview('assistant');
+          if (isLiveTalkFarewellPhrase(liveTalkAssistantHeard)) {
+            gptLiveHangupKind = gptLiveHangupKind || 'farewell';
+          }
+          scheduleAssistantTurnEnd(session);
+        }
+        if (event.type === SpeakCore.SpeakRealtimeEvent.INPUT_TRANSCRIPT && deltaText) {
+          liveTalkLog('transcript.heard', { chars: deltaText.length });
+          if (!gptLive) {
+            void saveLiveTranscript('user', transcript || deltaText);
+            upsertLivePreview('user', transcript || deltaText);
+          } else if (!gptLiveHangupInFlight) {
+            liveTalkUserHeard = appendLiveTalkDelta(liveTalkUserHeard, deltaText);
+            gptLiveHeard = appendLiveTalkDelta(gptLiveHeard, deltaText);
+            if (gptLiveHeard.length > 240) gptLiveHeard = gptLiveHeard.slice(-240);
+            scheduleLivePreview('user');
+            noteGptLiveActivity('transcript');
+            markUserHangupIfDone();
+            windowObject.clearTimeout(gptLiveHeardTimer);
+            gptLiveHeardTimer = windowObject.setTimeout(() => {
+              if (active?.session !== session || gptLiveHangupInFlight) return;
+              if (!markUserHangupIfDone()) return;
+              if (assistantAudioPlaying || awaitingAssistant) {
+                scheduleAssistantTurnEnd(session);
+                return;
+              }
+              beginGptLiveHangup(session, 'done');
+            }, 900);
+          }
         }
       });
       active = {
         session,
         bridge,
+        gptLive,
         get inputHeld() {
           return bridgeInputHeld;
         },
@@ -1056,17 +1972,16 @@
           return sessionId;
         },
       };
-      greetingPending = true;
+      greetingPending = !gptLive;
       try {
         await session.start();
         if (stopRequested || active?.session !== session) {
           if (active?.session === session) await stopCall(bar, 'stop');
           return;
         }
-        try {
-          session.setMuted?.(true);
-        } catch (_) {
-          /* mute until greeting finishes */
+        session.setMuted?.(!gptLive);
+        if (gptLive) {
+          armGptLiveHangupWatch(session);
         }
         liveTalkLog('session.started', session.snapshot?.() || { sessionId });
         if (pingTimer) windowObject.clearInterval(pingTimer);
@@ -1077,17 +1992,22 @@
             method: 'POST',
             body: '{}',
             quiet: true,
-          }).catch((error) => {
-            if (error?.status !== 404 || active?.session !== session) return;
-            void stopCall(bar, 'expired').then(() => {
-              setStatus(bar, 'error', 'Session ended. Start Live Talk again.');
+          })
+            .then((payload) => {
+              noteDurationDrain(session, payload);
+            })
+            .catch((error) => {
+              if (error?.status !== 404 || active?.session !== session) return;
+              void stopCall(bar, 'expired').then(() => {
+                setStatus(bar, 'error', 'Session ended. Start Live Talk again.');
+              });
             });
-          });
         }, 20000);
         watchPeer(session);
         if (active?.session === session && !paused) {
           await waitForRemotePlayback(session);
-          if (!paused) await speakGreeting(session);
+          if (!paused && !gptLive) await speakGreeting(session);
+          if (!paused && gptLive) setStatus(bar, 'listening', 'Listening…');
         }
       } catch (error) {
         if (stopRequested) {
@@ -1123,7 +2043,7 @@
       return;
     }
     if (!active) {
-      setStatus(bar, 'idle', 'Live Talk is available.');
+      setStatus(bar, 'idle', 'Chat or Talk Live');
       return;
     }
     setStatus(bar, ui.state || 'listening', ui.text || 'Listening…');
@@ -1131,16 +2051,25 @@
 
   async function applyShellAction(action, settings, greeting) {
     const bar = ensureBar();
+    if (settings) {
+      liveVoiceSettings = normalizeLiveVoiceSettings(settings);
+    }
     if (action === 'pause' || (action === 'toggle' && active && !paused)) {
+      if (active?.gptLive) {
+        await stopCall(bar, 'pause');
+        setStatus(bar, 'paused', 'Paused');
+        return;
+      }
       pauseCall(bar);
       return;
     }
     if (action === 'resume' || (action === 'toggle' && paused)) {
+      if (!active && liveVoiceSettings.provider === 'gpt-live') {
+        await startCall(bar);
+        return;
+      }
       resumeCall(bar);
       return;
-    }
-    if (settings) {
-      liveVoiceSettings = normalizeLiveVoiceSettings(settings);
     }
     const line = clean(greeting);
     if (line) greetingLine = line;
@@ -1193,9 +2122,13 @@
     windowObject.addEventListener('beforeunload', () => {
       if (active) void stopCall(ensureBar(), 'unload');
     });
+    windowObject.addEventListener('pagehide', () => {
+      if (active) void stopCall(ensureBar(), 'leave');
+    });
   }
 
   async function start() {
+    traceNavigation('loaded', { framed: windowObject.parent !== windowObject });
     liveTalkLog('overlay.boot', {
       href: String(windowObject.location?.href || ''),
       pathname: String(windowObject.location?.pathname || ''),
@@ -1233,6 +2166,7 @@
       config = { enabled: false };
     }
     overlayReady = true;
+    installComposerLock();
     syncBar();
     liveTalkLog('overlay.chrome', { host: 'shell-fab' });
     if (pendingShellAction) {

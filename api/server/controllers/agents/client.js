@@ -1,4 +1,5 @@
 const { getMCPRequestContext } = require('~/server/services/MCPRequestContext');
+const { saveTypedChatUsage } = require('../../../../config/ssmlabs/typedChatUsage');
 require('events').EventEmitter.defaultMaxListeners = 100;
 const { logger, MAX_AGENT_EVENT_ACTOR_ENCODING_LENGTH } = require('@librechat/data-schemas');
 const { getBufferString, HumanMessage } = require('@librechat/agents/langchain/messages');
@@ -5370,6 +5371,17 @@ class AgentClient extends BaseClient {
           getSafeErrorMetadata(err),
         );
       }
+      try {
+        await saveTypedChatUsage({
+          user: this.options.req.user,
+          responseMessageId: this.responseMessageId,
+          jobCreatedAt: this.jobCreatedAt,
+          usageEvents: this.usageEmitSink,
+          usage: aggregateEmittedUsage(this.usageEmitSink ?? []),
+        });
+      } catch (err) {
+        logger.warn('[AgentClient] Could not save typed Chat usage', getSafeErrorMetadata(err));
+      }
       if (this._resolveRun) {
         this._resolveRun(this.run ?? null);
         this._resolveRun = null;
@@ -6067,6 +6079,17 @@ class AgentClient extends BaseClient {
           '[api/server/controllers/agents/client.js #resumeCompletion] Error in cleanup phase',
           getSafeErrorMetadata(err),
         );
+      }
+      try {
+        await saveTypedChatUsage({
+          user: this.options.req.user,
+          responseMessageId: this.responseMessageId,
+          jobCreatedAt: this.jobCreatedAt,
+          usageEvents: this.usageEmitSink,
+          usage: aggregateEmittedUsage(this.usageEmitSink ?? []),
+        });
+      } catch (err) {
+        logger.warn('[AgentClient] Could not save typed Chat usage', getSafeErrorMetadata(err));
       }
       if (this._resolveRun) {
         this._resolveRun(this.run ?? null);

@@ -218,6 +218,39 @@ describe('steps', () => {
       warn.mockRestore();
     });
 
+    it('settles a known tool call when its late update points at a text slot', () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const opened = createResponse([
+        {
+          type: ContentTypes.TOOL_CALL,
+          tool_call: { id: 'call-1', name: 'search', args: {}, type: ToolCallTypes.TOOL_CALL },
+        } as TMessageContentParts,
+        { type: ContentTypes.TEXT, text: 'Answer' },
+      ]);
+
+      const result = updateContent(
+        opened,
+        1,
+        {
+          type: ContentTypes.TOOL_CALL,
+          tool_call: {
+            id: 'call-1',
+            name: 'search',
+            args: {},
+            type: ToolCallTypes.TOOL_CALL,
+            output: 'Found',
+          },
+        },
+        true,
+      );
+
+      expect(result.content?.[0]?.type).toBe(ContentTypes.TOOL_CALL);
+      expect(toolCallAt(result, 0)?.output).toBe('Found');
+      expect(result.content?.[1]).toEqual({ type: ContentTypes.TEXT, text: 'Answer' });
+      expect(warn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    });
+
     it('propagates agent and group metadata without mutating the previous part', () => {
       const step = messageStep('step-text', 0, { agentId: 'agent-a', groupId: 2 });
       const before = streamText(createResponse(), messageStep('step-text', 0), ['a']);

@@ -16,6 +16,8 @@ const {
 test('Live Talk is on for this Chat branch', () => {
   assert.equal(resolveLiveTalkConfig({}).enabled, true);
   assert.equal(resolveLiveTalkConfig({}).serverName, 'lessoncaddie-instructor');
+  assert.equal(resolveLiveTalkConfig({}).gptLiveIdleMs, 20000);
+  assert.equal(resolveLiveTalkConfig({}).gptLiveNoiseMs, 60000);
 });
 
 test('user Live Voice settings override VAD patience', () => {
