@@ -222,6 +222,23 @@
     }
   }
 
+  // TEMP navigation diagnosis: remove after the failing handoff is identified.
+  function traceNavigation(stage, data = {}) {
+    try {
+      windowObject.console.info(
+        '[LCNavTrace]',
+        JSON.stringify({
+          revision: 'nav-debug-20261115-1',
+          layer: 'live-talk',
+          stage,
+          ...data,
+        }),
+      );
+    } catch (_) {
+      /* Console diagnostics must not interrupt Live Talk. */
+    }
+  }
+
   function liveTalkWarn(stage, data) {
     try {
       windowObject.console.warn(LOG_PREFIX, stage, data || {});
@@ -377,6 +394,13 @@
   }
 
   async function applyHostToolResult(name, result) {
+    traceNavigation('tool-result', {
+      name,
+      requestId: result?.requestId || result?.structuredContent?.requestId,
+      destination: result?.destination || result?.structuredContent?.destination,
+      resultKeys: result && typeof result === 'object' ? Object.keys(result) : [],
+      bridgeAvailable: typeof windowObject.LessonCaddieNavigationOverlay?.navigate === 'function',
+    });
     postAppDataChanged(name, result);
     if (clean(name) !== 'open_app_screen') return null;
     const overlay = windowObject.LessonCaddieNavigationOverlay;
@@ -384,6 +408,7 @@
       typeof overlay?.navigate === 'function'
         ? await overlay.navigate(result)
         : { ok: false, code: 'bridge_unavailable' };
+    traceNavigation('navigation-outcome', outcome);
     liveTalkLog('tool.navigate', {
       opened: outcome.ok === true,
       code: outcome.code,
@@ -1304,6 +1329,12 @@
   }
 
   async function handleGptLiveDelegation(session, sessionId, delegationId) {
+    traceNavigation('delegation-received', {
+      delegationId,
+      activeSession: active?.session === session,
+      duplicate: delegationIds.has(delegationId),
+      busy: delegationPending,
+    });
     if (!delegationId || delegationIds.has(delegationId) || active?.session !== session) return;
     delegationIds.add(delegationId);
     session.sendEvent({
@@ -1332,9 +1363,19 @@
     delegationPending = true;
     setStatus(ensureBar(), 'tool', 'Checking LessonCaddie…');
     try {
+      traceNavigation('delegation-request', { delegationId, utteranceLength: utterance.length });
       const payload = await api(liveTalkPath(`/live-talk/session/${sessionId}/delegation`), {
         method: 'POST',
         body: JSON.stringify({ delegationId, utterance, history }),
+      });
+      traceNavigation('delegation-response', {
+        delegationId,
+        activeSession: active?.session === session,
+        actions: (payload.actions || []).map((action) => ({
+          name: action.name,
+          requestId: action.result?.requestId || action.result?.structuredContent?.requestId,
+          destination: action.result?.destination || action.result?.structuredContent?.destination,
+        })),
       });
       if (active?.session !== session) return;
       const navigationResults = [];
@@ -1358,6 +1399,7 @@
       });
     } catch (error) {
       if (active?.session !== session) return;
+      traceNavigation('delegation-error', { delegationId, name: error?.name });
       liveTalkWarn('delegation.failed', summarizeError(error));
       session.sendEvent({
         type: 'session.commentary.append',
@@ -1682,6 +1724,7 @@
         const providerEvent = event.detail?.providerEvent || event.detail?.event?.type || '';
         if (gptLive && providerEvent === 'session.delegation.created') {
           const delegationId = clean(event.detail?.event?.delegation?.id);
+          traceNavigation('provider-delegation-event', { delegationId });
           void handleGptLiveDelegation(session, sessionId, delegationId);
         }
         const deltaText = String(
@@ -2085,6 +2128,7 @@
   }
 
   async function start() {
+    traceNavigation('loaded', { framed: windowObject.parent !== windowObject });
     liveTalkLog('overlay.boot', {
       href: String(windowObject.location?.href || ''),
       pathname: String(windowObject.location?.pathname || ''),

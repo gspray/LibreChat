@@ -372,6 +372,23 @@
     }
   }
 
+  // TEMP navigation diagnosis: remove after the failing handoff is identified.
+  function traceNavigation(windowObject, stage, data = {}) {
+    try {
+      (windowObject.console || console).info(
+        '[LCNavTrace]',
+        JSON.stringify({
+          revision: 'nav-debug-20261115-1',
+          layer: 'bridge',
+          stage,
+          ...data,
+        }),
+      );
+    } catch {
+      /* Console diagnostics must not interrupt navigation. */
+    }
+  }
+
   function isFramed(windowObject) {
     try {
       return windowObject.parent !== windowObject;
@@ -508,6 +525,10 @@
         const pending = state.acknowledgements?.get(requestId);
         if (pending) {
           state.acknowledgements.delete(requestId);
+          traceNavigation(windowObject, 'ack-timeout', {
+            requestId,
+            destination: result.destination,
+          });
           pending({ ok: false, code: 'bridge_timeout', requestId });
           logNav('navigation_unconfirmed', {
             requestId,
@@ -595,6 +616,13 @@
 
   function postNavigate(windowObject, state, result) {
     ensureEmbeddedBridge(windowObject, state);
+    traceNavigation(windowObject, 'post-attempt', {
+      requestId: result.requestId,
+      destination: result.destination,
+      framed: isFramed(windowObject),
+      bridgeEnabled: state.appNavigationBridge,
+      parentOrigin: resolveParentOrigin(windowObject, state),
+    });
     if (!isFramed(windowObject) || state.appNavigationBridge !== true) {
       logNav('external_client', {
         requestId: result.requestId,
@@ -622,6 +650,11 @@
     }
     try {
       windowObject.parent.postMessage(message, origin);
+      traceNavigation(windowObject, 'message-posted', {
+        requestId: result.requestId,
+        destination: result.destination,
+        targetOrigin: origin,
+      });
       logNav('bridge_sent', { requestId: result.requestId, destination: result.destination });
       scheduleFallback(windowObject, state, result);
       return true;
@@ -675,6 +708,15 @@
     if (!event?.data || event.data.source !== SHELL_MESSAGE_SOURCE) {
       return;
     }
+    traceNavigation(windowObject, 'shell-message', {
+      type: event.data.type,
+      requestId: event.data.requestId,
+      ok: event.data.ok,
+      code: event.data.code,
+      origin: event.origin,
+      parentSource: event.source === windowObject.parent,
+      allowedOrigin: isAllowedOrigin(windowObject, event.origin),
+    });
     if (
       !isAllowedOrigin(windowObject, event.origin) ||
       !isFramed(windowObject) ||
@@ -1189,6 +1231,12 @@
     windowObject.LessonCaddieNavigationOverlay = {
       navigate(payload) {
         const result = extractNavigationFromPayload(payload, windowObject);
+        traceNavigation(windowObject, 'navigation-request', {
+          parsed: Boolean(result),
+          requestId: result?.requestId,
+          destination: result?.destination,
+          payloadKeys: payload && typeof payload === 'object' ? Object.keys(payload) : [],
+        });
         if (!result) return Promise.resolve({ ok: false, code: 'invalid_navigation' });
         if (!isFramed(windowObject)) return Promise.resolve({ ok: false, code: 'not_framed' });
         if (state.acknowledgements.has(result.requestId)) {
@@ -1227,6 +1275,7 @@
         return postNavigate(windowObject, state, result);
       },
     };
+    traceNavigation(windowObject, 'loaded', { framed: isFramed(windowObject) });
   }
 
   return {
