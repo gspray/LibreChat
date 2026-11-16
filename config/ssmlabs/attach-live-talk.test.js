@@ -2,7 +2,19 @@
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { unwrapMcpToolList, readConnectionTools } = require('./attach-live-talk');
+const {
+  unwrapMcpToolList,
+  readConnectionTools,
+  liveTalkMcpRequestBody,
+} = require('./attach-live-talk');
+
+test('Live Talk MCP requests carry conversation and unique message IDs', () => {
+  const first = liveTalkMcpRequestBody('conversation-1');
+  const second = liveTalkMcpRequestBody('conversation-1');
+  assert.equal(first.conversationId, 'conversation-1');
+  assert.match(first.messageId, /^[0-9a-f]{8}-[0-9a-f-]{27,}$/i);
+  assert.notEqual(first.messageId, second.messageId);
+});
 
 test('unwrapMcpToolList accepts arrays and { tools }', () => {
   assert.deepEqual(unwrapMcpToolList([{ name: 'search_directory' }]), [
