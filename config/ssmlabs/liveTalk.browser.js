@@ -215,6 +215,7 @@
   }
 
   function liveTalkLog(stage, data) {
+    if (windowObject.LessonCaddieDebugLogging?.liveTalk !== true) return;
     try {
       windowObject.console.info(LOG_PREFIX, stage, data || {});
     } catch (_) {
@@ -222,8 +223,9 @@
     }
   }
 
-  // TEMP navigation diagnosis: remove after the failing handoff is identified.
+  // End-to-end navigation diagnostics controlled from Admin Desk.
   function traceNavigation(stage, data = {}) {
+    if (windowObject.LessonCaddieDebugLogging?.navigation !== true) return;
     try {
       windowObject.console.info(
         '[LCNavTrace]',
@@ -241,7 +243,11 @@
 
   function liveTalkWarn(stage, data) {
     try {
-      windowObject.console.warn(LOG_PREFIX, stage, data || {});
+      windowObject.console.warn(
+        windowObject.LessonCaddieDebugLogging?.liveTalk === true ? LOG_PREFIX : 'Live Talk:',
+        stage,
+        data || {},
+      );
     } catch (_) {
       /* ignore console failures */
     }
@@ -249,7 +255,11 @@
 
   function liveTalkError(stage, data) {
     try {
-      windowObject.console.error(LOG_PREFIX, stage, data || {});
+      windowObject.console.error(
+        windowObject.LessonCaddieDebugLogging?.liveTalk === true ? LOG_PREFIX : 'Live Talk:',
+        stage,
+        data || {},
+      );
     } catch (_) {
       /* ignore console failures */
     }
@@ -854,6 +864,7 @@
       }
       throw error;
     }
+    if (payload?.debugLogging) windowObject.LessonCaddieDebugLogging = payload.debugLogging;
     liveTalkLog('api.ok', {
       method,
       path,

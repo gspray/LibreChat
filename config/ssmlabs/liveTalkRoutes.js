@@ -6,6 +6,7 @@ const { Readable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const express = require('express');
 const { unwrapMcpResult } = require('./liveTalkMcpResult');
+const { debugLogging, liveTalkLog } = require('./debugLogging');
 const {
   LIVE_TALK_PACKS,
   resolveLiveTalkConfig,
@@ -364,13 +365,6 @@ function clip(value, max = 800) {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
-function liveTalkLog(level, stage, data = {}) {
-  const line = `[ssmlabs-live-talk] ${stage}`;
-  if (level === 'error') console.error(line, data);
-  else if (level === 'warn') console.warn(line, data);
-  else console.info(line, data);
-}
-
 async function bootstrapOpenAi({ sdp, session }) {
   const apiKey = resolveLiveTalkConfig().openaiApiKey;
   if (!apiKey) {
@@ -485,6 +479,17 @@ function createLiveTalkRouter(deps = {}) {
   const bootstrapLive = deps.bootstrapGptLive || bootstrapGptLive;
   const now = deps.now || (() => Date.now());
 
+  if (deps.refreshDebugLogging) {
+    router.use(async (_req, _res, next) => {
+      try {
+        await deps.refreshDebugLogging();
+        next();
+      } catch (error) {
+        next(error);
+      }
+    });
+  }
+
   router.get('/config', (req, res) => {
     const baseConfig = loadConfig();
     const pack =
@@ -494,6 +499,7 @@ function createLiveTalkRouter(deps = {}) {
     res.set('Cache-Control', 'no-store');
     res.json({
       enabled: config.enabled,
+      debugLogging: { ...debugLogging },
       agentId: config.agentId,
       mcpServer: config.serverName,
       spec: pack.spec,

@@ -357,6 +357,8 @@
   }
 
   function logNav(event, fields) {
+    if (typeof window === 'undefined' || window.LessonCaddieDebugLogging?.navigation !== true)
+      return;
     try {
       console.info(
         JSON.stringify({
@@ -372,8 +374,9 @@
     }
   }
 
-  // TEMP navigation diagnosis: remove after the failing handoff is identified.
+  // End-to-end navigation diagnostics controlled from Admin Desk.
   function traceNavigation(windowObject, stage, data = {}) {
+    if (windowObject.LessonCaddieDebugLogging?.navigation !== true) return;
     try {
       (windowObject.console || console).info(
         '[LCNavTrace]',

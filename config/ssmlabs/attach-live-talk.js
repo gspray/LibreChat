@@ -7,6 +7,7 @@
 const http = require('http');
 const { createLiveTalkRouter, createLiveTalkMcpProxy } = require('./liveTalkRoutes');
 const { unwrapMcpResult } = require('./liveTalkMcpResult');
+const { refreshDebugLogging, liveTalkLog } = require('./debugLogging');
 
 const originalListen = http.Server.prototype.listen;
 
@@ -71,7 +72,7 @@ function createBoundRouter() {
         });
         const tools = await readConnectionTools(connection);
         if (Array.isArray(tools) && tools.length) {
-          console.info('[ssmlabs-live-talk] MCP tool list ok', {
+          liveTalkLog('info', 'MCP tool list ok', {
             serverName: config.serverName,
             count: tools.length,
             attempt,
@@ -83,7 +84,7 @@ function createBoundRouter() {
         lastError.code = 'mcp_tools_unavailable';
       } catch (error) {
         lastError = error;
-        console.warn('[ssmlabs-live-talk] MCP tool list failed', {
+        liveTalkLog('warn', 'MCP tool list failed', {
           message: error.message,
           name: error.name,
           status: error.status,
@@ -147,6 +148,7 @@ function createBoundRouter() {
   router.use(requireJwtAuth);
   router.use(
     createLiveTalkRouter({
+      refreshDebugLogging,
       getConvo,
       saveConvo,
       getAgent,
@@ -182,14 +184,14 @@ function attach(server) {
     stack.push(liveTalkLayer);
   }
   server.__ssmlabsLiveTalkAttached = true;
-  console.info('[ssmlabs-live-talk] mounted /live-talk');
+  liveTalkLog('info', 'mounted /live-talk');
 }
 
 http.Server.prototype.listen = function listenWithLiveTalk(...args) {
   try {
     attach(this);
   } catch (error) {
-    console.error('[ssmlabs-live-talk] failed to attach routes', error);
+    liveTalkLog('error', 'failed to attach routes', error);
     throw error;
   }
   return originalListen.apply(this, args);
