@@ -357,6 +357,8 @@
   }
 
   function logNav(event, fields) {
+    if (typeof window === 'undefined' || window.LessonCaddieDebugLogging?.navigation !== true)
+      return;
     try {
       console.info(
         JSON.stringify({
@@ -372,8 +374,9 @@
     }
   }
 
-  // TEMP navigation diagnosis: remove after the failing handoff is identified.
+  // End-to-end navigation diagnostics controlled from Admin Desk.
   function traceNavigation(windowObject, stage, data = {}) {
+    if (windowObject.LessonCaddieDebugLogging?.navigation !== true) return;
     try {
       (windowObject.console || console).info(
         '[LCNavTrace]',
@@ -931,6 +934,13 @@
       return Boolean(recovery);
     }
     state.lastResult = result;
+    if (state.helpOverview) {
+      logNav('overview_link_deferred', {
+        requestId: result.requestId,
+        destination: result.destination,
+      });
+      return true;
+    }
     if (!isFramed(windowObject)) {
       if (openStudentDetailFallback(windowObject, state, result, 'standalone')) return true;
       logNav('external_client', { requestId: result.requestId, destination: result.destination });
