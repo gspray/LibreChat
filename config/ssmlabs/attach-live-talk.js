@@ -6,6 +6,7 @@
  */
 const http = require('http');
 const { createLiveTalkRouter, createLiveTalkMcpProxy } = require('./liveTalkRoutes');
+const { unwrapMcpResult } = require('./liveTalkMcpResult');
 
 const originalListen = http.Server.prototype.listen;
 
@@ -139,29 +140,6 @@ function createBoundRouter() {
     const serverUrl = String(serverConfig.url || '');
     if (!serverUrl.startsWith('https://')) return null;
     return { serverUrl, firebaseUid };
-  }
-
-  function unwrapMcpResult(result) {
-    if (result == null) return null;
-    if (typeof result === 'string') {
-      try {
-        return unwrapMcpResult(JSON.parse(result));
-      } catch {
-        return { text: result };
-      }
-    }
-    if (Array.isArray(result)) {
-      return unwrapMcpResult(result[0]);
-    }
-    if (typeof result !== 'object') return result;
-    if (result.structuredContent && typeof result.structuredContent === 'object') {
-      return result.structuredContent;
-    }
-    if (Array.isArray(result.content)) {
-      const first = result.content.find((part) => part && part.text != null) || result.content[0];
-      return unwrapMcpResult(first && first.text != null ? first.text : first);
-    }
-    return result;
   }
 
   const router = require('express').Router();

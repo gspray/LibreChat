@@ -5,6 +5,7 @@ const crypto = require('node:crypto');
 const { Readable } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
 const express = require('express');
+const { unwrapMcpResult } = require('./liveTalkMcpResult');
 const {
   LIVE_TALK_PACKS,
   resolveLiveTalkConfig,
@@ -82,24 +83,6 @@ function parseJsonSafe(text) {
   } catch {
     return null;
   }
-}
-
-function unwrapMcpResult(result) {
-  if (result == null) return null;
-  if (typeof result === 'string') {
-    const parsed = parseJsonSafe(result);
-    return parsed == null ? { text: result } : unwrapMcpResult(parsed);
-  }
-  if (Array.isArray(result)) return unwrapMcpResult(result[0]);
-  if (typeof result !== 'object') return result;
-  if (result.structuredContent && typeof result.structuredContent === 'object') {
-    return result.structuredContent;
-  }
-  if (Array.isArray(result.content)) {
-    const first = result.content.find((part) => part && part.text != null) || result.content[0];
-    return unwrapMcpResult(first && first.text != null ? first.text : first);
-  }
-  return result;
 }
 
 function rpcMessagesFromBody(body) {
@@ -815,7 +798,8 @@ function createLiveTalkRouter(deps = {}) {
           conversationId: record.conversationId,
           config: { ...config, serverName: record.serverName },
         });
-        const tools = toOpenAiTools(mcpTools);
+        // Preserve MCP's optional arguments rather than Responses normalizing them as required.
+        const tools = toOpenAiTools(mcpTools).map((tool) => ({ ...tool, strict: false }));
         record.allowedTools = liveTalkToolNames(tools);
         if (!tools.length) {
           throw publicError(502, 'mcp_tools_unavailable', 'LessonCaddie tools are unavailable.');
@@ -881,6 +865,15 @@ function createLiveTalkRouter(deps = {}) {
             } else {
               try {
                 const args = parseJsonSafe(call.arguments);
+                if (call.name === 'open_app_screen') {
+                  liveTalkLog('info', 'delegation.navigation-arguments', {
+                    sessionId: record.id,
+                    destination: args?.destination,
+                    period: args?.period,
+                    lessonRef: args?.lessonRef,
+                    argumentKeys: args && typeof args === 'object' ? Object.keys(args) : [],
+                  });
+                }
                 result = await callMcpTool({
                   user: req.user,
                   serverName: record.serverName,
@@ -889,11 +882,39 @@ function createLiveTalkRouter(deps = {}) {
                     args && typeof args === 'object' && !Array.isArray(args) ? args : {},
                   conversationId: record.conversationId,
                 });
-                actions.push({ name: call.name, result: unwrapMcpResult(result) });
-                liveTalkLog('info', 'delegation.tool-ok', {
+                const clientResult = unwrapMcpResult(result);
+                const failed =
+                  result?.isError === true ||
+                  clientResult?.ok === false ||
+                  Boolean(clientResult?.error);
+                const navigationReturned =
+                  clientResult?.type === 'lessoncaddie.navigation' &&
+                  typeof clientResult.destination === 'string' &&
+                  typeof clientResult.requestId === 'string';
+                if (!failed && (call.name !== 'open_app_screen' || navigationReturned)) {
+                  actions.push({ name: call.name, result: clientResult });
+                }
+                liveTalkLog(failed ? 'warn' : 'info', 'delegation.tool-returned', {
                   sessionId: record.id,
                   name: call.name,
+                  code: clientResult?.code || result?._meta?.code,
+                  navigationReturned:
+                    call.name === 'open_app_screen' ? navigationReturned : undefined,
+                  resultKeys:
+                    clientResult && typeof clientResult === 'object'
+                      ? Object.keys(clientResult)
+                      : [],
                 });
+                if (call.name === 'open_app_screen' && (failed || !navigationReturned)) {
+                  res.json({
+                    ok: true,
+                    delegationId,
+                    actions,
+                    reply:
+                      'I could not open the requested page. Please try opening it from the app menu.',
+                  });
+                  return;
+                }
               } catch (error) {
                 liveTalkLog('warn', 'delegation.tool-failed', {
                   sessionId: record.id,
@@ -908,6 +929,28 @@ function createLiveTalkRouter(deps = {}) {
               call_id: call.call_id,
               output: JSON.stringify(result ?? null),
             });
+          }
+          const navigation = actions.find(
+            (action) =>
+              action.name === 'open_app_screen' &&
+              action.result?.type === 'lessoncaddie.navigation' &&
+              typeof action.result.destination === 'string' &&
+              typeof action.result.requestId === 'string',
+          );
+          if (navigation) {
+            liveTalkLog('info', 'delegation.navigation-ready', {
+              sessionId: record.id,
+              requestId: navigation.result.requestId,
+              destination: navigation.result.destination,
+            });
+            // The browser applies the action and supplies speech only after navigate-ack.
+            res.json({
+              ok: true,
+              delegationId,
+              reply: 'Waiting for the app to open the requested page.',
+              actions,
+            });
+            return;
           }
         }
         if (!reply)
