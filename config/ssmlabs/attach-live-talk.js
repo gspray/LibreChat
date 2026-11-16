@@ -5,6 +5,7 @@
  * Mounts /live-talk at listen time so api/server/index.js stays upstream.
  */
 const http = require('http');
+const crypto = require('node:crypto');
 const { createLiveTalkRouter, createLiveTalkMcpProxy } = require('./liveTalkRoutes');
 const { unwrapMcpResult } = require('./liveTalkMcpResult');
 const { refreshDebugLogging, liveTalkLog } = require('./debugLogging');
@@ -25,6 +26,10 @@ function unwrapMcpToolList(listed) {
   if (Array.isArray(listed)) return listed;
   if (Array.isArray(listed?.tools)) return listed.tools;
   return [];
+}
+
+function liveTalkMcpRequestBody(conversationId) {
+  return { conversationId, messageId: crypto.randomUUID() };
 }
 
 /**
@@ -68,7 +73,7 @@ function createBoundRouter() {
           serverName: config.serverName,
           flowManager,
           tokenMethods,
-          requestBody: { conversationId },
+          requestBody: liveTalkMcpRequestBody(conversationId),
         });
         const tools = await readConnectionTools(connection);
         if (Array.isArray(tools) && tools.length) {
@@ -117,7 +122,7 @@ function createBoundRouter() {
       toolArguments,
       flowManager,
       tokenMethods,
-      requestBody: { conversationId },
+      requestBody: liveTalkMcpRequestBody(conversationId),
     });
     return unwrapMcpResult(result);
   }
@@ -201,4 +206,5 @@ module.exports = {
   attach,
   unwrapMcpToolList,
   readConnectionTools,
+  liveTalkMcpRequestBody,
 };
